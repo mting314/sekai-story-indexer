@@ -288,6 +288,167 @@ def test_query_uses_configured_candidate_counts(monkeypatch):
     assert calls == [{"n_results": 41, "where": {"summary_level": 4}}]
 
 
+def test_query_default_does_not_analyze(monkeypatch):
+    engine = make_engine()
+    raw_hit = raw_node("花帆: raw scene", scene_start=4)
+    calls: list[dict[str, Any]] = []
+
+    def fail_analyze(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("analyze_query should not be called by default")
+
+    def fake_hybrid_retrieve(
+        question: str,
+        *,
+        n_results: int,
+        where: dict[str, Any] | None = None,
+        query_embedding: list[float] | None = None,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        calls.append({"n_results": n_results, "where": where})
+        assert query_embedding == [0.1]
+        return [raw_hit]
+
+    monkeypatch.setattr(query_engine, "analyze_query", fail_analyze)
+    monkeypatch.setattr(engine, "_hybrid_retrieve", fake_hybrid_retrieve)
+    monkeypatch.setattr(engine, "_query_embedding", lambda question: [0.1])
+    monkeypatch.setattr(
+        engine,
+        "_answer_from_raw_evidence",
+        lambda question, nodes, analysis: "answered",
+    )
+
+    assert engine.query("What happened in the 105th term?") == "answered"
+    assert calls == [{"n_results": 40, "where": {"summary_level": 4}}]
+
+
+def test_query_default_uses_raw_filter_for_scoped_questions(monkeypatch):
+    engine = make_engine()
+    raw_hit = raw_node("花帆: raw scene", scene_start=4)
+    calls: list[dict[str, Any]] = []
+
+    def fake_hybrid_retrieve(
+        question: str,
+        *,
+        n_results: int,
+        where: dict[str, Any] | None = None,
+        query_embedding: list[float] | None = None,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        calls.append({"n_results": n_results, "where": where})
+        return [raw_hit]
+
+    monkeypatch.setattr(engine, "_hybrid_retrieve", fake_hybrid_retrieve)
+    monkeypatch.setattr(engine, "_query_embedding", lambda question: [0.1])
+    monkeypatch.setattr(
+        engine,
+        "_answer_from_raw_evidence",
+        lambda question, nodes, analysis: "answered",
+    )
+
+    scoped_questions = [
+        "What happened in the 105th term?",
+        "What happens in the side stories?",
+        "What does Kaho say?",
+        "What happens in ABYSS scene 2?",
+    ]
+
+    for question in scoped_questions:
+        calls.clear()
+        assert engine.query(question) == "answered"
+        assert calls[0]["where"] == {"summary_level": 4}
+
+
+def test_query_default_skips_structured_answers(monkeypatch):
+    engine = make_engine()
+    raw_hit = raw_node("泉: 行こう", scene_start=4)
+
+    def fail_structured_answer(question: str, analysis: Any) -> str:
+        raise AssertionError("_structured_answer should not be called by default")
+
+    monkeypatch.setattr(engine, "_structured_answer", fail_structured_answer)
+    monkeypatch.setattr(engine, "_hybrid_retrieve", lambda question, **kwargs: [raw_hit])
+    monkeypatch.setattr(engine, "_query_embedding", lambda question: [0.1])
+    monkeypatch.setattr(
+        engine,
+        "_answer_from_raw_evidence",
+        lambda question, nodes, analysis: "answered from raw",
+    )
+
+    assert engine.query("Who said 「行こう」?") == "answered from raw"
+
+
+def test_query_default_expands_ranks_and_synthesizes_raw_evidence(monkeypatch):
+    engine = make_engine()
+    engine.retrieval_config = RetrievalConfig(neighbor_scene_window=1, final_top_k=5)
+    seed = raw_node("seed scene", scene_start=5)
+    before = raw_node("nearby before scene", scene_start=4)
+    after = raw_node("Kaho nearby after scene", scene_start=6)
+    far = raw_node("far scene", scene_start=9)
+    captured_nodes: list[tuple[str, dict[str, Any]]] = []
+    captured_analysis: list[Any] = []
+
+    monkeypatch.setattr(engine, "_hybrid_retrieve", lambda question, **kwargs: [seed])
+    monkeypatch.setattr(
+        engine,
+        "_raw_nodes_for_part",
+        lambda question, metadata, **kwargs: [before, seed, after, far],
+    )
+    monkeypatch.setattr(engine, "_query_embedding", lambda question: [0.1])
+
+    def fake_answer(
+        question: str,
+        nodes: list[tuple[str, dict[str, Any]]],
+        analysis: Any,
+    ) -> str:
+        captured_nodes.extend(nodes)
+        captured_analysis.append(analysis)
+        return "answered"
+
+    monkeypatch.setattr(engine, "_answer_from_raw_evidence", fake_answer)
+
+    assert engine.query("What does Kaho do?") == "answered"
+    assert {engine._scene_span(metadata) for _, metadata in captured_nodes} == {
+        (4, 4),
+        (5, 5),
+        (6, 6),
+    }
+    assert captured_analysis == [None]
+
+
+def test_query_analysis_enabled_applies_analyzer_filters(monkeypatch):
+    engine = make_engine()
+    engine.retrieval_config = RetrievalConfig(enable_query_analysis=True, neighbor_scene_window=0)
+    raw_hit = raw_node("花帆: scoped raw scene", scene_start=4)
+    raw_hit[1]["arc_id"] = "105"
+    calls: list[dict[str, Any]] = []
+
+    def fake_hybrid_retrieve(
+        question: str,
+        *,
+        n_results: int,
+        where: dict[str, Any] | None = None,
+        query_embedding: list[float] | None = None,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        calls.append({"n_results": n_results, "where": where})
+        if where == {"$and": [{"summary_level": 4}, {"arc_id": "105"}]}:
+            return [raw_hit]
+        return []
+
+    monkeypatch.setattr(engine, "_hybrid_retrieve", fake_hybrid_retrieve)
+    monkeypatch.setattr(engine, "_query_embedding", lambda question: [0.1])
+    monkeypatch.setattr(
+        engine,
+        "_answer_from_raw_evidence",
+        lambda question, nodes, analysis: "answered",
+    )
+
+    assert engine.query("what happened at the end of the 105th term?") == "answered"
+    assert calls == [
+        {
+            "n_results": 40,
+            "where": {"$and": [{"summary_level": 4}, {"arc_id": "105"}]},
+        }
+    ]
+
+
 def test_tiered_retrieve_dispatches_each_summary_tier_and_raw(monkeypatch):
     engine = make_engine()
     calls: list[dict[str, Any]] = []
@@ -531,12 +692,7 @@ def test_query_uses_only_raw_retrieval_for_scoped_question(monkeypatch):
     class FakeCollection:
         def query(self, **kwargs: Any) -> dict[str, list[list[Any]]]:
             query_calls.append(kwargs)
-            if kwargs.get("where") == {
-                "$and": [
-                    {"summary_level": 4},
-                    {"arc_id": "105"},
-                ]
-            }:
+            if kwargs.get("where") == {"summary_level": 4}:
                 return {
                     "documents": [["花帆 reached the end of the term in the raw scene."]],
                     "metadatas": [
@@ -584,13 +740,7 @@ def test_query_uses_only_raw_retrieval_for_scoped_question(monkeypatch):
     assert answer == "answered from raw scene"
     assert embedding_calls == [["what happened to kaho at the end of the 105th term?"]]
     assert len(query_calls) == 1
-    assert query_calls[0]["where"] == {
-        "$and": [
-            {"summary_level": 4},
-            {"arc_id": "105"},
-        ]
-    }
-    assert query_calls[0]["where"]["$and"][0] == {"summary_level": 4}
+    assert query_calls[0]["where"] == {"summary_level": 4}
     assert "SUMMARY:" not in agent_prompts[0]
     assert "花帆 reached the end of the term in the raw scene." in agent_prompts[0]
     assert "105 · Episode 12 · Part 2 · Scene 5" in agent_prompts[0]
@@ -732,6 +882,62 @@ def test_structured_quantitative_query_counts_turns_by_speaker() -> None:
         engine._structured_answer("How many turns does Kaho have?", analysis)
         == "花帆 has 3 dialogue turns in the indexed source records."
     )
+
+
+def test_answer_from_raw_evidence_does_not_analyze_when_analysis_is_none(monkeypatch):
+    engine = make_engine()
+    engine.state_ledger = {
+        "schema_version": 3,
+        "facts": [
+            {
+                "subject": "花帆",
+                "predicate": "honorific_used_for",
+                "target": "さやか",
+                "object": "ちゃん",
+                "arc": "103",
+                "valid_from": 1,
+                "valid_to": 10,
+            },
+            {
+                "subject": "花帆",
+                "predicate": "honorific_used_for",
+                "target": "さやか",
+                "object": "さん",
+                "arc": "103",
+                "valid_from": 10,
+                "valid_to": None,
+            },
+        ],
+    }
+    raw_hit = raw_node("花帆 mentions さやか.", scene_start=4)
+    system_prompts: list[str] = []
+
+    class FakeAgent:
+        def run_sync(self, prompt: str) -> Any:
+            class Result:
+                output = "answered"
+
+            return Result()
+
+    def fail_analyze(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("analyze_query should not be called for analysis=None")
+
+    def fake_create_text_agent(system_prompt: str) -> FakeAgent:
+        system_prompts.append(system_prompt)
+        return FakeAgent()
+
+    monkeypatch.setattr(query_engine, "analyze_query", fail_analyze)
+    monkeypatch.setattr(query_engine, "create_text_agent", fake_create_text_agent)
+
+    answer = engine._answer_from_raw_evidence(
+        "Before episode 2, what does Kaho call Sayaka?",
+        [raw_hit],
+        analysis=None,
+    )
+
+    assert answer == "answered"
+    assert "ちゃん" in system_prompts[0]
+    assert "さん" in system_prompts[0]
 
 
 def test_query_caps_final_raw_evidence_to_configured_top_k(monkeypatch):

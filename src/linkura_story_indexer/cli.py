@@ -51,7 +51,7 @@ from .indexer.source_store import SourceRecordStore
 from .indexer.summarizer import SUMMARIZATION_PROMPT_VERSION, HierarchicalSummarizer
 from .lexical import LexicalIndex, get_lexical_db_path, glossary_alias_groups
 from .models.story import StoryNode
-from .query.engine import StoryQueryEngine
+from .query.engine import RetrievalConfig, StoryQueryEngine
 from .story_order import StoryOrder, default_story_order, load_story_order
 from .summary_export import (
     DEFAULT_PRODUCTION_READER_SOURCE,
@@ -297,19 +297,32 @@ def hello():
     console.print("Hello!")
 
 @app.command()
-def query(question: str):
+def query(
+    question: str,
+    analyze: bool = typer.Option(
+        False,
+        "--analyze/--no-analyze",
+        help="Enable analyzer-derived filters and structured query helpers.",
+    ),
+):
     """Answers a question based on the RAG index and State Ledger."""
     initialize_settings()
-    engine = StoryQueryEngine()
+    engine = StoryQueryEngine(retrieval_config=RetrievalConfig(enable_query_analysis=analyze))
     console.print(f"\n[bold blue]Question:[/bold blue] {question}")
     answer = engine.query(question)
     console.print(f"\n[bold green]Answer:[/bold green]\n{answer}\n")
 
 @app.command()
-def chat():
+def chat(
+    analyze: bool = typer.Option(
+        False,
+        "--analyze/--no-analyze",
+        help="Enable analyzer-derived filters and structured query helpers.",
+    ),
+):
     """Starts an interactive chat session with the RAG index."""
     initialize_settings()
-    engine = StoryQueryEngine()
+    engine = StoryQueryEngine(retrieval_config=RetrievalConfig(enable_query_analysis=analyze))
     console.print("[bold green]Interactive Chat Started! Type 'exit' or 'quit' to end.[/bold green]")
     
     while True:

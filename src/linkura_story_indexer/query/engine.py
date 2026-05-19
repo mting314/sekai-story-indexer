@@ -44,6 +44,7 @@ class RetrievalConfig:
     max_ranked_candidates: int = MAX_RANKED_CANDIDATES
     final_top_k: int = FINAL_TOP_K
     rrf_k: int = RRF_K
+    enable_query_analysis: bool = False
 
     def __post_init__(self) -> None:
         if self.routing_candidate_count < 1:
@@ -1083,8 +1084,6 @@ class StoryQueryEngine:
         raw_nodes: list[Node],
         analysis: QueryAnalysis | None = None,
     ) -> str:
-        if analysis is None:
-            analysis = analyze_query(question, self.glossary)
         state_ledger_arc_ids = self._state_ledger_arc_ids(question, self._raw_arc_ids(raw_nodes))
         system_prompt = self._build_system_prompt(state_ledger_arc_ids, analysis)
         combined_context = "\n".join(self._build_context_chunks(raw_nodes))
@@ -1190,10 +1189,12 @@ class StoryQueryEngine:
     def query(self, question: str) -> str:
         """Executes the raw-first RAG query flow."""
         safe_print("Searching raw source evidence...")
-        analysis = analyze_query(question, self.glossary)
-        structured_answer = self._structured_answer(question, analysis)
-        if structured_answer is not None:
-            return structured_answer
+        analysis = None
+        if self._config().enable_query_analysis:
+            analysis = analyze_query(question, self.glossary)
+            structured_answer = self._structured_answer(question, analysis)
+            if structured_answer is not None:
+                return structured_answer
         expanded_question = self._expanded_question(question)
         query_embedding = self._query_embedding(expanded_question)
         retrieved_nodes = self._raw_only_retrieve(
@@ -1205,10 +1206,9 @@ class StoryQueryEngine:
         if not retrieved_nodes:
             safe_print("Raw evidence retrieval returned no hits.")
 
-        raw_nodes = self._filter_raw_nodes_by_analysis(
-            self._raw_evidence_nodes(retrieved_nodes),
-            analysis,
-        )
+        raw_nodes = self._raw_evidence_nodes(retrieved_nodes)
+        if analysis is not None:
+            raw_nodes = self._filter_raw_nodes_by_analysis(raw_nodes, analysis)
 
         if not raw_nodes:
             return INSUFFICIENT_SOURCE_CONTEXT
@@ -1219,23 +1219,27 @@ class StoryQueryEngine:
             raw_nodes,
             query_embedding=query_embedding,
         )
-        expanded_raw_nodes = self._filter_raw_nodes_by_analysis(expanded_raw_nodes, analysis)
-        expanded_raw_nodes = self._filter_before_semantic_boundary(
-            question,
-            expanded_question,
-            expanded_raw_nodes,
-            raw_nodes,
-            analysis,
-        )
+        if analysis is not None:
+            expanded_raw_nodes = self._filter_raw_nodes_by_analysis(expanded_raw_nodes, analysis)
+            expanded_raw_nodes = self._filter_before_semantic_boundary(
+                question,
+                expanded_question,
+                expanded_raw_nodes,
+                raw_nodes,
+                analysis,
+            )
         ranked_raw_nodes = self._rank_raw_candidates(
             question,
             expanded_question,
             expanded_raw_nodes,
             raw_nodes,
         )
-        final_raw_nodes = self._filter_raw_nodes_by_analysis(ranked_raw_nodes, analysis)[
-            : self._config().final_top_k
-        ]
+        if analysis is not None:
+            final_raw_nodes = self._filter_raw_nodes_by_analysis(ranked_raw_nodes, analysis)[
+                : self._config().final_top_k
+            ]
+        else:
+            final_raw_nodes = ranked_raw_nodes[: self._config().final_top_k]
 
         if not final_raw_nodes:
             return INSUFFICIENT_SOURCE_CONTEXT
