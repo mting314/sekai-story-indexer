@@ -25,6 +25,9 @@ from linkura_story_indexer.query.tools import (
 
 
 def make_engine() -> StoryQueryEngine:
+    # Bypass __init__ so these unit tests can exercise tool formatting without opening Chroma,
+    # SQLite, or model-provider resources. Tests only rely on retrieval_config, glossary,
+    # state_ledger, source_store, and monkeypatched retrieval methods.
     engine = StoryQueryEngine.__new__(StoryQueryEngine)
     engine.retrieval_config = RetrievalConfig(neighbor_scene_window=0)
     engine.glossary = {"characters": {"日野下花帆": "Kaho Hinoshita"}}
@@ -169,7 +172,6 @@ def test_search_raw_returns_ranked_candidates_and_trace(monkeypatch: pytest.Monk
 def test_search_summaries_filters_level_and_arc(monkeypatch: pytest.MonkeyPatch) -> None:
     engine = make_engine()
     summary = summary_node("Kaho starts school.", summary_level=2, arc_id="103")
-    raw = raw_node("raw should not leak", arc_id="103")
     captured: list[dict[str, Any]] = []
 
     def fake_hybrid_retrieve_trace(
@@ -182,7 +184,7 @@ def test_search_summaries_filters_level_and_arc(monkeypatch: pytest.MonkeyPatch)
     ) -> tuple[list[tuple[str, dict[str, Any]]], dict[str, query_engine.StageTrace]]:
         captured.append({"n_results": n_results, "where": where})
         return (
-            [summary, raw],
+            [summary],
             {
                 "dense_raw": engine._trace_stage("dense_raw", []),
                 "lexical_raw": engine._trace_stage("lexical_raw", []),
@@ -265,3 +267,4 @@ def test_build_query_toolset_registers_pydantic_schema_tools() -> None:
         search_raw_schema["properties"]
     )
     assert search_raw_schema["properties"]["top_k"]["minimum"] == 1
+    assert "OR semantics" in search_raw_schema["properties"]["speakers"]["description"]

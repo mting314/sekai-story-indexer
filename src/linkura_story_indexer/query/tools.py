@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_ai import FunctionToolset
 
-from linkura_story_indexer.eval.models import CandidateScores, SourceIdentity, StageTrace
-from linkura_story_indexer.lexical import glossary_alias_groups
+from linkura_story_indexer.eval.models import SourceIdentity, StageTrace
 from linkura_story_indexer.query.engine import Node, StoryQueryEngine
+
+_CJK_RE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff々〆〤ー]+")
+_WORD_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9'_-]*")
 
 
 class SearchRawInput(BaseModel):
@@ -19,7 +22,13 @@ class SearchRawInput(BaseModel):
     part: str | None = None
     scene_start: int | None = Field(default=None, ge=0)
     scene_end: int | None = Field(default=None, ge=0)
-    speakers: list[str] = Field(default_factory=list)
+    speakers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Optional speaker names to filter raw chunks. Multiple speakers use OR semantics: "
+            "a result may contain any listed speaker, not necessarily all of them."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_scene_range(self) -> SearchRawInput:
@@ -73,14 +82,6 @@ class GlossaryLookupResult(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
-def _combine_filters(engine: StoryQueryEngine, filters: list[dict[str, Any]]) -> dict[str, Any] | None:
-    return engine._and_where(filters)
-
-
-def _source_identity(engine: StoryQueryEngine, metadata: dict[str, Any]) -> SourceIdentity | None:
-    return engine._source_identity(metadata)
-
-
 def _candidate_from_node(
     engine: StoryQueryEngine,
     node: Node,
@@ -94,7 +95,7 @@ def _candidate_from_node(
         text=text or document,
         citation_label=engine._citation_label(metadata),
         metadata=dict(metadata),
-        source_identity=_source_identity(engine, metadata),
+        source_identity=engine._source_identity(metadata),
         rank=rank,
     )
 
@@ -149,7 +150,7 @@ def _raw_where(
     if speaker_filter is not None:
         filters.append(speaker_filter)
 
-    return _combine_filters(engine, filters), warnings, empty
+    return engine._and_where(filters), warnings, empty
 
 
 def _summary_where(engine: StoryQueryEngine, args: SearchSummariesInput) -> dict[str, Any] | None:
@@ -160,7 +161,7 @@ def _summary_where(engine: StoryQueryEngine, args: SearchSummariesInput) -> dict
         filters.append({"summary_level": args.summary_level})
     if args.arc_id is not None:
         filters.append({"arc_id": args.arc_id})
-    return _combine_filters(engine, filters)
+    return engine._and_where(filters)
 
 
 def _public_trace_stages(stages: dict[Any, StageTrace]) -> dict[str, StageTrace]:
@@ -172,82 +173,19 @@ def search_raw(engine: StoryQueryEngine, args: SearchRawInput) -> ToolResult:
     if empty:
         return ToolResult(warnings=warnings, metadata={"where": where})
 
-    expanded_query = engine._expanded_question(args.query)
-    query_embedding = None
-    dense_unavailable_reason = None
-    try:
-        query_embedding = engine._query_embedding(expanded_query)
-    except Exception as exc:
-        dense_unavailable_reason = f"query embedding unavailable: {exc}"
-
-    retrieved_nodes, stages = engine._hybrid_retrieve_trace(
-        expanded_query,
-        n_results=max(args.top_k, engine._config().raw_candidate_count),
-        where=where,
-        query_embedding=query_embedding,
-        dense_unavailable_reason=dense_unavailable_reason,
-    )
-    seed_nodes = engine._raw_evidence_nodes(retrieved_nodes)
-    stages["raw_seed_filter"] = engine._trace_stage(
-        "raw_seed_filter",
-        [engine._trace_candidate(node, rank=rank) for rank, node in enumerate(seed_nodes, start=1)],
-    )
-
-    expanded_nodes = engine._expand_raw_neighbors(
-        expanded_query,
-        seed_nodes,
-        query_embedding=query_embedding,
-    )
-    stages["neighbor_expansion"] = engine._trace_stage(
-        "neighbor_expansion",
-        [
-            engine._trace_candidate(
-                node,
-                rank=rank,
-                provenance=provenance,
-                provenance_node_id=provenance_node_id,
-            )
-            for rank, node in enumerate(expanded_nodes, start=1)
-            for provenance, provenance_node_id in [
-                engine._neighbor_trace_provenance(node, seed_nodes)
-            ]
-        ],
-    )
-
-    ranked_with_scores = engine._score_raw_candidates(
+    retrieval = engine.retrieve_raw_nodes_with_trace(
         args.query,
-        expanded_query,
-        expanded_nodes,
-        seed_nodes,
-    )
-    stages["deterministic_ranking"] = engine._trace_stage(
-        "deterministic_ranking",
-        [
-            engine._trace_candidate(
-                node,
-                rank=rank,
-                scores=CandidateScores(deterministic_score=float(score)),
-                signal_breakdown=signal_breakdown,
-            )
-            for rank, (node, signal_breakdown, score) in enumerate(
-                ranked_with_scores,
-                start=1,
-            )
-        ],
-    )
-
-    final_nodes = [node for node, _, _ in ranked_with_scores[: args.top_k]]
-    stages["final_top_k"] = engine._trace_stage(
-        "final_top_k",
-        [engine._trace_candidate(node, rank=rank) for rank, node in enumerate(final_nodes, start=1)],
+        where=where,
+        top_k=args.top_k,
+        n_results=max(args.top_k, engine._config().raw_candidate_count),
     )
 
     return ToolResult(
         candidates=[
             _candidate_from_node(engine, node, rank=rank, fetch_raw_text=True)
-            for rank, node in enumerate(final_nodes, start=1)
+            for rank, node in enumerate(retrieval.nodes, start=1)
         ],
-        trace_stages=_public_trace_stages(stages),
+        trace_stages=_public_trace_stages(retrieval.stages),
         warnings=warnings,
         metadata={"where": where},
     )
@@ -255,31 +193,20 @@ def search_raw(engine: StoryQueryEngine, args: SearchRawInput) -> ToolResult:
 
 def search_summaries(engine: StoryQueryEngine, args: SearchSummariesInput) -> ToolResult:
     where = _summary_where(engine, args)
-    expanded_query = engine._expanded_question(args.query)
-    query_embedding = None
-    dense_unavailable_reason = None
-    try:
-        query_embedding = engine._query_embedding(expanded_query)
-    except Exception as exc:
-        dense_unavailable_reason = f"query embedding unavailable: {exc}"
-
-    summary_nodes, stages = engine._hybrid_retrieve_trace(
-        expanded_query,
-        n_results=args.top_k,
+    retrieval = engine.retrieve_summary_nodes_with_trace(
+        args.query,
         where=where,
-        query_embedding=query_embedding,
-        dense_unavailable_reason=dense_unavailable_reason,
+        top_k=args.top_k,
     )
-    summary_nodes = [
-        node for node in summary_nodes if node[1].get("summary_level") in {1, 2, 3}
-    ][: args.top_k]
+    # Summary tier bounds are enforced by the dense and lexical retrieval where clause.
+    summary_nodes = retrieval.nodes
 
     return ToolResult(
         candidates=[
             _candidate_from_node(engine, node, rank=rank)
             for rank, node in enumerate(summary_nodes, start=1)
         ],
-        trace_stages=_public_trace_stages(stages),
+        trace_stages=_public_trace_stages(retrieval.stages),
         metadata={"where": where},
     )
 
@@ -307,10 +234,33 @@ def get_scene(engine: StoryQueryEngine, args: GetSceneInput) -> ToolResult:
         text=str(scene.get("text", "")),
         citation_label=engine._citation_label(metadata),
         metadata=metadata,
-        source_identity=_source_identity(engine, metadata),
+        source_identity=engine._source_identity(metadata),
         rank=1,
     )
     return ToolResult(candidates=[candidate])
+
+
+def _ordered_unique(values: list[str]) -> list[str]:
+    unique = []
+    seen = set()
+    for value in values:
+        cleaned = value.strip()
+        if not cleaned or cleaned in seen:
+            continue
+        unique.append(cleaned)
+        seen.add(cleaned)
+    return unique
+
+
+def _glossary_aliases(canonical_term: str, translation: str) -> list[str]:
+    aliases = [canonical_term, translation]
+    aliases.extend(part for part in _WORD_RE.findall(translation) if len(part) >= 2)
+    if _CJK_RE.fullmatch(canonical_term):
+        if len(canonical_term) >= 4:
+            aliases.append(canonical_term[-2:])
+        if len(canonical_term) >= 5:
+            aliases.append(canonical_term[-3:])
+    return _ordered_unique(aliases)
 
 
 def lookup_glossary(engine: StoryQueryEngine, args: LookupGlossaryInput) -> GlossaryLookupResult:
@@ -322,15 +272,13 @@ def lookup_glossary(engine: StoryQueryEngine, args: LookupGlossaryInput) -> Glos
     for category, terms in glossary.items():
         if not isinstance(terms, dict):
             continue
-        category_groups = glossary_alias_groups({category: terms})
-        for (canonical_term, translation), aliases in zip(
-            terms.items(),
-            category_groups,
-            strict=False,
-        ):
-            if args.term == canonical_term:
+        for canonical_term, translation in terms.items():
+            canonical = str(canonical_term)
+            translated = str(translation)
+            aliases = _glossary_aliases(canonical, translated)
+            if args.term == canonical:
                 match_type: Literal["canonical", "translation", "alias"] = "canonical"
-            elif normalized_term == str(translation).casefold():
+            elif normalized_term == translated.casefold():
                 match_type = "translation"
             elif any(normalized_term == alias.casefold() for alias in aliases):
                 match_type = "alias"
@@ -339,8 +287,8 @@ def lookup_glossary(engine: StoryQueryEngine, args: LookupGlossaryInput) -> Glos
 
             return GlossaryLookupResult(
                 matched_category=str(category),
-                canonical_term=str(canonical_term),
-                translation=str(translation),
+                canonical_term=canonical,
+                translation=translated,
                 aliases=aliases,
                 match_type=match_type,
             )
@@ -355,19 +303,39 @@ def build_query_toolset(engine: StoryQueryEngine) -> FunctionToolset:
     toolset = FunctionToolset()
 
     def search_raw_tool(args: SearchRawInput) -> ToolResult:
-        """Search raw source scenes and nearby context."""
+        """Search raw source scenes for exact evidence, dialogue, and scene-level details.
+
+        Prefer this over summaries when the user asks about specific lines, who said something,
+        what happened in a scene, or needs citations to raw story text. Use speaker filters as
+        an OR-union when narrowing to scenes involving any listed speaker.
+        """
         return search_raw(engine, args)
 
     def search_summaries_tool(args: SearchSummariesInput) -> ToolResult:
-        """Search indexed year, episode, or part summaries."""
+        """Search indexed year, episode, or part summaries for broad narrative context.
+
+        Prefer this when the user asks for arc-level, episode-level, or part-level overview
+        information rather than exact quoted evidence. The summary-level and arc filters are
+        enforced by the retrieval query.
+        """
         return search_summaries(engine, args)
 
     def get_scene_tool(args: GetSceneInput) -> ToolResult:
-        """Fetch one exact raw source scene by file path and scene index."""
+        """Fetch one exact raw source scene by file path and scene index.
+
+        Use this after a search result has already identified a file_path and scene_index, or
+        when the caller already knows that exact source location. Do not use it for discovery
+        because it does not search.
+        """
         return get_scene(engine, args)
 
     def lookup_glossary_tool(args: LookupGlossaryInput) -> GlossaryLookupResult:
-        """Resolve a glossary term, translation, or generated alias."""
+        """Resolve a Japanese glossary term, English translation, or generated alias.
+
+        Use this first when a query contains character, unit, location, or story-specific terms
+        that may need Japanese-English alias expansion before searching. The result gives the
+        canonical Japanese term, official translation, aliases, and match type.
+        """
         return lookup_glossary(engine, args)
 
     toolset.add_function(search_raw_tool, name="search_raw")
