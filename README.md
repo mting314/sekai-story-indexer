@@ -23,6 +23,28 @@ by `LINKURA_EMBEDDING_MODEL` (default: `gemini-embedding-2`). Running `ingest`
 therefore always requires `GOOGLE_API_KEY`, even when
 `LINKURA_INGEST_PROVIDER=openai`.
 
+## Querying
+
+By default, `query` and `chat` use raw hybrid retrieval only. The default query
+path retrieves raw source evidence with `summary_level: 4`, does not add
+analyzer-derived metadata filters, and does not perform summary-tier retrieval
+or summary fanout.
+
+Use `--analyze` when you want targeted scoped workflows that apply
+analyzer-derived filters or structured helpers:
+
+```powershell
+indexer query "What happened in the 105th term?" --analyze
+indexer chat --analyze
+```
+
+Use `--no-analyze` to make the default explicit:
+
+```powershell
+indexer query "What happened in the 105th term?" --no-analyze
+indexer chat --no-analyze
+```
+
 ## Index Rebuilds
 
 Raw evidence is embedded as coalesced retrieval chunks over adjacent source
