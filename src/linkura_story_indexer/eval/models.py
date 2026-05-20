@@ -1,10 +1,10 @@
-from typing import Any, Literal
+from typing import Any, Literal, cast, get_args
 
 from pydantic import BaseModel, Field, model_validator
 
 RoutingMode = Literal["off", "heuristic", "llm_router"]
 EvalMode = RoutingMode
-ROUTING_MODES = ("off", "heuristic", "llm_router")
+ROUTING_MODES = cast(tuple[RoutingMode, ...], get_args(RoutingMode))
 CandidateKind = Literal["raw_span", "summary", "summary_section", "reranker"]
 StageName = Literal[
     "dense_raw",

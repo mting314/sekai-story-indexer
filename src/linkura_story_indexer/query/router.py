@@ -49,6 +49,10 @@ class RouterDispatchResult:
     tool_result: ToolResult
 
 
+def _engine_cache_key(engine: Any | None) -> int | None:
+    return id(engine) if engine is not None else None
+
+
 def _fallback_decision(
     question: str,
     *,
@@ -73,10 +77,6 @@ def _raw_output(output: RouterOutput | None) -> dict[str, Any] | None:
     if output is None:
         return None
     return output.model_dump(mode="json")
-
-
-def _validation_error_text(exc: ValidationError) -> str:
-    return str(exc)
 
 
 def validate_router_output(
@@ -108,7 +108,7 @@ def validate_router_output(
             router_model=model_name,
             raw_output=raw_output,
             reason="invalid tool arguments",
-            validation_errors=[_validation_error_text(exc)],
+            validation_errors=[str(exc)],
         )
 
     return RouterDecision(
@@ -172,9 +172,7 @@ def _story_location_catalog(engine: Any | None) -> str:
         arc_id = metadata.get("arc_id")
         story_type = metadata.get("story_type")
         episode = metadata.get("episode_number")
-        if not isinstance(arc_id, str) or not isinstance(story_type, str) or episode is None:
-            continue
-        if not isinstance(episode, int):
+        if not isinstance(arc_id, str) or not isinstance(story_type, str) or not isinstance(episode, int):
             continue
         episodes_by_arc.setdefault((arc_id, story_type), set()).add(episode)
 
@@ -192,12 +190,10 @@ def _story_location_catalog(engine: Any | None) -> str:
         "in this catalog. If the user asks for an unavailable episode, keep the original "
         "episode wording in query and use broader search_raw filters such as arc_id only."
     )
-    catalog = "\n".join(lines)
-    setattr(engine, "_router_story_location_catalog", catalog)
-    return catalog
+    return "\n".join(lines)
 
 
-def _router_instructions(engine: Any | None = None) -> str:
+def _router_instructions_from_catalog(story_location_catalog: str) -> str:
     return (
         "Select exactly one query tool for the user's question. "
         "Return only the tool name and arguments matching that tool's schema. "
@@ -227,14 +223,28 @@ def _router_instructions(engine: Any | None = None) -> str:
         "term','arc_id':'104','summary_level':1,'top_k':8}\n"
         "Question: resolve the glossary term 日野下花帆\n"
         "Output: tool_name='lookup_glossary', args={'term':'日野下花帆'}\n\n"
-        f"{_story_location_catalog(engine)}\n\n"
+        f"{story_location_catalog}\n\n"
         f"Registered tools:\n{_tool_catalog()}"
     )
+
+
+def _router_instructions(engine: Any | None = None) -> str:
+    return _router_instructions_from_catalog(_story_location_catalog(engine))
 
 
 class QueryRouter:
     def __init__(self, model_name: str | None = None) -> None:
         self.model_name = model_name or get_router_model_name()
+        self._location_catalogs_by_engine_id: dict[int | None, str] = {}
+
+    def _story_location_catalog(self, engine: Any | None) -> str:
+        cache_key = _engine_cache_key(engine)
+        if cache_key not in self._location_catalogs_by_engine_id:
+            self._location_catalogs_by_engine_id[cache_key] = _story_location_catalog(engine)
+        return self._location_catalogs_by_engine_id[cache_key]
+
+    def _instructions(self, engine: Any | None) -> str:
+        return _router_instructions_from_catalog(self._story_location_catalog(engine))
 
     def _run_model(
         self,
@@ -246,7 +256,7 @@ class QueryRouter:
         agent: Agent[None, RouterOutput] = Agent(
             create_google_model(self.model_name),
             output_type=RouterOutput,
-            instructions=_router_instructions(engine),
+            instructions=self._instructions(engine),
         )
         result = agent.run_sync(
             json.dumps(

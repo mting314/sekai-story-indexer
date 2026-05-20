@@ -173,10 +173,6 @@ def _summary_where(engine: StoryQueryEngine, args: SearchSummariesInput) -> dict
     return engine._and_where(filters)
 
 
-def _public_trace_stages(stages: dict[StageName, StageTrace]) -> dict[StageName, StageTrace]:
-    return stages
-
-
 def search_raw(engine: StoryQueryEngine, args: SearchRawInput) -> ToolResult:
     where, warnings, empty = _raw_where(engine, args)
     if empty:
@@ -194,7 +190,7 @@ def search_raw(engine: StoryQueryEngine, args: SearchRawInput) -> ToolResult:
             _candidate_from_node(engine, node, rank=rank, fetch_raw_text=True)
             for rank, node in enumerate(retrieval.nodes, start=1)
         ],
-        trace_stages=_public_trace_stages(retrieval.stages),
+        trace_stages=retrieval.stages,
         warnings=warnings,
         metadata={"where": where},
     )
@@ -215,7 +211,7 @@ def search_summaries(engine: StoryQueryEngine, args: SearchSummariesInput) -> To
             _candidate_from_node(engine, node, rank=rank)
             for rank, node in enumerate(summary_nodes, start=1)
         ],
-        trace_stages=_public_trace_stages(retrieval.stages),
+        trace_stages=retrieval.stages,
         metadata={"where": where},
     )
 
