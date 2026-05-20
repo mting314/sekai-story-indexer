@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field, model_validator
@@ -77,6 +78,17 @@ class GlossaryLookupResult(BaseModel):
     aliases: list[str] = Field(default_factory=list)
     match_type: Literal["canonical", "translation", "alias", "miss"] = "miss"
     errors: list[str] = Field(default_factory=list)
+
+
+QueryToolDispatcher = Callable[[StoryQueryEngine, BaseModel], BaseModel]
+
+
+@dataclass(frozen=True)
+class QueryToolSpec:
+    name: str
+    input_model: type[BaseModel]
+    dispatcher: QueryToolDispatcher
+    description: str
 
 
 def _candidate_from_node(
@@ -317,3 +329,56 @@ def build_query_toolset(engine: StoryQueryEngine) -> FunctionToolset:
     toolset.add_function(get_scene_tool, name="get_scene")
     toolset.add_function(lookup_glossary_tool, name="lookup_glossary")
     return toolset
+
+
+def _dispatch_search_raw(engine: StoryQueryEngine, args: BaseModel) -> ToolResult:
+    return search_raw(engine, cast(SearchRawInput, args))
+
+
+def _dispatch_search_summaries(engine: StoryQueryEngine, args: BaseModel) -> ToolResult:
+    return search_summaries(engine, cast(SearchSummariesInput, args))
+
+
+def _dispatch_get_scene(engine: StoryQueryEngine, args: BaseModel) -> ToolResult:
+    return get_scene(engine, cast(GetSceneInput, args))
+
+
+def _dispatch_lookup_glossary(engine: StoryQueryEngine, args: BaseModel) -> GlossaryLookupResult:
+    return lookup_glossary(engine, cast(LookupGlossaryInput, args))
+
+
+QUERY_TOOL_REGISTRY: dict[str, QueryToolSpec] = {
+    "search_raw": QueryToolSpec(
+        name="search_raw",
+        input_model=SearchRawInput,
+        dispatcher=_dispatch_search_raw,
+        description=(
+            "Search raw source scenes for exact evidence, dialogue, scene-level details, "
+            "and citation-backed answers."
+        ),
+    ),
+    "search_summaries": QueryToolSpec(
+        name="search_summaries",
+        input_model=SearchSummariesInput,
+        dispatcher=_dispatch_search_summaries,
+        description=(
+            "Search year, episode, or part summaries for broad narrative context rather "
+            "than exact source evidence."
+        ),
+    ),
+    "get_scene": QueryToolSpec(
+        name="get_scene",
+        input_model=GetSceneInput,
+        dispatcher=_dispatch_get_scene,
+        description="Fetch one exact raw source scene by file path and zero-based scene index.",
+    ),
+    "lookup_glossary": QueryToolSpec(
+        name="lookup_glossary",
+        input_model=LookupGlossaryInput,
+        dispatcher=_dispatch_lookup_glossary,
+        description=(
+            "Resolve a Japanese glossary term, English translation, or generated alias "
+            "without performing source retrieval."
+        ),
+    ),
+}
