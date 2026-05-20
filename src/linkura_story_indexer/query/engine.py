@@ -313,6 +313,8 @@ class StoryQueryEngine:
         episode = self._summary_episode_label(metadata)
         if episode.startswith("Episode "):
             return episode.removeprefix("Episode ")
+        if episode.startswith("Side Story "):
+            return episode.removeprefix("Side Story ")
         return episode
 
     def _summary_part_label(self, metadata: dict[str, Any]) -> str:

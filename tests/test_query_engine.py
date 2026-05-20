@@ -1181,10 +1181,18 @@ def test_summary_citation_labels_include_summary_scope_without_scene():
             "scene_index": 0,
         }
     )
+    side_story_episode = engine._summary_episode_value(
+        {
+            "story_type": "Side",
+            "episode_name": "～Shades of Stars～",
+            "summary_level": 2,
+        }
+    )
 
     assert year_label == "103 · Main · Episode ALL_EPISODES · Part ALL_PARTS · summary_level 1"
     assert episode_label == "103 · Main · Episode 3 · Part ALL_PARTS · summary_level 2"
     assert part_label == "103 · Main · Episode 3 · Part 2 · summary_level 3"
+    assert side_story_episode == "～Shades of Stars～"
     assert "Scene" not in year_label
     assert "Scene" not in episode_label
     assert "Scene" not in part_label
