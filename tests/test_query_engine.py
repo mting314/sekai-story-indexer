@@ -59,12 +59,32 @@ def test_system_prompt_restores_raw_source_claim_and_compacts_ledger():
 
     prompt = engine._build_system_prompt({"103"})
 
-    assert "based strictly on the provided raw source text" in prompt
+    assert "retrieved evidence in the user message is raw source text" in prompt
     assert "Some retrieved context may be generated summaries" not in prompt
     assert '"subject":"Kaho Hinoshita"' in prompt
     assert '"extracted_quote":"Kaho"' in prompt
     assert '\n  "subject"' not in prompt
     assert "YEAR 104 FACTS" not in prompt
+
+
+def test_system_prompt_includes_all_year_summaries_in_arc_order():
+    engine = make_engine()
+    engine.year_summaries = {
+        "105": "The {105} summary contains **Markdown**.",
+        "103": "The 103 summary.",
+        "104": "The 104 summary.",
+    }
+
+    prompt = engine._build_system_prompt({"104"})
+
+    assert prompt.index("## YEAR/ARC 103") < prompt.index("## YEAR/ARC 104")
+    assert prompt.index("## YEAR/ARC 104") < prompt.index("## YEAR/ARC 105")
+    assert "The {105} summary contains **Markdown**." in prompt
+    assert (
+        "CITATION: 104 · Main · Episode ALL_EPISODES · Part ALL_PARTS · summary_level 1"
+        in prompt
+    )
+    assert "may directly ground the answer" in prompt
 
 
 def test_state_ledger_arc_ids_prefers_explicit_question_arc():
