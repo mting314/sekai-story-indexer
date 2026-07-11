@@ -25,10 +25,29 @@ def test_raw_and_summary_system_policies_are_distinct() -> None:
     )
 
     assert "raw source text" in raw
-    assert "generated summaries" not in raw
+    assert "may be generated summaries rather than raw source text" not in raw
     assert "generated summaries" in summary
     assert "never present it as a quotation" in summary
     assert prompts.PROMPT_VERSION in raw
+
+
+def test_raw_prompts_allow_year_overview_for_broad_synthesis() -> None:
+    system = prompts.render_system_prompt(
+        context_kind="raw",
+        glossary="",
+        state_ledger="",
+        year_summaries="## YEAR/ARC 105\nCITATION: year-label\nFull Year summary",
+    )
+    user = prompts.render_user_prompt(
+        context_kind="raw",
+        question="What happened in the 105th term?",
+        context="CITATION: raw-label\nOpening scene",
+    )
+
+    assert "Year summaries in the Story Overview are also eligible evidence" in system
+    assert "Year-summary labels" in system
+    assert "you may use the generated Year summaries" in user
+    assert "Answer based only on the raw source text below" not in user
 
 
 def test_dynamic_braces_and_markdown_are_not_interpreted() -> None:

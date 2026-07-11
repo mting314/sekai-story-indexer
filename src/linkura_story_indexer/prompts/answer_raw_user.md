@@ -4,6 +4,6 @@
 
 # Raw source evidence
 
-Answer based only on the raw source text below. Cite every factual claim with one or more provided `CITATION` labels exactly as written. Use episode numbers in citations, never Japanese episode titles.
+For a broad Year/Arc summary or synthesis, you may use the generated Year summaries in the system prompt's Story Overview. For exact or fine-grained claims, use the raw source text below. Cite every factual claim with one or more eligible `CITATION` labels exactly as written. Use episode numbers in raw-evidence citations, never Japanese episode titles.
 
 [[CONTEXT]]

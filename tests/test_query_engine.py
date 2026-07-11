@@ -59,7 +59,7 @@ def test_system_prompt_restores_raw_source_claim_and_compacts_ledger():
 
     prompt = engine._build_system_prompt({"103"})
 
-    assert "based strictly on the provided raw source text" in prompt
+    assert "retrieved evidence in the user message is raw source text" in prompt
     assert "Some retrieved context may be generated summaries" not in prompt
     assert '"subject":"Kaho Hinoshita"' in prompt
     assert '"extracted_quote":"Kaho"' in prompt

@@ -5,7 +5,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Literal
 
-PROMPT_VERSION = "answer-v2"
+PROMPT_VERSION = "answer-v3"
 
 
 class PromptResourceError(RuntimeError):
@@ -44,10 +44,15 @@ def render_system_prompt(
     """Render the system prompt with dynamic consistency context."""
     if context_kind == "raw":
         context_policy = (
-            "Answer based strictly on the provided raw source text. Ground every final factual "
-            "claim in that raw evidence."
+            "The retrieved evidence in the user message is raw source text. Use it for exact "
+            "events, quotations, dialogue attribution, and other fine-grained claims. For broad "
+            "Year/Arc synthesis, the generated Year summaries in the Story Overview are also "
+            "eligible evidence."
         )
-        citation_policy = "Final citations must come from retrieved raw-evidence labels."
+        citation_policy = (
+            "Final citations must come from retrieved raw-evidence labels or, when using the "
+            "Story Overview for broad synthesis, its Year-summary labels."
+        )
     else:
         context_policy = (
             "The retrieved context may be generated summaries rather than raw source text. "
