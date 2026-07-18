@@ -36,6 +36,7 @@ _chroma_collections: dict[tuple[str, str], Any] = {}
 _genai_clients: dict[str, genai.Client] = {}
 _google_models: dict[tuple[str, str], GoogleModel] = {}
 _openai_models: dict[tuple[str, str, str], Any] = {}
+_openai_responses_models: dict[tuple[str, str, str], Any] = {}
 
 
 def get_google_api_key() -> str:
@@ -139,6 +140,27 @@ def create_generation_model(model_name: str | None = None) -> Any:
     )
 
 
+def create_agentic_generation_model(model_name: str | None = None) -> Any:
+    """Creates the generation model for tool-calling agent runs.
+
+    OpenAI reasoning models reject function tools on Chat Completions, so the
+    agentic path uses the Responses API. Set LINKURA_OPENAI_API=chat to force
+    Chat Completions (for OPENAI_BASE_URL proxies without a Responses endpoint).
+    """
+    provider = get_generation_provider_name()
+    model_name = model_name or get_generation_model_name()
+    if provider == "google":
+        return create_google_model(model_name)
+    if provider == "openai":
+        if os.getenv("LINKURA_OPENAI_API", "").strip().lower() == "chat":
+            return create_openai_model(model_name)
+        return create_openai_responses_model(model_name)
+    raise ValueError(
+        f"Unsupported LINKURA_INGEST_PROVIDER {provider!r}. "
+        f"Expected one of: {', '.join(sorted(SUPPORTED_GENERATION_PROVIDERS))}"
+    )
+
+
 def create_google_model(model_name: str | None = None) -> GoogleModel:
     api_key = get_google_api_key()
     model_name = model_name or get_chat_model_name()
@@ -172,6 +194,29 @@ def create_openai_model(model_name: str | None = None) -> Any:
             provider=OpenAIProvider(base_url=base_url or None, api_key=api_key),
         )
     return _openai_models[cache_key]
+
+
+def create_openai_responses_model(model_name: str | None = None) -> Any:
+    api_key = get_openai_api_key()
+    model_name = model_name or get_generation_model_name()
+    base_url = os.getenv("OPENAI_BASE_URL", "")
+    cache_key = (api_key, model_name, base_url)
+    if cache_key not in _openai_responses_models:
+        try:
+            from pydantic_ai.models.openai import OpenAIResponsesModel
+            from pydantic_ai.providers.openai import OpenAIProvider
+        except ImportError as exc:
+            raise ImportError(
+                "OpenAI generation requires the OpenAI extra. "
+                "Install dependencies with `uv sync` after adding "
+                '`pydantic-ai-slim[google,openai]`.'
+            ) from exc
+
+        _openai_responses_models[cache_key] = OpenAIResponsesModel(
+            model_name,
+            provider=OpenAIProvider(base_url=base_url or None, api_key=api_key),
+        )
+    return _openai_responses_models[cache_key]
 
 
 def get_genai_client() -> genai.Client:
@@ -303,3 +348,4 @@ def reset_client_caches() -> None:
     _genai_clients.clear()
     _google_models.clear()
     _openai_models.clear()
+    _openai_responses_models.clear()

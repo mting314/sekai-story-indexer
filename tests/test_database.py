@@ -1,4 +1,6 @@
-from typing import Any
+from typing import Any, cast
+
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
 
 from linkura_story_indexer import database
 from linkura_story_indexer.database import EmbeddingDocument
@@ -103,6 +105,83 @@ def test_generation_model_honors_model_override(monkeypatch):
 
     assert database.create_generation_model("gpt-router") == "openai-model"
     assert calls == ["gpt-router"]
+
+
+def test_agentic_generation_model_uses_responses_api_for_openai(monkeypatch):
+    database.reset_client_caches()
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
+    monkeypatch.setenv("LINKURA_INGEST_MODEL", "gpt-5.6-luna")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://example.test/v1")
+    monkeypatch.delenv("LINKURA_OPENAI_API", raising=False)
+
+    model = database.create_agentic_generation_model()
+
+    assert isinstance(model, OpenAIResponsesModel)
+    assert not isinstance(model, OpenAIChatModel)
+    assert model.model_name == "gpt-5.6-luna"
+    provider = cast(Any, model.provider)
+    assert str(provider.client.base_url) == "https://example.test/v1/"
+    assert database.create_agentic_generation_model() is model
+
+    database.reset_client_caches()
+    fresh_model = database.create_agentic_generation_model()
+    assert fresh_model is not model
+    assert isinstance(fresh_model, OpenAIResponsesModel)
+
+    generation_model = database.create_generation_model()
+    assert isinstance(generation_model, OpenAIChatModel)
+    assert not isinstance(generation_model, OpenAIResponsesModel)
+
+
+def test_agentic_generation_model_uses_google_for_google_provider(monkeypatch):
+    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "google")
+    monkeypatch.setenv("LINKURA_INGEST_MODEL", "gemini-agent")
+    calls: list[str | None] = []
+
+    def fake_create_google_model(model_name: str | None = None) -> str:
+        calls.append(model_name)
+        return "google-model"
+
+    monkeypatch.setattr(database, "create_google_model", fake_create_google_model)
+
+    assert database.create_agentic_generation_model() == "google-model"
+    assert calls == ["gemini-agent"]
+
+
+def test_agentic_generation_model_chat_escape_hatch(monkeypatch):
+    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
+    monkeypatch.setenv("LINKURA_INGEST_MODEL", "gpt-5.6-luna")
+    monkeypatch.setenv("LINKURA_OPENAI_API", "chat")
+    calls: list[str | None] = []
+
+    def fake_create_openai_model(model_name: str | None = None) -> str:
+        calls.append(model_name)
+        return "chat-model"
+
+    monkeypatch.setattr(database, "create_openai_model", fake_create_openai_model)
+
+    assert database.create_agentic_generation_model() == "chat-model"
+    assert calls == ["gpt-5.6-luna"]
+
+
+def test_agentic_generation_model_honors_model_override(monkeypatch):
+    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
+    monkeypatch.delenv("LINKURA_OPENAI_API", raising=False)
+    calls: list[str | None] = []
+
+    def fake_create_openai_responses_model(model_name: str | None = None) -> str:
+        calls.append(model_name)
+        return "responses-model"
+
+    monkeypatch.setattr(
+        database,
+        "create_openai_responses_model",
+        fake_create_openai_responses_model,
+    )
+
+    assert database.create_agentic_generation_model("gpt-agent") == "responses-model"
+    assert calls == ["gpt-agent"]
 
 
 def test_generation_settings_validate_only_selected_provider(monkeypatch):

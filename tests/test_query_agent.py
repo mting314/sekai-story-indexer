@@ -73,6 +73,30 @@ def test_agent_toolset_registers_the_shared_typed_schemas() -> None:
     assert "speaker" in by_name["count_dialogue"].parameters_json_schema["properties"]
 
 
+def test_query_agent_builds_model_with_agentic_factory(monkeypatch: Any) -> None:
+    engine = make_engine()
+    test_model = TestModel(
+        call_tools=[],
+        custom_output_args={"answer": "agent answer", "cited_labels": []},
+    )
+    calls: list[str | None] = []
+
+    def fake_create_agentic_generation_model(model_name: str | None = None) -> TestModel:
+        calls.append(model_name)
+        return test_model
+
+    monkeypatch.setattr(
+        "linkura_story_indexer.query.agent.create_agentic_generation_model",
+        fake_create_agentic_generation_model,
+    )
+
+    result = QueryAgent(model_name="gpt-5.6-luna").run(engine, "question")
+
+    assert calls == ["gpt-5.6-luna"]
+    assert result.stop_reason == "final_answer"
+    assert result.answer.answer == "agent answer"
+
+
 def test_function_model_agent_records_multi_step_calls_and_reranks_candidates(
     monkeypatch: Any,
 ) -> None:
