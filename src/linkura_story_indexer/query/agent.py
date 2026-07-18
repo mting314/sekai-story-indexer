@@ -11,7 +11,10 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent, FunctionToolset, UsageLimits
 from pydantic_ai.exceptions import UsageLimitExceeded
 
-from linkura_story_indexer.database import create_generation_model, get_generation_model_name
+from linkura_story_indexer.database import (
+    create_agentic_generation_model,
+    get_generation_model_name,
+)
 from linkura_story_indexer.query.router import _story_location_catalog
 from linkura_story_indexer.query.tools import (
     QUERY_TOOL_REGISTRY,
@@ -221,7 +224,7 @@ class QueryAgent:
         recorder: list[AgentToolCall],
     ) -> AgentAnswer:
         agent: Agent[None, AgentAnswer] = Agent(
-            self.model or create_generation_model(self.model_name),
+            self.model or create_agentic_generation_model(self.model_name),
             output_type=AgentAnswer,
             instructions=self._instructions(engine),
         )
