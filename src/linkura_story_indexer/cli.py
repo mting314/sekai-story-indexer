@@ -1,5 +1,4 @@
 import json
-import re
 from pathlib import Path
 from typing import Any, cast
 
@@ -50,7 +49,7 @@ from .indexer.manifest import (
     write_manifest,
 )
 from .indexer.parser import PARSER_VERSION
-from .indexer.processor import StoryProcessor
+from .indexer.processor import StoryProcessor, episode_number_from_names
 from .indexer.source_store import SourceRecordStore
 from .indexer.summarizer import SUMMARIZATION_PROMPT_VERSION, HierarchicalSummarizer
 from .lexical import LexicalIndex, get_lexical_db_path, glossary_alias_groups
@@ -138,14 +137,6 @@ def _assign_canonical_story_order(
     for order, node in enumerate(sorted(nodes, key=order_config.chronological_node_key), start=1):
         node.metadata.canonical_story_order = order
         node.metadata.story_order = order
-
-
-def _episode_number(node: StoryNode) -> int:
-    for value in (node.metadata.episode_name, node.metadata.part_name):
-        match = re.search(r"第(\d+)話", value)
-        if match:
-            return int(match.group(1))
-    return 0
 
 
 def _translation_aliases(node: StoryNode, glossary: dict | None) -> list[str]:
@@ -254,7 +245,10 @@ def _metadata_for_node(node: StoryNode) -> dict:
     if not metadata.get("story_order"):
         metadata["story_order"] = metadata.get("canonical_story_order", 0)
     if not metadata.get("episode_number"):
-        metadata["episode_number"] = _episode_number(node)
+        metadata["episode_number"] = episode_number_from_names(
+            node.metadata.episode_name,
+            node.metadata.part_name,
+        )
     metadata["detected_speakers"] = "|".join(node.metadata.detected_speakers)
     metadata["speakers"] = "|".join(node.metadata.speakers)
     metadata["source_scene_ids"] = "|".join(node.metadata.source_scene_ids)
