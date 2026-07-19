@@ -31,9 +31,12 @@ load_dotenv()  # pick up GOOGLE_API_KEY from the repo-root .env
 _STYLE = (
     "\n\n# Response style\n"
     "Answer concisely: lead with a direct 2–4 sentence answer to exactly what was "
-    "asked, citing inline. Do NOT give an episode-by-episode recap unless the user "
-    "explicitly asks to 'summarize in detail', 'episode by episode', or 'everything'. "
-    "Prefer plain prose over headings and bullet lists for short answers."
+    "asked. Do NOT give an episode-by-episode recap unless the user explicitly asks "
+    "to 'summarize in detail', 'episode by episode', or 'everything'. Prefer plain "
+    "prose over headings and bullet lists for short answers.\n"
+    "Cite every claim with the bracketed source NUMBER(S) shown in the evidence "
+    "(e.g. [1], or [2][3]). Use only those numbers — never invent a citation or "
+    "cite an episode title."
 )
 
 
@@ -92,7 +95,8 @@ def _context(citations: list[dict], max_chars: int = 8000) -> str:
     blocks, used = [], 0
     for c in citations:
         excerpt = c.get("excerpt") or c.get("quote") or ""
-        block = f"### {c.get('label', c.get('arc_id', ''))}\n{excerpt}".strip()
+        # numbered so the model cites [n] -> maps directly to a source in the UI
+        block = f"[{c.get('ref', '?')}] {c.get('label', c.get('arc_id', ''))}\n{excerpt}".strip()
         if used + len(block) > max_chars:
             break
         blocks.append(block)

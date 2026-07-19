@@ -180,6 +180,15 @@ function renderAssistant(container, res) {
     }
     container.appendChild(sources);
   }
+
+  // Wire inline [n] citations in the answer to open + highlight their excerpt.
+  container.querySelectorAll("a.cite").forEach((a) => {
+    a.onclick = (e) => {
+      e.preventDefault();
+      const c = byRef[a.dataset.ref];
+      if (c) openExcerpt(c);
+    };
+  });
 }
 
 // Minimal, safe markdown -> HTML (escape first, then a limited subset).
@@ -190,7 +199,9 @@ function renderMarkdown(src) {
     esc(s)
       .replace(/`([^`]+)`/g, "<code>$1</code>")
       .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-      .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
+      .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>")
+      // clickable numbered citations: [1] / [2][3]  (also inside `code`/brackets)
+      .replace(/\[(\d+)\]/g, '<a href="#" class="cite" data-ref="$1">[$1]</a>');
   const out = [];
   let list = false;
   for (const raw of (src || "").split("\n")) {
@@ -217,8 +228,19 @@ function openExcerpt(cite) {
   if (cite.plot_weight && cite.plot_weight !== "unrated") bits.push(cite.plot_weight);
   if (cite.scene_index != null) bits.push(`scene ${cite.scene_index}`);
   document.getElementById("sb-sub").textContent = bits.join(" · ");
-  document.getElementById("sb-body").textContent = cite.excerpt || cite.quote || "";
+  // Highlight the quoted line within the full excerpt.
+  const esc = (s) =>
+    (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  let body = esc(cite.excerpt || cite.quote || "");
+  if (cite.quote) {
+    const q = esc(cite.quote);
+    body = body.split(q).join(`<mark>${q}</mark>`);
+  }
+  const el = document.getElementById("sb-body");
+  el.innerHTML = body;
   sb.classList.remove("hidden");
+  const m = el.querySelector("mark");
+  if (m) m.scrollIntoView({ block: "center" });
 }
 
 function closeExcerpt() {
