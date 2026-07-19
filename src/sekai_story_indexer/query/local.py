@@ -21,11 +21,13 @@ from pathlib import Path
 
 from ..indexer.processor import StoryProcessor
 from ..models.story import StoryNode
+from ..source.constants import UNIT_NAMES
 from ..source.relevance import weight_factor
 from .scoping import ScopeIndex
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 _CJK_RE = re.compile(r"[぀-ヿ㐀-鿿]")
+_H1_RE = re.compile(r"^#\s*(.+)$")
 
 
 def tokenize(text: str) -> list[str]:
@@ -64,12 +66,14 @@ class LocalQueryEngine:
         self._idf: dict[str, float] = {
             term: math.log(1 + n_docs / (1 + count)) for term, count in df.items()
         }
-        # shared scope resolver (nickname/unit/event) + plot-weight lookup
+        # shared scope resolver (nickname/unit/event) + plot-weight + human-name lookups
         self._scope_index = ScopeIndex(events_index)
         self._weight_by_arc: dict[str, str] = {}
+        self._meta_by_arc: dict[str, dict] = {}
         for row in events_index or []:
             if row.get("arc_slug"):
                 self._weight_by_arc[row["arc_slug"]] = row.get("plot_weight", "unrated")
+                self._meta_by_arc[row["arc_slug"]] = row
         # Cross-lingual bridge: the corpus is JP but questions may be EN (or vice
         # versa). From the glossary (JP<->EN) build trigger->add token expansions
         # so a name in one language also searches the other.
@@ -143,6 +147,39 @@ class LocalQueryEngine:
         m = node.metadata
         return (m.unit, m.arc_id, m.episode_number, m.scene_index)
 
+    # -- human-readable labels ----------------------------------------------
+    def _episode_title(self, node: StoryNode) -> str:
+        """The episode's human title, from the scene's H1 (e.g. '1. 感じていること')."""
+        for ln in node.text.splitlines():
+            match = _H1_RE.match(ln.strip())
+            if match:
+                return match.group(1).strip()
+        return node.metadata.episode_name
+
+    def human_location(self, node: StoryNode) -> dict:
+        """Reader-facing names for a node: unit display name, event name,
+        nickname, episode title, and a composed one-line label."""
+        m = node.metadata
+        row = self._meta_by_arc.get(m.arc_id, {})
+        unit_name = UNIT_NAMES.get(m.unit, m.unit)
+        if m.content_type == "unit_overview":
+            return {
+                "unit_name": unit_name, "event_name": f"{unit_name} — story overview",
+                "nickname": None, "episode_title": "", "label": f"{unit_name} — story overview",
+            }
+        event_name = row.get("name") or m.arc_id
+        nickname = row.get("nickname")
+        ep_title = self._episode_title(node)
+        label = f"{unit_name} — {event_name}"
+        if nickname:
+            label += f" [{nickname}]"
+        if ep_title:
+            label += f" · Ep {ep_title}"
+        return {
+            "unit_name": unit_name, "event_name": event_name, "nickname": nickname,
+            "episode_title": ep_title, "label": label,
+        }
+
     # -- answer --------------------------------------------------------------
     def query(
         self,
@@ -187,7 +224,6 @@ class LocalQueryEngine:
                 }
 
         top, _ = hits[0]
-        m = top.metadata
         q_tokens = set(self._expand_tokens(tokenize(question)))
         # Extractive answer: gather query-overlapping lines from across the top
         # hits (not just #1), ranked by overlap × scene score, so supporting
@@ -219,31 +255,34 @@ class LocalQueryEngine:
         best_quote: dict[int, str] = {}
         for _, line, hit_idx in quotes:
             best_quote.setdefault(hit_idx, line)
-        citations = [
-            {
-                "ref": i + 1,
-                "unit": h.metadata.unit,
-                "arc_id": h.metadata.arc_id,
-                "episode": h.metadata.episode_name,
-                "scene_index": h.metadata.scene_index,
-                "score": round(score, 4),
-                "plot_weight": self._weight_by_arc.get(h.metadata.arc_id, "unrated"),
-                "quote": best_quote.get(i, ""),
-                "excerpt": h.text,
-            }
-            for i, (h, score) in enumerate(hits)
-        ]
+        citations = []
+        for i, (h, score) in enumerate(hits):
+            loc = self.human_location(h)
+            citations.append(
+                {
+                    "ref": i + 1,
+                    "label": loc["label"],  # human one-liner for the UI
+                    "unit_name": loc["unit_name"],
+                    "event_name": loc["event_name"],
+                    "nickname": loc["nickname"],
+                    "episode_title": loc["episode_title"],
+                    # raw ids retained for programmatic use
+                    "unit": h.metadata.unit,
+                    "arc_id": h.metadata.arc_id,
+                    "episode": h.metadata.episode_name,
+                    "scene_index": h.metadata.scene_index,
+                    "score": round(score, 4),
+                    "plot_weight": self._weight_by_arc.get(h.metadata.arc_id, "unrated"),
+                    "quote": best_quote.get(i, ""),
+                    "excerpt": h.text,
+                }
+            )
 
-        loc = f"{m.unit} · {m.arc_id} · {m.episode_name}"
-        # structured parts: a lead-in then clickable quote blocks (each carries
-        # the ref of the citation whose excerpt it opens).
-        answer_parts: list[dict] = [
-            {"type": "text", "text": f"Based on {loc}:"}
-        ]
+        label = citations[0]["label"]
+        answer_parts: list[dict] = [{"type": "text", "text": f"From {label}:"}]
         for _, line, hit_idx in quotes:
             answer_parts.append({"type": "quote", "ref": hit_idx + 1, "text": line})
-        # flat string kept for back-compat / non-structured clients / evals
-        answer = f"[local extractive answer — {loc}]\n" + "\n".join(q[1] for q in quotes)
+        answer = f"From {label}:\n" + "\n".join(q[1] for q in quotes)
 
         return {
             "answer": answer,

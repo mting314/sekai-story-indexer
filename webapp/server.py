@@ -126,10 +126,29 @@ def _get_local_engine():
     return _local_engine["engine"]
 
 
+# NL generation over local retrieval ("RAG-lite"): on by default when a key is
+# present; set SEKAI_GENERATE=0 to force pure extractive output.
+GENERATE = os.environ.get("SEKAI_GENERATE", "1") != "0"
+
+
 def _query_local(req: QueryRequest) -> dict:
     engine = _get_local_engine()
     result = engine.query(req.question, unit=req.unit, event_id=req.event_id)
-    return {"answer": result["answer"], "error": None, **result}
+    result["error"] = None
+
+    if GENERATE and result.get("citations"):
+        from sekai_story_indexer.query.generate import generate_answer
+
+        nl = generate_answer(req.question, result["citations"])
+        if nl:
+            # Natural-language answer up top; keep quotes as supporting evidence.
+            result["answer"] = nl
+            result["answer_parts"] = (
+                [{"type": "text", "text": nl}]
+                + [p for p in result.get("answer_parts", []) if p.get("type") == "quote"]
+            )
+            result["generated"] = True
+    return result
 
 
 def _query_full(req: QueryRequest) -> dict:

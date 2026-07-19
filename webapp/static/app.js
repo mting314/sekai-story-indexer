@@ -129,14 +129,30 @@ function renderAssistant(container, res) {
   for (const c of res.citations || []) byRef[c.ref] = c;
 
   const parts = res.answer_parts || [{ type: "text", text: res.answer || "" }];
-  for (const p of parts) {
-    if (p.type === "quote") {
+  const quotes = parts.filter((p) => p.type === "quote");
+  const texts = parts.filter((p) => p.type !== "quote");
+
+  // Natural-language answer (or extractive lead-in) as prose.
+  for (const p of texts) {
+    const t = document.createElement("div");
+    t.className = "answer-text";
+    t.textContent = p.text;
+    container.appendChild(t);
+  }
+
+  // Supporting quotes, collapsed under a small heading.
+  if (quotes.length) {
+    const h = document.createElement("div");
+    h.className = "quotes-head";
+    h.textContent = res.generated ? "Supporting quotes" : "";
+    if (h.textContent) container.appendChild(h);
+    for (const p of quotes) {
       const q = document.createElement("blockquote");
       q.className = "quote";
       q.textContent = p.text;
       const cite = byRef[p.ref];
       if (cite) {
-        q.title = "Click to view the full excerpt";
+        q.title = `${cite.label} — click for the full scene`;
         q.onclick = () => openExcerpt(cite);
         const tag = document.createElement("span");
         tag.className = "quote-ref";
@@ -144,11 +160,6 @@ function renderAssistant(container, res) {
         q.appendChild(tag);
       }
       container.appendChild(q);
-    } else {
-      const t = document.createElement("div");
-      t.className = "answer-text";
-      t.textContent = p.text;
-      container.appendChild(t);
     }
   }
 
@@ -160,7 +171,7 @@ function renderAssistant(container, res) {
       const a = document.createElement("a");
       a.href = "#";
       a.className = "source-link";
-      a.textContent = `[${c.ref}] ${c.arc_id} · ${c.episode}`;
+      a.textContent = `[${c.ref}] ${c.label}`;
       a.onclick = (e) => {
         e.preventDefault();
         openExcerpt(c);
@@ -173,11 +184,11 @@ function renderAssistant(container, res) {
 
 function openExcerpt(cite) {
   const sb = document.getElementById("sidebar");
-  document.getElementById("sb-title").textContent =
-    `${cite.unit} · ${cite.arc_id}`;
-  document.getElementById("sb-sub").textContent =
-    `${cite.episode} · scene ${cite.scene_index}` +
-    (cite.score != null ? ` · score ${cite.score}` : "");
+  document.getElementById("sb-title").textContent = cite.label || cite.arc_id;
+  const bits = [];
+  if (cite.plot_weight && cite.plot_weight !== "unrated") bits.push(cite.plot_weight);
+  if (cite.scene_index != null) bits.push(`scene ${cite.scene_index}`);
+  document.getElementById("sb-sub").textContent = bits.join(" · ");
   document.getElementById("sb-body").textContent = cite.excerpt || cite.quote || "";
   sb.classList.remove("hidden");
 }

@@ -85,3 +85,4 @@ main {
 .event-card .name { font-size: 14px; margin: 1px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .event-card .focus, .event-card .song { font-size: 12px; color: var(--muted); }
 .empty { color: var(--muted); font-size: 13px; }
+.quotes-head { margin: 10px 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
