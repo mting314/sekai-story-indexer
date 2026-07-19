@@ -58,6 +58,19 @@ def test_query_nickname_scoping(client):
     assert r.json()["scope"]["arc_id"] == "0006-lyric"
 
 
+def test_query_returns_quotes_and_excerpts(client):
+    body = client.post(
+        "/api/query", json={"question": "How does Kohane feel about singing?"}
+    ).json()
+    quotes = [p for p in body["answer_parts"] if p["type"] == "quote"]
+    assert quotes, "expected at least one clickable quote part"
+    # every quote references a citation that carries a full excerpt for the sidebar
+    refs = {c["ref"] for c in body["citations"]}
+    assert all(p["ref"] in refs for p in quotes)
+    top = body["citations"][0]
+    assert top["excerpt"] and top["quote"]
+
+
 def test_query_not_indexed_event(client):
     r = client.post("/api/query", json={"question": "Tell me about akito1"})
     assert "not indexed" in r.json()["answer"].lower()

@@ -10,6 +10,10 @@ small FastAPI backend.
   built / keys aren't set, it returns a clear message and the timeline still
   works.
 * Clicking an event scopes your next question to it.
+* **Grounded answers**: the chat quotes lines from the story and lists sources.
+  Click any quote or source `[n]` to open a **side panel with the full scene
+  excerpt** (from `citations[].excerpt` in the query response) — verify without
+  leaving the chat.
 * Each event shows an **indexed indicator**: a filled green dot = queryable in
   chat now; a hollow dot + dimmed card = on the timeline but not yet ingested
   (chat-answerable after the next `scripts/sync.sh`). A legend at the top counts

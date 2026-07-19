@@ -37,6 +37,23 @@ main {
 .msg.user { align-self: flex-end; background: var(--accent); color: #04222b; }
 .msg.assistant { align-self: flex-start; background: var(--card); }
 .msg.system { align-self: center; background: transparent; color: var(--muted); font-size: 12.5px; }
+.answer-text { margin: 2px 0 6px; }
+.quote { margin: 6px 0; padding: 7px 10px; border-left: 3px solid var(--accent); background: #0c0e14; border-radius: 0 8px 8px 0; cursor: pointer; font-style: italic; color: #cdd3df; transition: background .12s; }
+.quote:hover { background: #12151d; }
+.quote-ref { font-style: normal; color: var(--accent); font-weight: 600; font-size: 11px; }
+.sources { margin-top: 8px; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; }
+.source-link { color: var(--accent); text-decoration: none; }
+.source-link:hover { text-decoration: underline; }
+
+/* excerpt sidebar */
+.sidebar { position: fixed; top: 0; right: 0; width: min(420px, 92vw); height: 100vh; background: var(--panel); border-left: 1px solid #2b2f3a; box-shadow: -8px 0 24px #0008; padding: 16px; overflow-y: auto; z-index: 50; }
+.sidebar.hidden { display: none; }
+.sb-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.sb-title { font-weight: 600; font-size: 15px; }
+.sb-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.sb-close { background: transparent; border: 0; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; }
+.sb-close:hover { color: var(--text); }
+.sb-body { white-space: pre-wrap; font-family: inherit; font-size: 13.5px; line-height: 1.55; color: var(--text); margin: 0; }
 #ask-form { display: flex; gap: 8px; }
 #ask-form input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #2b2f3a; background: #0c0e14; color: var(--text); }
 #ask-form button { padding: 10px 16px; border: 0; border-radius: 8px; background: var(--accent); color: #04222b; font-weight: 600; cursor: pointer; }

@@ -140,6 +140,7 @@ class LocalQueryEngine:
                 msg = "No matching story content found for that query."
             return {
                 "answer": msg,
+                "answer_parts": [{"type": "text", "text": msg}],
                 "citations": [],
                 "scope": {"unit": unit, "arc_id": arc_id},
                 "backend": "local",
@@ -150,40 +151,62 @@ class LocalQueryEngine:
         q_tokens = set(tokenize(question))
         # Extractive answer: gather query-overlapping lines from across the top
         # hits (not just #1), ranked by overlap × scene score, so supporting
-        # evidence in a lower-ranked scene of the same arc still surfaces.
-        scored_lines: list[tuple[float, str]] = []
+        # evidence in a lower-ranked scene of the same arc still surfaces. Track
+        # which hit each quote came from so the UI can link quote -> excerpt.
+        scored_lines: list[tuple[float, str, int]] = []
         seen_lines: set[str] = set()
-        for node, node_score in hits:
+        for hit_idx, (node, node_score) in enumerate(hits):
             for ln in node.text.splitlines():
                 stripped = ln.strip()
                 if not stripped or stripped.startswith("#") or stripped in seen_lines:
                     continue
                 overlap = len(q_tokens & set(tokenize(stripped)))
                 if overlap:
-                    scored_lines.append((overlap * node_score, stripped))
+                    scored_lines.append((overlap * node_score, stripped, hit_idx))
                     seen_lines.add(stripped)
         scored_lines.sort(key=lambda s: -s[0])
-        relevant = [ln for _, ln in scored_lines[:6]]
-        if not relevant:  # fall back to the head of the top scene
-            relevant = [
+        quotes = scored_lines[:6]
+        if not quotes:  # fall back to the head of the top scene
+            head = [
                 ln.strip()
                 for ln in top.text.splitlines()
                 if ln.strip() and not ln.startswith("#")
             ][:3]
-        loc = f"{m.unit} · {m.arc_id} · {m.episode_name}"
-        answer = f"[local extractive answer — {loc}]\n" + "\n".join(relevant)
+            quotes = [(0.0, ln, 0) for ln in head]
+
+        # citations: every hit, ref = 1-based rank, with the full scene as an
+        # excerpt (for the click-to-open sidebar) and its best quoted line.
+        best_quote: dict[int, str] = {}
+        for _, line, hit_idx in quotes:
+            best_quote.setdefault(hit_idx, line)
         citations = [
             {
+                "ref": i + 1,
                 "unit": h.metadata.unit,
                 "arc_id": h.metadata.arc_id,
                 "episode": h.metadata.episode_name,
                 "scene_index": h.metadata.scene_index,
                 "score": round(score, 4),
+                "quote": best_quote.get(i, ""),
+                "excerpt": h.text,
             }
-            for h, score in hits
+            for i, (h, score) in enumerate(hits)
         ]
+
+        loc = f"{m.unit} · {m.arc_id} · {m.episode_name}"
+        # structured parts: a lead-in then clickable quote blocks (each carries
+        # the ref of the citation whose excerpt it opens).
+        answer_parts: list[dict] = [
+            {"type": "text", "text": f"Based on {loc}:"}
+        ]
+        for _, line, hit_idx in quotes:
+            answer_parts.append({"type": "quote", "ref": hit_idx + 1, "text": line})
+        # flat string kept for back-compat / non-structured clients / evals
+        answer = f"[local extractive answer — {loc}]\n" + "\n".join(q[1] for q in quotes)
+
         return {
             "answer": answer,
+            "answer_parts": answer_parts,
             "citations": citations,
             "scope": {"unit": unit, "arc_id": arc_id},
             "backend": "local",

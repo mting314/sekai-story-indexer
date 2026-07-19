@@ -128,6 +128,10 @@ even the filesystem sorted chronologically). Hand-authored content still uses
 - [x] **Phase 1g — Regression evals.** Golden set (`eval/golden_local.json`) +
   runner (`eval/local_eval.py`) gating retrieval/scoping/answer content, run as a
   pytest (`test_eval_local.py`) + API tests (`test_webapp_api.py`).
+- [x] **Phase 1h — Grounded/quoting chat.** Query response returns structured
+  `answer_parts` (text + clickable quote blocks) and `citations[].excerpt`; the
+  web app renders quotes inline and opens a side panel with the full scene on
+  click. (Full engine gains the same structure in Phase 4.)
 - [ ] **Phase 4 — Full-engine scoping.** Port the same nickname/unit scoping into
   the production Google/Chroma engine as metadata filters; run the golden set
   against `--backend full`; extend `ALLOWED_STORY_TYPES`/tier labels for Sekai.

@@ -121,6 +121,71 @@ function addMessage(role, text) {
   return div;
 }
 
+// Render a rich assistant answer: text runs + clickable quote blocks that open
+// the excerpt sidebar, plus a compact source list.
+function renderAssistant(container, res) {
+  container.textContent = "";
+  const byRef = {};
+  for (const c of res.citations || []) byRef[c.ref] = c;
+
+  const parts = res.answer_parts || [{ type: "text", text: res.answer || "" }];
+  for (const p of parts) {
+    if (p.type === "quote") {
+      const q = document.createElement("blockquote");
+      q.className = "quote";
+      q.textContent = p.text;
+      const cite = byRef[p.ref];
+      if (cite) {
+        q.title = "Click to view the full excerpt";
+        q.onclick = () => openExcerpt(cite);
+        const tag = document.createElement("span");
+        tag.className = "quote-ref";
+        tag.textContent = ` [${p.ref}]`;
+        q.appendChild(tag);
+      }
+      container.appendChild(q);
+    } else {
+      const t = document.createElement("div");
+      t.className = "answer-text";
+      t.textContent = p.text;
+      container.appendChild(t);
+    }
+  }
+
+  if (res.citations && res.citations.length) {
+    const sources = document.createElement("div");
+    sources.className = "sources";
+    sources.appendChild(document.createTextNode("Sources: "));
+    for (const c of res.citations) {
+      const a = document.createElement("a");
+      a.href = "#";
+      a.className = "source-link";
+      a.textContent = `[${c.ref}] ${c.arc_id} · ${c.episode}`;
+      a.onclick = (e) => {
+        e.preventDefault();
+        openExcerpt(c);
+      };
+      sources.appendChild(a);
+    }
+    container.appendChild(sources);
+  }
+}
+
+function openExcerpt(cite) {
+  const sb = document.getElementById("sidebar");
+  document.getElementById("sb-title").textContent =
+    `${cite.unit} · ${cite.arc_id}`;
+  document.getElementById("sb-sub").textContent =
+    `${cite.episode} · scene ${cite.scene_index}` +
+    (cite.score != null ? ` · score ${cite.score}` : "");
+  document.getElementById("sb-body").textContent = cite.excerpt || cite.quote || "";
+  sb.classList.remove("hidden");
+}
+
+function closeExcerpt() {
+  document.getElementById("sidebar").classList.add("hidden");
+}
+
 document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const input = document.getElementById("question");
@@ -139,10 +204,19 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
         event_id: state.scopeEventId,
       }),
     }).then((r) => r.json());
-    pending.textContent = res.answer || `⚠ ${res.error || "no answer"}`;
+    if (res.error && !res.answer) {
+      pending.textContent = `⚠ ${res.error}`;
+    } else {
+      renderAssistant(pending, res);
+    }
   } catch (err) {
     pending.textContent = `⚠ ${err}`;
   }
+  document.getElementById("messages").scrollTop = 1e9;
+});
+
+document.addEventListener("click", (e) => {
+  if (e.target && e.target.id === "sb-close") closeExcerpt();
 });
 
 boot();
