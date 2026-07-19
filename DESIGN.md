@@ -146,6 +146,17 @@ against `full` to catch answer-quality drift (Phase 4).
 Scoping (unit + nickname) is implemented in the local backend now; Phase 4 ports
 the identical logic into the full engine as Chroma metadata filters.
 
+### Cross-lingual bridge (local backend only)
+The story text is Japanese but users may ask in English. The **full** backend
+gets this for free — Google embeddings are multilingual, so an EN query retrieves
+JP passages semantically (this is also why linkura never needed a bridge; its
+glossary is for translation / name-consistency, not retrieval). The **local**
+backend does exact lexical matching, which can't cross languages, so it builds
+JP↔EN token expansions from `glossary.json` (character names trigger on any
+single name-token; units/terms require the full phrase). This is a deliberate
+patch for the lexical shortcut — decision: **keep it** so the no-API local mode
+is usable in English. It is inert on the full backend.
+
 ## Non-goals (for now)
 * No EN-asset ingestion (translate JP instead).
 * No card/area/unit-story fetch yet (Phase 5) — event + main stories are the
