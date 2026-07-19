@@ -23,6 +23,40 @@ auto-generates `story_order.yaml` in chronological (release) order, and writes
 
 Then run `indexer ingest` / `indexer query` as below.
 
+## Run it now (no API key needed)
+
+Two CLIs: **`indexer`** = full Google/Chroma RAG (needs deps + `GOOGLE_API_KEY`);
+**`sekai`** = dependency-light, no-API path (lexical engine) that runs anywhere.
+
+```bash
+uv sync --extra web
+
+# ask from the terminal (local lexical engine; supports nickname scoping)
+sekai ask "What happens in koha1?" --story-root sample/story --events-index sample/events_index.json
+
+# launch the web app (chat + timeline) against the bundled sample corpus
+sekai serve --port 8000 --story-root sample/story --events-index sample/events_index.json
+# -> http://127.0.0.1:8000
+
+# regression eval (deterministic; non-zero exit on regression)
+sekai eval --golden eval/golden_local.json
+```
+
+Point `--story-root`/`--events-index` at your real `story/` + `events_index.json`
+(from `indexer fetch`) once you've fetched. For the production RAG answer quality,
+run `sekai serve --backend full` with the full deps + `GOOGLE_API_KEY`.
+
+## Tests & evals
+
+```bash
+uv run pytest                 # unit + API + regression-eval tests
+sekai eval                    # standalone regression gate
+```
+
+Regression evals live in `eval/golden_local.json` and run against the local
+backend in `tests/test_eval_local.py`, so retrieval/scoping/answer regressions
+fail CI. See `DESIGN.md` for the two-backend + eval strategy.
+
 ---
 
 _(Inherited linkura usage follows; env vars, commands, and prompts are shared.)_

@@ -1,0 +1,205 @@
+"""Local, dependency-light query backend — no external API, fully deterministic.
+
+Why this exists:
+  * makes the chat genuinely queryable offline / in CI (no GOOGLE_API_KEY,
+    no Chroma, no network), so the web app runs anywhere;
+  * gives regression evals a stable, reproducible target;
+  * serves as a graceful fallback when the full RAG stack isn't configured.
+
+It does real lexical retrieval (TF-IDF over scene nodes) with unit / event /
+nickname scoping and an extractive answer with citations. The production path
+(Google embeddings + Gemini generation + Chroma) remains in engine.py; this is
+the same query surface at lower fidelity.
+"""
+
+from __future__ import annotations
+
+import math
+import re
+from collections import Counter
+from pathlib import Path
+
+from ..indexer.processor import StoryProcessor
+from ..models.story import StoryNode
+
+_WORD_RE = re.compile(r"[a-z0-9]+")
+_CJK_RE = re.compile(r"[぀-ヿ㐀-鿿]")
+_NICK_TOKEN_RE = re.compile(r"[a-z]+\d+", re.IGNORECASE)
+
+
+def tokenize(text: str) -> list[str]:
+    """ASCII words + CJK character bigrams — a language-agnostic lexical key set
+    that needs no tokenizer dependency (works for JP and EN)."""
+    text = text.lower()
+    tokens = _WORD_RE.findall(text)
+    cjk = _CJK_RE.findall(text)
+    tokens += ["".join(pair) for pair in zip(cjk, cjk[1:])] if len(cjk) > 1 else cjk
+    return tokens
+
+
+def load_story_nodes(root: str | Path) -> list[StoryNode]:
+    """Parse every ``*.md`` under ``root`` into scene StoryNodes."""
+    root = Path(root)
+    nodes: list[StoryNode] = []
+    for path in sorted(root.rglob("*.md")):
+        nodes.extend(StoryProcessor.process_file(path))
+    return nodes
+
+
+class LocalQueryEngine:
+    def __init__(self, nodes: list[StoryNode], events_index: list[dict] | None = None):
+        self.nodes = nodes
+        self._tokens: list[list[str]] = [tokenize(n.text) for n in nodes]
+        self._tf: list[Counter] = [Counter(t) for t in self._tokens]
+        df: Counter = Counter()
+        for toks in self._tokens:
+            df.update(set(toks))
+        n_docs = max(1, len(nodes))
+        self._idf: dict[str, float] = {
+            term: math.log(1 + n_docs / (1 + count)) for term, count in df.items()
+        }
+        # nickname / event scoping lookups from the enriched events index
+        self._arc_by_nick: dict[str, str] = {}
+        self._arc_by_event: dict[int, str] = {}
+        for row in events_index or []:
+            if row.get("arc_slug"):
+                self._arc_by_event[row["event_id"]] = row["arc_slug"]
+                if row.get("nickname"):
+                    self._arc_by_nick[row["nickname"].lower()] = row["arc_slug"]
+
+    # -- scoping -------------------------------------------------------------
+    def _detect_scope(self, question: str) -> tuple[str | None, str | None]:
+        """Infer (unit, arc_id) scope from nickname tokens in the question."""
+        for tok in _NICK_TOKEN_RE.findall(question):
+            arc = self._arc_by_nick.get(tok.lower())
+            if arc:
+                unit = next(
+                    (n.metadata.unit for n in self.nodes if n.metadata.arc_id == arc), None
+                )
+                return unit, arc
+        return None, None
+
+    def _candidate_indices(self, unit: str | None, arc_id: str | None) -> list[int]:
+        out = []
+        for i, node in enumerate(self.nodes):
+            if unit and node.metadata.unit != unit:
+                continue
+            if arc_id and node.metadata.arc_id != arc_id:
+                continue
+            out.append(i)
+        return out
+
+    # -- retrieval -----------------------------------------------------------
+    def retrieve(
+        self,
+        question: str,
+        *,
+        k: int = 5,
+        unit: str | None = None,
+        arc_id: str | None = None,
+    ) -> list[tuple[StoryNode, float]]:
+        q_tokens = [t for t in tokenize(question) if t in self._idf]
+        candidates = self._candidate_indices(unit, arc_id)
+        scored: list[tuple[float, int]] = []
+        for i in candidates:
+            tf = self._tf[i]
+            score = sum(tf.get(t, 0) * self._idf[t] for t in q_tokens)
+            if score > 0:
+                scored.append((score, i))
+        # deterministic tie-break: score desc, then stable source order
+        scored.sort(key=lambda s: (-s[0], self._sort_key(self.nodes[s[1]])))
+        return [(self.nodes[i], score) for score, i in scored[:k]]
+
+    @staticmethod
+    def _sort_key(node: StoryNode) -> tuple:
+        m = node.metadata
+        return (m.unit, m.arc_id, m.episode_number, m.scene_index)
+
+    # -- answer --------------------------------------------------------------
+    def query(
+        self,
+        question: str,
+        *,
+        unit: str | None = None,
+        event_id: int | None = None,
+        k: int = 5,
+    ) -> dict:
+        arc_id = self._arc_by_event.get(event_id) if event_id else None
+        if not unit and not arc_id:
+            unit, arc_id = self._detect_scope(question)
+
+        hits = self.retrieve(question, k=k, unit=unit, arc_id=arc_id)
+        if not hits:
+            # distinguish "resolved to an event that isn't indexed yet" from a miss
+            if arc_id and not self._candidate_indices(unit, arc_id):
+                msg = (
+                    f"That event ({arc_id}) is on the timeline but not indexed yet, "
+                    "so it isn't chat-answerable until the next ingest."
+                )
+            else:
+                msg = "No matching story content found for that query."
+            return {
+                "answer": msg,
+                "citations": [],
+                "scope": {"unit": unit, "arc_id": arc_id},
+                "backend": "local",
+            }
+
+        top, _ = hits[0]
+        m = top.metadata
+        q_tokens = set(tokenize(question))
+        # Extractive answer: gather query-overlapping lines from across the top
+        # hits (not just #1), ranked by overlap × scene score, so supporting
+        # evidence in a lower-ranked scene of the same arc still surfaces.
+        scored_lines: list[tuple[float, str]] = []
+        seen_lines: set[str] = set()
+        for node, node_score in hits:
+            for ln in node.text.splitlines():
+                stripped = ln.strip()
+                if not stripped or stripped.startswith("#") or stripped in seen_lines:
+                    continue
+                overlap = len(q_tokens & set(tokenize(stripped)))
+                if overlap:
+                    scored_lines.append((overlap * node_score, stripped))
+                    seen_lines.add(stripped)
+        scored_lines.sort(key=lambda s: -s[0])
+        relevant = [ln for _, ln in scored_lines[:6]]
+        if not relevant:  # fall back to the head of the top scene
+            relevant = [
+                ln.strip()
+                for ln in top.text.splitlines()
+                if ln.strip() and not ln.startswith("#")
+            ][:3]
+        loc = f"{m.unit} · {m.arc_id} · {m.episode_name}"
+        answer = f"[local extractive answer — {loc}]\n" + "\n".join(relevant)
+        citations = [
+            {
+                "unit": h.metadata.unit,
+                "arc_id": h.metadata.arc_id,
+                "episode": h.metadata.episode_name,
+                "scene_index": h.metadata.scene_index,
+                "score": round(score, 4),
+            }
+            for h, score in hits
+        ]
+        return {
+            "answer": answer,
+            "citations": citations,
+            "scope": {"unit": unit, "arc_id": arc_id},
+            "backend": "local",
+        }
+
+
+def build_local_engine(
+    story_root: str | Path,
+    events_index: list[dict] | None = None,
+) -> LocalQueryEngine:
+    """Build the engine over the story tree, restricted to arcs the index marks
+    ``indexed`` (the queryable contract: timeline may list more than chat can
+    answer). If no index is given, all parsed nodes are queryable."""
+    nodes = load_story_nodes(story_root)
+    if events_index:
+        indexed_arcs = {r["arc_slug"] for r in events_index if r.get("indexed") and r.get("arc_slug")}
+        if indexed_arcs:
+            nodes = [n for n in nodes if n.metadata.arc_id in indexed_arcs]
+    return LocalQueryEngine(nodes, events_index)

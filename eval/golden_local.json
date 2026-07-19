@@ -1,0 +1,51 @@
+{
+  "description": "Regression golden set for the local query backend over sample/story. Each case asserts the retrieved evidence arc and/or answer content, or that a not-yet-indexed event is refused. Deterministic: same corpus + engine => same result.",
+  "corpus": "sample/story",
+  "events_index": "sample/events_index.json",
+  "cases": [
+    {
+      "id": "kohane-fear",
+      "question": "How does Kohane feel about singing in front of people?",
+      "expect_arc": "0006-lyric",
+      "expect_unit": "vivid_bad_squad",
+      "answer_contains_any": ["scared", "afraid", "shaking"]
+    },
+    {
+      "id": "nickname-koha1",
+      "question": "What happens in koha1?",
+      "expect_scope_arc": "0006-lyric",
+      "expect_arc": "0006-lyric"
+    },
+    {
+      "id": "an-introduces",
+      "question": "Who is An and where does she tell Kohane to meet?",
+      "expect_arc": "0006-lyric",
+      "answer_contains_any": ["An Shiraishi", "Vivid Street"]
+    },
+    {
+      "id": "mafuyu-disappear",
+      "question": "Why is everyone worried that Mafuyu has not been logging into Nightcord?",
+      "expect_arc": "0002-marionette",
+      "expect_unit": "nightcord",
+      "answer_contains_any": ["week", "logged", "silence"]
+    },
+    {
+      "id": "kanade-search",
+      "question": "What does Kanade promise to do about Mafuyu in the Empty Sekai?",
+      "expect_arc": "0002-marionette",
+      "answer_contains_any": ["find you", "Empty Sekai", "disappear"]
+    },
+    {
+      "id": "unit-filter-vbs",
+      "question": "How did the team start to feel united?",
+      "unit": "vivid_bad_squad",
+      "expect_unit": "vivid_bad_squad"
+    },
+    {
+      "id": "not-indexed-akito1",
+      "question": "What is the story of akito1 about?",
+      "expect_no_answer": true,
+      "answer_contains_any": ["not indexed"]
+    }
+  ]
+}

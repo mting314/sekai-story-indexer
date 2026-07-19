@@ -50,7 +50,33 @@ fail. The pure Sekai modules (`source/`, `processor`, `models`) can be tested
 with any interpreter that has `pydantic`+`pyyaml`:
 `PYTHONPATH=src <python> -m pytest tests/test_sekai_source.py`.
 
+## Two CLIs / two query backends
+* `indexer` (cli.py) — full Google/Chroma RAG; needs deps + `GOOGLE_API_KEY`.
+* `sekai` (localcli.py) — dependency-light, no-API: `fetch`, `ask`, `serve`,
+  `eval`. Uses the **local** lexical engine (`query/local.py`): deterministic
+  TF-IDF retrieval + unit/nickname (`kasa5`) scoping + indexed-only queryable
+  contract. This is what makes the app runnable + evals stable anywhere.
+* `/api/query` picks backend via `SEKAI_QUERY_BACKEND` (`local` default, `full`).
+
+## Run / test locally (no keys)
+```bash
+uv sync --extra web
+sekai serve --story-root sample/story --events-index sample/events_index.json  # web app
+sekai eval        # regression gate
+uv run pytest     # unit + API + eval tests
+```
+`sample/story` + `sample/events_index.json` are a committed fixture corpus so the
+app + evals work with no fetch/keys.
+
+## Env note (restricted sandboxes)
+No PyPI-egress? `PYTHONPATH=src <python-with-pydantic> -m pytest tests/`. The
+`sekai` paths need only typer + fastapi/uvicorn (for serve); no chromadb.
+
 ## Status
-Phase 0, 1, 1b complete and tested (`tests/test_sekai_source.py`, 8 passing).
-Inherited linkura tests are still Hasunosora-shaped — port per phase. Next:
-Phase 2 (run summarizer over fetched events + add Unit-tier rollup).
+Phases 0–1g complete and tested: fork, ingestion, enrichment (focus/song/images),
+nicknames, freshness (live timeline + scheduled ingest), indexed indicator,
+**local query backend + web app chat + regression evals**. 31 focused tests
+passing (`test_sekai_source`, `test_local_query`, `test_eval_local`,
+`test_webapp_api`). Inherited linkura tests remain Hasunosora-shaped.
+Next: Phase 2 (Sekai summarizer/ingest end-to-end + Unit-tier) and Phase 4
+(port nickname/unit scoping into the full engine).

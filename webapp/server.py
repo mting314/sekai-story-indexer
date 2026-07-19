@@ -100,30 +100,74 @@ class QueryRequest(BaseModel):
     event_id: int | None = None
 
 
-@app.post("/api/query")
-def query(req: QueryRequest) -> dict:
-    """Answer via the RAG engine. Degrades gracefully if it isn't set up."""
+# Backend selection: "local" (default) = dependency-light lexical engine that
+# runs anywhere with no API key; "full" = Google embeddings + Gemini + Chroma.
+QUERY_BACKEND = os.environ.get("SEKAI_QUERY_BACKEND", "local")
+
+
+def _story_root() -> Path:
+    env = os.environ.get("SEKAI_STORY_ROOT")
+    if env:
+        return Path(env)
+    for candidate in (Path("story"), HERE.parent / "story", HERE.parent / "sample" / "story"):
+        if candidate.exists():
+            return candidate
+    return Path("story")
+
+
+_local_engine: dict[str, object] = {"engine": None}
+
+
+def _get_local_engine():
+    if _local_engine["engine"] is None:
+        from sekai_story_indexer.query.local import build_local_engine
+
+        _local_engine["engine"] = build_local_engine(_story_root(), _static_events())
+    return _local_engine["engine"]
+
+
+def _query_local(req: QueryRequest) -> dict:
+    engine = _get_local_engine()
+    result = engine.query(req.question, unit=req.unit, event_id=req.event_id)
+    return {"answer": result["answer"], "error": None, **result}
+
+
+def _query_full(req: QueryRequest) -> dict:
     try:
         from sekai_story_indexer.database import initialize_query_settings
         from sekai_story_indexer.query.engine import RetrievalConfig, StoryQueryEngine
     except Exception as exc:  # pragma: no cover - optional heavy deps
-        return {"answer": None, "error": f"query engine unavailable: {exc}"}
-
+        return {"answer": None, "error": f"full query engine unavailable: {exc}", "backend": "full"}
     try:
         initialize_query_settings()
         engine = StoryQueryEngine(retrieval_config=RetrievalConfig())
-        # NOTE: unit/event scoping (req.unit / req.event_id) becomes a metadata
-        # filter once Phase 4 wiring lands; today the engine answers globally.
-        answer = engine.query(req.question)
-        return {"answer": answer, "error": None}
+        return {"answer": engine.query(req.question), "error": None, "backend": "full"}
     except Exception as exc:  # pragma: no cover - runtime/config
         return {
             "answer": None,
+            "backend": "full",
             "error": (
-                f"{exc}. The index may not be built yet — run `indexer fetch` then "
-                "`indexer ingest`, and set GOOGLE_API_KEY."
+                f"{exc}. Build the index (`indexer fetch` + `indexer ingest`) and set "
+                "GOOGLE_API_KEY, or use SEKAI_QUERY_BACKEND=local."
             ),
         }
+
+
+@app.post("/api/query")
+def query(req: QueryRequest) -> dict:
+    """Answer a question. Uses the local lexical engine by default (runs anywhere);
+    set SEKAI_QUERY_BACKEND=full for the Google/Chroma RAG stack."""
+    if QUERY_BACKEND == "full":
+        return _query_full(req)
+    try:
+        return _query_local(req)
+    except Exception as exc:  # pragma: no cover - defensive
+        return {"answer": None, "error": f"local query failed: {exc}", "backend": "local"}
+
+
+@app.get("/api/health")
+def health() -> dict:
+    return {"status": "ok", "backend": QUERY_BACKEND, "events": len(load_events())}
 
 
 @app.get("/")

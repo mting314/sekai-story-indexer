@@ -121,6 +121,31 @@ With continuous releases a frozen snapshot rots, so the timeline endpoint earns
 its keep as a cached passthrough+enrichment over the source. `/api/units` stays
 effectively static (units don't change).
 
+## Two query backends (and why)
+
+The chat has two interchangeable backends behind one request shape
+(`/api/query`, `engine.query(...)`):
+
+* **`local`** (default) — a dependency-light, deterministic **lexical** engine
+  (`query/local.py`): TF-IDF over scene nodes, unit + nickname (`kasa5`) scoping,
+  extractive answers with citations, and enforcement of the indexed-only
+  queryable contract. No API key, no Chroma, no network — so the app runs
+  anywhere (laptops, CI, this repo's sample corpus) and gives evals a stable
+  target.
+* **`full`** — the inherited production stack: Google embeddings + Gemini
+  generation + Chroma, higher answer quality, needs deps + `GOOGLE_API_KEY` +
+  a built index.
+
+This isn't just a fallback — a deterministic backend is what makes **regression
+evals** meaningful. `eval/golden_local.json` + `eval/local_eval.py` score each
+case on retrieved-arc, scope, unit, and answer-content; `tests/test_eval_local.py`
+gates it in CI, and `tests/test_webapp_api.py` exercises the real FastAPI app.
+Because both backends share the query surface, the same golden set can later run
+against `full` to catch answer-quality drift (Phase 4).
+
+Scoping (unit + nickname) is implemented in the local backend now; Phase 4 ports
+the identical logic into the full engine as Chroma metadata filters.
+
 ## Non-goals (for now)
 * No EN-asset ingestion (translate JP instead).
 * No card/area/unit-story fetch yet (Phase 5) — event + main stories are the

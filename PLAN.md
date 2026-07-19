@@ -120,9 +120,17 @@ even the filesystem sorted chronologically). Hand-authored content still uses
 - [x] **Phase 1e — Web app.** `webapp/` FastAPI + vanilla-JS SPA: chat over the
   query engine + unit-filterable event timeline with CDN visuals, nicknames,
   focus character, and song.
-- [ ] **Phase 4 — Retrieval & query.** `--unit`/`--event` and **nickname**
-  scoping end-to-end (resolve `kasa5` → event_id → metadata filter); per-unit
-  golden eval sets; extend `ALLOWED_STORY_TYPES`/tier labels for Sekai.
+- [x] **Phase 1f — Local query backend + web app chat.** Dependency-light,
+  deterministic lexical engine (`query/local.py`) with unit + **nickname**
+  (`kasa5`) scoping and the indexed-only queryable contract; wired into
+  `/api/query` (default backend) and the `sekai` CLI (`ask`/`serve`/`eval`).
+  Runs with no API key / no Chroma, so the app is live anywhere.
+- [x] **Phase 1g — Regression evals.** Golden set (`eval/golden_local.json`) +
+  runner (`eval/local_eval.py`) gating retrieval/scoping/answer content, run as a
+  pytest (`test_eval_local.py`) + API tests (`test_webapp_api.py`).
+- [ ] **Phase 4 — Full-engine scoping.** Port the same nickname/unit scoping into
+  the production Google/Chroma engine as metadata filters; run the golden set
+  against `--backend full`; extend `ALLOWED_STORY_TYPES`/tier labels for Sekai.
 - [ ] **Phase 5 — Content beyond events.** Main stories, Unit stories, Card
   side-stories (bulk), Area conversations via additional fetcher sources.
 - [ ] **Phase 6 — Translation & audit.** Reuse glossary + State Ledger
