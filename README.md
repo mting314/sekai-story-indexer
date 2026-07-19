@@ -40,7 +40,17 @@ sekai serve --port 8000 --story-root sample/story --events-index sample/events_i
 
 # regression eval (deterministic; non-zero exit on regression)
 sekai eval --golden eval/golden_local.json
+
+# classify plot_weight for an existing index; fetch unit (formation) stories
+sekai classify --events-index events_index.json
+sekai fetch-unit-stories --story-root story
 ```
+
+The local chat supports **unit + nickname scoping** (`kasa5`), **plot-weight
+boosting** (plot events rank up, filler stays retrievable), **Tier-1 unit
+overviews** ("overview of Leo/need"), a **cross-lingual glossary bridge** (ask in
+English over the JP corpus), and **quote-grounded answers** with click-to-open
+excerpts.
 
 Point `--story-root`/`--events-index` at your real `story/` + `events_index.json`
 (from `indexer fetch`) once you've fetched. For the production RAG answer quality,

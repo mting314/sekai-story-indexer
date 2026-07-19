@@ -25,12 +25,18 @@ def fetch(
     story_root: Path = typer.Option(Path("story")),
     limit: int = typer.Option(0, help="Only the N earliest events (0 = all)"),
     event_id: list[int] = typer.Option(None),
+    skip_existing: bool = typer.Option(
+        False, help="Resumable: skip episodes already on disk (don't re-download)"
+    ),
 ):
     """Download story text + build the story tree, story_order.yaml, events_index.json."""
     from .source.fetcher import fetch_and_write
 
     plans = fetch_and_write(
-        story_root, limit=limit or None, event_ids=list(event_id) if event_id else None
+        story_root,
+        limit=limit or None,
+        event_ids=list(event_id) if event_id else None,
+        skip_existing=skip_existing,
     )
     typer.echo(f"Fetched {len(plans)} events into {story_root}")
 

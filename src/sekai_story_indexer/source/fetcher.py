@@ -191,6 +191,7 @@ def fetch_and_write(
     limit: int | None = None,
     event_ids: list[int] | None = None,
     scenario_fetch: Callable[[str, str], dict] | None = None,
+    skip_existing: bool = False,
     log: Callable[[str], None] = print,
 ) -> list[EventPlan]:
     """Fetch events + scenarios and write the story tree + story_order.yaml.
@@ -215,6 +216,7 @@ def fetch_and_write(
         selected = selected[:limit]
 
     plans: list[EventPlan] = []
+    written_ids: set[int] = set()
     for event in selected:
         story = stories_by_event.get(event["id"])
         if not story:
@@ -230,6 +232,10 @@ def fetch_and_write(
         )
         ok = 0
         for ep in plan.episodes:
+            out_path = story_root / ep.relpath
+            if skip_existing and out_path.exists() and out_path.stat().st_size > 0:
+                ok += 1  # already fetched — resumable
+                continue
             try:
                 scenario = fetch_scenario(ep.asset_bundle, ep.scenario_id)
             except Exception as exc:  # one bad episode must not abort the run
@@ -237,12 +243,13 @@ def fetch_and_write(
                 continue
             lines = scenario_to_lines(scenario)
             markdown = render_episode_markdown(ep.title, [lines])
-            out_path = story_root / ep.relpath
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_text(markdown, encoding="utf-8")
             ok += 1
         log(f"wrote {plan.unit}/{plan.arc_slug} ({ok}/{len(plan.episodes)} episodes)")
         plans.append(plan)
+        if ok:
+            written_ids.add(plan.event_id)
 
     # emit ordering (covers written trees) + a COMPLETE events index (all events,
     # so the timeline stays complete and nicknames are globally correct even with
@@ -254,10 +261,9 @@ def fetch_and_write(
         encoding="utf-8",
     )
 
-    wrote_ids = {p.event_id for p in plans}
     catalog = build_catalog(events, **{k: tables[k] for k in tables if k != "events"})
     for row in catalog:
-        row["indexed"] = row["event_id"] in wrote_ids
+        row["indexed"] = row["event_id"] in written_ids
 
     index_path = story_root.parent / "events_index.json"
     index_path.write_text(
