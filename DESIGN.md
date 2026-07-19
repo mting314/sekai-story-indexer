@@ -50,6 +50,24 @@ multi-file episodes appear.
 | **Quantity (5 units)** | `unit` facet + `--unit` scoping + data-driven chronological `story_order.yaml` | 1 (facet), 4 (scoping UX) |
 | **Filler vs plot** | index everything; `plot_weight` LLM tag; retrieval boost for thematic queries, full recall for factual ones | 3 |
 
+### Native "key story" signal (`is_key_story`)
+The game/sekai.best already tags events via `eventStoryUnits.json`: an event is a
+"key story" (`isKeyEventStory`) when it has a `main`-relation unit. We ingest
+this as `is_key_story` — a **prior**, stored separately from our own
+`plot_weight`, because the native tag is overinclusive (nearly every unit event
+qualifies, filler included). So:
+
+* `is_key_story` = raw native signal, always captured at fetch time.
+* `plot_weight` = **our** classifier's verdict (Phase 3), the final say. It uses
+  `is_key_story` as one input feature but can downgrade an "overzealous" key
+  event to `filler`, or upgrade a non-key event that actually moves an arc.
+* Interim (before the classifier): retrieval may use `is_key_story` as a light
+  boost so thematic queries already favor main-arc events.
+
+`eventStoryUnits` is also the **authoritative unit resolver** (main-relation
+unit), superseding the earlier character-count heuristic (kept only as a
+fallback when the table is unavailable).
+
 ### On filler specifically
 The requirement is explicit: **include everything, but focus on character
 development and plot progression.** So `plot_weight` never *excludes* — it's a

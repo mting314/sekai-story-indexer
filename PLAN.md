@@ -83,11 +83,17 @@ even the filesystem sorted chronologically). Hand-authored content still uses
 
 ### Challenge 3 — Event-story relevance (filler vs plot)
 * **Everything is indexed in full** — filler included, per the requirement.
-* Add a `plot_weight` tag (`high | medium | filler | unrated`) per episode via an
-  LLM classification pass at ingest, scoring character-development and
-  plot-progression. Retrieval **boosts** high-weight content for thematic /
-  character-arc queries but returns everything for "what happened in X" /
-  exhaustive queries. State Ledger extraction prioritizes high/medium.
+* **Native prior:** capture the game's own "key story" tag as `is_key_story`
+  (from `eventStoryUnits.json` main-relation, sekai.best's `isKeyEventStory`).
+  It's overinclusive, so it's only an input feature — not the verdict.
+* **Our verdict:** a `plot_weight` tag (`high | medium | filler | unrated`) per
+  episode via an LLM classification pass at ingest, scoring character-development
+  and plot-progression, using `is_key_story` as one feature but free to disagree.
+  Retrieval **boosts** high-weight content for thematic / character-arc queries
+  but returns everything for "what happened in X" / exhaustive queries. State
+  Ledger extraction prioritizes high/medium.
+* `eventStoryUnits` also drives **authoritative unit resolution** (main-relation
+  unit) — the character-count heuristic is now just a fallback.
 
 ## 4. Plan of attack (phased)
 

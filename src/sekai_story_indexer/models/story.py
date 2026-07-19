@@ -44,10 +44,19 @@ class StoryMetadata(BaseModel):
     plot_weight: str = Field(
         "unrated",
         description=(
-            "Narrative importance for a unit's arc: high (major character "
-            "development / plot progression), medium, filler, or unrated. "
-            "Filler is still indexed in full; this only affects retrieval "
-            "prioritization for thematic queries."
+            "OUR narrative-importance rating for a unit's arc: high (major "
+            "character development / plot progression), medium, filler, or "
+            "unrated. Filler is still indexed in full; this only affects "
+            "retrieval prioritization for thematic queries. Set by our own "
+            "classifier — the final say, independent of is_key_story."
+        ),
+    )
+    is_key_story: bool = Field(
+        False,
+        description=(
+            "Native game 'key story' signal (sekai.best isKeyEventStory: the "
+            "event has a main-relation unit). An overinclusive input prior, "
+            "not the final relevance verdict."
         ),
     )
     event_id: int = Field(0, description="Sekai master-DB event id, 0 if not an event story")

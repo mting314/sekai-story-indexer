@@ -46,6 +46,12 @@ def event_stories() -> list[dict]:
     return fetch_json(f"{MASTER_DB}/eventStories.json")
 
 
+def event_story_units() -> list[dict]:
+    """eventStoryUnits.json: authoritative event -> unit + relation ("main"/"sub").
+    Basis for both unit resolution and the native "key story" signal."""
+    return fetch_json(f"{MASTER_DB}/eventStoryUnits.json")
+
+
 def unit_stories() -> list[dict]:
     return fetch_json(f"{MASTER_DB}/unitStories.json")
 

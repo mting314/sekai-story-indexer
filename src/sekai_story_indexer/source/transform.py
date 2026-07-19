@@ -85,6 +85,40 @@ def resolve_unit(
     return "mixed"
 
 
+def resolve_unit_from_story_units(story_units: list[dict]) -> str:
+    """Authoritative unit slug from ``eventStoryUnits`` rows for one event.
+
+    Prefers the ``main``-relation unit(s); a single main unit wins, multiple
+    main units (crossover) -> ``mixed``. Falls back to any present unit, else
+    ``mixed``. Each row: ``{unit, eventStoryUnitRelation}``.
+    """
+    main = {
+        DB_UNIT_TO_SLUG.get((r.get("unit") or "").lower())
+        for r in story_units
+        if r.get("eventStoryUnitRelation") == "main"
+    }
+    main.discard(None)
+    if len(main) == 1:
+        return next(iter(main))
+    if len(main) > 1:
+        return "mixed"
+    other = {DB_UNIT_TO_SLUG.get((r.get("unit") or "").lower()) for r in story_units}
+    other.discard(None)
+    if len(other) == 1:
+        return next(iter(other))
+    return "mixed"
+
+
+def is_key_event_story(story_units: list[dict]) -> bool:
+    """Native "key story" signal: any story-unit row with relation ``main``.
+
+    This is sekai.best's ``isKeyEventStory`` rule. It is deliberately
+    overinclusive (most unit events qualify), so it is stored as an input
+    prior only — our own ``plot_weight`` classifier remains the final say.
+    """
+    return any(r.get("eventStoryUnitRelation") == "main" for r in story_units)
+
+
 def scenario_to_lines(scenario: dict) -> list[tuple[str, str]]:
     """Extract ordered ``(speaker, text)`` tuples from a scenario ``.asset``.
 

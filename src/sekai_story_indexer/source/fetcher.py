@@ -15,12 +15,13 @@ from pathlib import Path
 import yaml
 
 from . import client
-from .constants import CHARACTER_ID_TO_UNIT
 from .transform import (
     arc_slug,
     episode_filename,
+    is_key_event_story,
     render_episode_markdown,
     resolve_unit,
+    resolve_unit_from_story_units,
     scenario_to_lines,
     tree_relpath,
 )
@@ -48,6 +49,7 @@ class EventPlan:
     arc_slug: str
     started_at: int
     outline: str
+    is_key_story: bool = False
     episodes: list[EpisodePlan] = field(default_factory=list)
 
 
@@ -56,17 +58,25 @@ def plan_event(
     story: dict,
     *,
     content_type: str = "event",
+    story_units: list[dict] | None = None,
     event_characters: dict[int, list[int]] | None = None,
 ) -> EventPlan:
     """Pure: turn one event + its eventStories record into a write plan.
 
-    ``event_characters`` maps event_id -> featured character ids, used to resolve
-    the unit when the event carries no explicit unit field.
+    Unit resolution precedence: authoritative ``eventStoryUnits`` (main
+    relation) -> explicit event ``unit`` field / featured characters -> mixed.
+    ``story_units`` are the eventStoryUnits rows for this event's story; they
+    also determine the native ``is_key_story`` signal.
     """
     event_id = event["id"]
     name = event.get("name", str(event_id))
-    char_ids = (event_characters or {}).get(event_id)
-    unit = resolve_unit(db_unit=event.get("unit"), character_ids=char_ids)
+    story_units = story_units or []
+    if story_units:
+        unit = resolve_unit_from_story_units(story_units)
+    else:
+        char_ids = (event_characters or {}).get(event_id)
+        unit = resolve_unit(db_unit=event.get("unit"), character_ids=char_ids)
+    is_key = is_key_event_story(story_units)
     slug = arc_slug(event_id, name)
     asset_bundle = story["assetbundleName"]
 
@@ -90,6 +100,7 @@ def plan_event(
         arc_slug=slug,
         started_at=event.get("startAt", 0),
         outline=story.get("outline", ""),
+        is_key_story=is_key,
         episodes=episodes,
     )
 
@@ -114,18 +125,6 @@ def story_order_doc(plans: list[EventPlan]) -> dict:
     }
 
 
-def _event_characters(event_stories_deck: list[dict]) -> dict[int, list[int]]:
-    """Map event_id -> featured character ids from eventDeckBonuses / eventCards.
-    Best-effort; unknown ids simply don't contribute to unit resolution."""
-    out: dict[int, list[int]] = {}
-    for row in event_stories_deck:
-        ev = row.get("eventId")
-        cid = row.get("gameCharacterId") or row.get("characterId")
-        if ev and cid in CHARACTER_ID_TO_UNIT:
-            out.setdefault(ev, []).append(cid)
-    return out
-
-
 def fetch_and_write(
     story_root: Path,
     *,
@@ -143,14 +142,16 @@ def fetch_and_write(
     fetch_scenario = scenario_fetch or client.event_scenario
 
     events = client.events()
-    stories_by_event = {s["eventId"]: s for s in client.event_stories()}
-    # Featured-character -> unit resolution is best-effort; when the eventCards
-    # table is unavailable, resolve_unit() falls back to the db unit or "mixed".
+    stories = client.event_stories()
+    stories_by_event = {s["eventId"]: s for s in stories}
+    # eventStoryUnits gives authoritative unit + the native key-story signal,
+    # grouped by eventStoryId. Optional/offline -> fall back per event.
+    story_units_by_story_id: dict[int, list[dict]] = {}
     try:
-        deck = client.fetch_json(f"{client.MASTER_DB}/eventCards.json")
-        char_map = _event_characters(deck)
+        for row in client.event_story_units():
+            story_units_by_story_id.setdefault(row["eventStoryId"], []).append(row)
     except Exception:  # pragma: no cover - optional table / offline
-        char_map = {}
+        story_units_by_story_id = {}
 
     selected = [e for e in events if not event_ids or e["id"] in event_ids]
     selected.sort(key=lambda e: (e.get("startAt", 0), e["id"]))
@@ -163,7 +164,9 @@ def fetch_and_write(
         if not story:
             log(f"skip event {event['id']} ({event.get('name')}): no eventStories record")
             continue
-        plan = plan_event(event, story, event_characters=char_map)
+        plan = plan_event(
+            event, story, story_units=story_units_by_story_id.get(story["id"], [])
+        )
         for ep in plan.episodes:
             scenario = fetch_scenario(ep.asset_bundle, ep.scenario_id)
             lines = scenario_to_lines(scenario)
@@ -192,6 +195,8 @@ def fetch_and_write(
                     "arc_slug": p.arc_slug,
                     "started_at": p.started_at,
                     "outline": p.outline,
+                    "is_key_story": p.is_key_story,
+                    "plot_weight": "unrated",
                     "episodes": len(p.episodes),
                 }
                 for p in plans

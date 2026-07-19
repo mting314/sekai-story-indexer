@@ -5,8 +5,10 @@ from sekai_story_indexer.source.fetcher import plan_event, story_order_doc
 from sekai_story_indexer.source.transform import (
     arc_slug,
     episode_filename,
+    is_key_event_story,
     render_episode_markdown,
     resolve_unit,
+    resolve_unit_from_story_units,
     scenario_to_lines,
     slugify,
     tree_relpath,
@@ -75,14 +77,40 @@ def _story():
     }
 
 
+def test_resolve_unit_from_story_units_prefers_main_relation():
+    rows = [
+        {"unit": "street", "eventStoryUnitRelation": "main"},
+        {"unit": "piapro", "eventStoryUnitRelation": "sub"},
+    ]
+    assert resolve_unit_from_story_units(rows) == "vivid_bad_squad"
+    assert is_key_event_story(rows) is True
+    # two main units -> crossover
+    cross = [
+        {"unit": "street", "eventStoryUnitRelation": "main"},
+        {"unit": "idol", "eventStoryUnitRelation": "main"},
+    ]
+    assert resolve_unit_from_story_units(cross) == "mixed"
+    # no main relation -> not a key story; single present unit still resolves
+    sub_only = [{"unit": "theme_park", "eventStoryUnitRelation": "sub"}]
+    assert is_key_event_story(sub_only) is False
+    assert resolve_unit_from_story_units(sub_only) == "wonderlands_showtime"
+
+
 def test_plan_event_orders_episodes_and_resolves_unit():
-    plan = plan_event(_event(), _story())
+    story_units = [{"unit": "street", "eventStoryUnitRelation": "main"}]
+    plan = plan_event(_event(), _story(), story_units=story_units)
     assert plan.unit == "vivid_bad_squad"
+    assert plan.is_key_story is True
     assert plan.arc_slug == "0151-grow-glorious"
     assert [e.scenario_id for e in plan.episodes] == ["ev_151_01", "ev_151_02"]
     assert plan.episodes[0].relpath == tree_relpath(
         "vivid_bad_squad", "event", "0151-grow-glorious", "01_one.md"
     )
+
+    # without story_units, falls back to the event's own unit field
+    fallback = plan_event(_event(), _story())
+    assert fallback.unit == "vivid_bad_squad"
+    assert fallback.is_key_story is False
 
 
 def test_story_order_doc_is_chronological():
