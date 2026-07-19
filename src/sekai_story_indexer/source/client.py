@@ -83,3 +83,48 @@ def cards() -> list[dict]:
 def event_scenario(asset_bundle: str, scenario_id: str) -> dict:
     url = f"{ASSET_CDN}/event_story/{asset_bundle}/scenario/{scenario_id}.asset"
     return fetch_json(url)
+
+
+# --- grouped bundle ---------------------------------------------------------
+
+def load_catalog_tables() -> dict:
+    """Fetch + group every master table the enriched catalog needs, in the shape
+    ``catalog.build_catalog`` expects. Shared by the fetcher and the web app so
+    both derive the timeline identically. Optional tables degrade to empty."""
+    events_list = events()
+    stories = event_stories()
+    stories_by_event = {s["eventId"]: s for s in stories}
+
+    story_units_by_story_id: dict[int, list[dict]] = {}
+    try:
+        for row in event_story_units():
+            story_units_by_story_id.setdefault(row["eventStoryId"], []).append(row)
+    except Exception:  # pragma: no cover - optional/offline
+        story_units_by_story_id = {}
+
+    cards_by_id: dict[int, dict] = {}
+    event_card_ids: dict[int, list[int]] = {}
+    try:
+        cards_by_id = {c["id"]: c for c in cards()}
+        for row in event_cards():
+            event_card_ids.setdefault(row["eventId"], []).append(row["cardId"])
+    except Exception:  # pragma: no cover - optional/offline
+        cards_by_id, event_card_ids = {}, {}
+
+    music_by_event: dict[int, dict] = {}
+    try:
+        musics_by_id = {m["id"]: m for m in musics()}
+        for row in event_musics():
+            if row["eventId"] not in music_by_event and row["musicId"] in musics_by_id:
+                music_by_event[row["eventId"]] = musics_by_id[row["musicId"]]
+    except Exception:  # pragma: no cover - optional/offline
+        music_by_event = {}
+
+    return {
+        "events": events_list,
+        "stories_by_event": stories_by_event,
+        "story_units_by_story_id": story_units_by_story_id,
+        "event_card_ids": event_card_ids,
+        "cards_by_id": cards_by_id,
+        "music_by_event": music_by_event,
+    }

@@ -190,3 +190,47 @@ def test_song_info_flattens_music_record():
 def test_asset_urls():
     assert event_logo_url("event_grow").endswith("/event/event_grow/logo/logo.webp")
     assert music_jacket_url("m01").endswith("/music/jacket/m01/m01.webp")
+
+
+def test_build_catalog_enriches_and_numbers_nicknames():
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    events = [
+        {"id": 6, "name": "Lyric", "startAt": 2000},
+        {"id": 2, "name": "Marionette", "startAt": 1000},
+    ]
+    stories_by_event = {
+        6: {"id": 106, "eventId": 6, "assetbundleName": "ab6",
+            "eventStoryEpisodes": [{"episodeNo": 1}, {"episodeNo": 2}]},
+        2: {"id": 102, "eventId": 2, "assetbundleName": "ab2", "eventStoryEpisodes": []},
+    }
+    story_units_by_story_id = {
+        106: [{"unit": "street", "eventStoryUnitRelation": "main"}],
+        102: [{"unit": "school_refusal", "eventStoryUnitRelation": "main"}],
+    }
+    event_card_ids = {6: [901], 2: [902]}
+    cards_by_id = {
+        901: {"id": 901, "characterId": 9, "cardRarityType": "rarity_4", "releaseAt": 1},
+        902: {"id": 902, "characterId": 18, "cardRarityType": "rarity_4", "releaseAt": 1},
+    }
+    music_by_event = {6: {"title": "Hibana", "assetbundleName": "m6"}}
+
+    cat = build_catalog(
+        events,
+        stories_by_event=stories_by_event,
+        story_units_by_story_id=story_units_by_story_id,
+        event_card_ids=event_card_ids,
+        cards_by_id=cards_by_id,
+        music_by_event=music_by_event,
+    )
+    # chronological
+    assert [r["event_id"] for r in cat] == [2, 6]
+    marionette, lyric = cat[0], cat[1]
+    assert marionette["unit"] == "nightcord"
+    assert marionette["nickname"] == "mafu1"      # Mafuyu (18) 1st focus
+    assert lyric["unit"] == "vivid_bad_squad"
+    assert lyric["nickname"] == "koha1"           # Kohane (9) 1st focus
+    assert lyric["song_title"] == "Hibana"
+    assert lyric["episodes"] == 2
+    assert lyric["has_story"] is True
+    assert lyric["logo_url"].endswith("/event/ab6/logo/logo.webp")

@@ -15,9 +15,8 @@ from pathlib import Path
 import yaml
 
 from . import client
-from .assets import event_banner_url, event_logo_url, music_jacket_url
+from .catalog import build_catalog
 from .constants import CHARACTER_ID_TO_JP
-from .nicknames import assign_focus_nicknames
 from .transform import (
     arc_slug,
     episode_filename,
@@ -160,36 +159,13 @@ def fetch_and_write(
     story_root = Path(story_root)
     fetch_scenario = scenario_fetch or client.event_scenario
 
-    events = client.events()
-    stories = client.event_stories()
-    stories_by_event = {s["eventId"]: s for s in stories}
-    # eventStoryUnits gives authoritative unit + the native key-story signal,
-    # grouped by eventStoryId. Optional/offline -> fall back per event.
-    story_units_by_story_id: dict[int, list[dict]] = {}
-    try:
-        for row in client.event_story_units():
-            story_units_by_story_id.setdefault(row["eventStoryId"], []).append(row)
-    except Exception:  # pragma: no cover - optional table / offline
-        story_units_by_story_id = {}
-
-    # Focus character (eventCards -> cards) and commissioned song (eventMusics ->
-    # musics). All optional; enrichment degrades gracefully if a table is absent.
-    cards_by_id: dict[int, dict] = {}
-    event_card_ids: dict[int, list[int]] = {}
-    music_by_event: dict[int, dict] = {}
-    try:
-        cards_by_id = {c["id"]: c for c in client.cards()}
-        for row in client.event_cards():
-            event_card_ids.setdefault(row["eventId"], []).append(row["cardId"])
-    except Exception:  # pragma: no cover - optional table / offline
-        cards_by_id, event_card_ids = {}, {}
-    try:
-        musics_by_id = {m["id"]: m for m in client.musics()}
-        for row in client.event_musics():
-            if row["eventId"] not in music_by_event and row["musicId"] in musics_by_id:
-                music_by_event[row["eventId"]] = musics_by_id[row["musicId"]]
-    except Exception:  # pragma: no cover - optional table / offline
-        music_by_event = {}
+    tables = client.load_catalog_tables()
+    events = tables["events"]
+    stories_by_event = tables["stories_by_event"]
+    story_units_by_story_id = tables["story_units_by_story_id"]
+    event_card_ids = tables["event_card_ids"]
+    cards_by_id = tables["cards_by_id"]
+    music_by_event = tables["music_by_event"]
 
     selected = [e for e in events if not event_ids or e["id"] in event_ids]
     selected.sort(key=lambda e: (e.get("startAt", 0), e["id"]))
@@ -220,59 +196,25 @@ def fetch_and_write(
         log(f"wrote {plan.unit}/{plan.arc_slug} ({len(plan.episodes)} episodes)")
         plans.append(plan)
 
-    # emit ordering + an events index manifest alongside the story root
+    # emit ordering (covers written trees) + a COMPLETE events index (all events,
+    # so the timeline stays complete and nicknames are globally correct even with
+    # --limit). Events without written story text carry has_story=False; the
+    # `indexed` flag marks which trees this run wrote.
     order_path = story_root.parent / "story_order.yaml"
     order_path.write_text(
         yaml.safe_dump(story_order_doc(plans), allow_unicode=True, sort_keys=False),
         encoding="utf-8",
     )
-    # Assign community nicknames (kasa5, mizu3, …) from focus characters,
-    # numbering each character's focus events in release order.
-    nicknames = assign_focus_nicknames(
-        [
-            {
-                "event_id": p.event_id,
-                "focus_character_id": p.focus_character_id,
-                "started_at": p.started_at,
-            }
-            for p in plans
-        ]
-    )
+
+    wrote_ids = {p.event_id for p in plans}
+    catalog = build_catalog(events, **{k: tables[k] for k in tables if k != "events"})
+    for row in catalog:
+        row["indexed"] = row["event_id"] in wrote_ids
 
     index_path = story_root.parent / "events_index.json"
     index_path.write_text(
-        json.dumps(
-            [
-                {
-                    "event_id": p.event_id,
-                    "name": p.name,
-                    "unit": p.unit,
-                    "content_type": p.content_type,
-                    "arc_slug": p.arc_slug,
-                    "started_at": p.started_at,
-                    "outline": p.outline,
-                    "is_key_story": p.is_key_story,
-                    "plot_weight": "unrated",
-                    "focus_character_id": p.focus_character_id,
-                    "focus_character": p.focus_character,
-                    "nickname": (nicknames.get(p.event_id) or {}).get("nickname"),
-                    "focus_index": (nicknames.get(p.event_id) or {}).get("focus_index"),
-                    **p.song,
-                    "logo_url": event_logo_url(p.asset_bundle) if p.asset_bundle else "",
-                    "banner_url": event_banner_url(p.asset_bundle) if p.asset_bundle else "",
-                    "jacket_url": (
-                        music_jacket_url(p.song["song_assetbundle"])
-                        if p.song.get("song_assetbundle")
-                        else ""
-                    ),
-                    "episodes": len(p.episodes),
-                }
-                for p in plans
-            ],
-            ensure_ascii=False,
-            indent=2,
-        ),
+        json.dumps(catalog, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    log(f"wrote {order_path} and {index_path} ({len(plans)} events)")
+    log(f"wrote {order_path} and {index_path} ({len(plans)} trees / {len(catalog)} events)")
     return plans

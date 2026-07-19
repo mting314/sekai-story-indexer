@@ -90,6 +90,37 @@ filler rarely changes canonical world-state.
 * Speaker labels come straight from `TalkData[].WindowDisplayName`; narration has
   an empty speaker and is written as a bare line (parsed as a narrative beat).
 
+## Freshness: two tracks, two mechanisms
+
+The source ships a new event ~every 15 days, so the system must keep updating. The
+mistake is treating this as one problem — it's two, with different cost and cadence:
+
+| | Timeline / event metadata | RAG index (story text) |
+|---|---|---|
+| Updates | new event's name/date/logo/unit/nickname/focus/song | embeddings, tier summaries, State Ledger for the new text |
+| Cost | cheap (re-read master tables) | expensive (LLM summarize + embed per episode) |
+| Live from source API? | **yes** | **no** — source has raw text, not our derived index |
+| Mechanism | **dynamic + cached endpoint** (`/api/events`) | **scheduled incremental ingest** (`scripts/sync.sh`) |
+
+* **Timeline is served live** from the master DB through `client.load_catalog_tables`
+  → `catalog.build_catalog`, cached (`SEKAI_EVENTS_TTL`, default 6h), falling back
+  to the last on-disk index when the source is unreachable. New events appear with
+  no redeploy. This is where using the *source's own API* is correct — for the
+  listing, not the RAG.
+* **RAG updates on a schedule** — `scripts/sync.sh` = `indexer fetch` (idempotent)
+  + `indexer ingest` (manifest/content-hash gated, so only new episodes are
+  re-embedded). Run daily via cron/CI; no-ops when nothing new landed.
+* **The timeline leads the index.** An event can be on the timeline before its
+  text is ingested, so every row carries `indexed`: true once chat can answer
+  about it, false = "listed, coming after next sync." One enrichment code path
+  (`build_catalog`) feeds both the live API and the on-disk index, so they never
+  diverge.
+
+Why not a pure static file (my earlier suggestion): that assumed a fixed corpus.
+With continuous releases a frozen snapshot rots, so the timeline endpoint earns
+its keep as a cached passthrough+enrichment over the source. `/api/units` stays
+effectively static (units don't change).
+
 ## Non-goals (for now)
 * No EN-asset ingestion (translate JP instead).
 * No card/area/unit-story fetch yet (Phase 5) — event + main stories are the
