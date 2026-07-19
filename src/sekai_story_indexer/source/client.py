@@ -118,6 +118,39 @@ def game_character_units() -> list[dict]:
     return fetch_json(f"{MASTER_DB}/gameCharacterUnits.json")
 
 
+# Other-region master DBs. Same event IDs as JP, but each region releases the
+# event on its own schedule — this is what sekai.best's per-server "Event Period"
+# block shows. JP is the primary MASTER_DB.
+REGION_DBS = {
+    "en": "https://sekai-world.github.io/sekai-master-db-en-diff",
+    "tw": "https://sekai-world.github.io/sekai-master-db-tc-diff",
+    "kr": "https://sekai-world.github.io/sekai-master-db-kr-diff",
+}
+
+
+def region_event_times() -> dict[int, dict[str, dict[str, int]]]:
+    """Per-region event windows keyed by event id:
+    ``{event_id: {"en": {"start": ms, "end": ms}, "tw": {...}, "kr": {...}}}``.
+
+    JP is intentionally omitted (it's already on each catalog record). A region
+    that can't be fetched is skipped, never fatal."""
+    out: dict[int, dict[str, dict[str, int]]] = {}
+    for region, base in REGION_DBS.items():
+        try:
+            rows = fetch_json(f"{base}/events.json")
+        except Exception:  # region down / not yet published -> skip that server
+            continue
+        for e in rows:
+            eid = e.get("id")
+            if eid is None:
+                continue
+            out.setdefault(eid, {})[region] = {
+                "start": e.get("startAt", 0),
+                "end": e.get("aggregateAt", 0),
+            }
+    return out
+
+
 # --- grouped bundle ---------------------------------------------------------
 
 def load_catalog_tables() -> dict:
