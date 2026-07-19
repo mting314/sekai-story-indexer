@@ -72,11 +72,20 @@ app + evals work with no fetch/keys.
 No PyPI-egress? `PYTHONPATH=src <python-with-pydantic> -m pytest tests/`. The
 `sekai` paths need only typer + fastapi/uvicorn (for serve); no chromadb.
 
-## Status
-Phases 0–1g complete and tested: fork, ingestion, enrichment (focus/song/images),
-nicknames, freshness (live timeline + scheduled ingest), indexed indicator,
-**local query backend + web app chat + regression evals**. 31 focused tests
-passing (`test_sekai_source`, `test_local_query`, `test_eval_local`,
-`test_webapp_api`). Inherited linkura tests remain Hasunosora-shaped.
-Next: Phase 2 (Sekai summarizer/ingest end-to-end + Unit-tier) and Phase 4
-(port nickname/unit scoping into the full engine).
+## Phase status (see PLAN.md)
+- Local backend fully implemented + tested (no API key):
+  - Phase 2: Tier-1 unit overviews (`query/summaries.py`, deterministic).
+  - Phase 3: `plot_weight` heuristic classifier + retrieval boost (`source/relevance.py`).
+  - Phase 4: shared `query/scoping.py` (unit/nickname/event → Scope, `chroma_where`).
+  - Phase 5: unit stories fetched (`fetch-unit-stories`); card/area still TODO.
+  - Cross-lingual glossary bridge; quote-grounded answers + excerpt sidebar.
+- **Full engine (needs GOOGLE_API_KEY + chromadb) — raised as untested here:**
+  Phase 2 LLM Refine summarizer, Phase 4 `chroma_where` injection into engine.py,
+  Phase 6 translation/audit (inherited, consumes our glossary). `unit`/`arc_id`
+  already flow into Chroma metadata, so the filters are ready to wire.
+- Fetch is resilient (retries IncompleteRead) + resumable (`--skip-existing`).
+
+## Tests
+Sekai tests (run explicitly; inherited linkura tests need chromadb to collect):
+`test_sekai_source test_local_query test_scoping test_eval_local test_webapp_api
+test_content_and_summaries` — 43 passing.
