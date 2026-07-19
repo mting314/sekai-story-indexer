@@ -94,6 +94,38 @@ def events() -> list[dict]:
     return load_events()
 
 
+# Per-region event windows (JP/EN/TW/KR). Release schedules are static once set,
+# so cache for a day. Best-effort: any failure -> no region data, never fatal.
+_REGION_TTL_SECONDS = int(os.environ.get("SEKAI_REGION_TTL", "86400"))
+_region_cache: dict[str, object] = {"at": 0.0, "times": None}
+
+
+def _region_times() -> dict:
+    now = time.time()
+    if _region_cache["times"] is not None and now - float(_region_cache["at"]) < _REGION_TTL_SECONDS:
+        return _region_cache["times"]  # type: ignore[return-value]
+    try:
+        from sekai_story_indexer.source import client
+
+        times = client.region_event_times()
+    except Exception:
+        times = {}
+    _region_cache["times"] = times
+    _region_cache["at"] = now
+    return times
+
+
+def _regions_for(event: dict) -> dict:
+    """JP window (from the record) plus any EN/TW/KR windows for this event."""
+    regions = {}
+    if event.get("started_at"):
+        regions["jp"] = {"start": event.get("started_at", 0), "end": event.get("ended_at", 0)}
+    for region, win in _region_times().get(event.get("event_id"), {}).items():
+        if win.get("start"):
+            regions[region] = win
+    return regions
+
+
 def _summaries_path() -> Path:
     env = os.environ.get("SEKAI_EVENT_SUMMARIES")
     candidates = [Path(env)] if env else [Path("event_summaries.json"), HERE.parent / "event_summaries.json"]
@@ -119,6 +151,7 @@ def summaries() -> list[dict]:
             "nickname": e.get("nickname"),
             "started_at": e.get("started_at", 0),
             "ended_at": e.get("ended_at", 0),
+            "regions": _regions_for(e),
             "focus_character_id": e.get("focus_character_id", 0),
             "song_title": e.get("song_title", ""),
             "jacket_url": e.get("jacket_url", ""),

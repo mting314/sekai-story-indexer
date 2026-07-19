@@ -128,34 +128,70 @@ function summaryCard(s) {
   return card;
 }
 
+// Per-server release windows, in display order, with region flag + label.
+const _REGIONS = [
+  ["jp", "🇯🇵", "JP"],
+  ["en", "🌏", "EN"],
+  ["tw", "🇹🇼", "TW"],
+  ["kr", "🇰🇷", "KR"],
+];
+
+function regionPeriods(regions) {
+  regions = regions || {};
+  const rows = _REGIONS.filter(([k]) => regions[k] && regions[k].start).map(
+    ([k, flag, label]) => {
+      const r = regions[k];
+      const range = `${fmtDateLong(r.start)} → ${fmtDateLong(r.end)}`;
+      return (
+        `<div class="region-row"><span class="flag">${flag}</span>` +
+        `<span class="rlabel">${label}</span><span class="rperiod">${range}</span></div>`
+      );
+    }
+  );
+  if (!rows.length) return "";
+  return `<div class="region-block"><div class="region-head">Event period</div>${rows.join("")}</div>`;
+}
+
+// Album-hero header: large art on the left, topline info + per-region periods on
+// the right; the decorated summary prose below.
 function summaryBody(s) {
   const frag = document.createDocumentFragment();
-
-  const chips = [];
+  const u = state.meta.units[s.unit] || {};
   const fc = state.meta.characters[s.focus_character_id];
+
+  const hero = document.createElement("div");
+  hero.className = "sum-hero";
+
+  const art = s.jacket_url || s.logo_url || "";
+  const artHtml = art
+    ? `<img class="sum-art" src="${art}" alt="" onerror="this.closest('.sum-hero').classList.add('no-art')">`
+    : "";
+
+  const rows = [`<div class="hero-title">${escapeHtml(s.name)}</div>`];
+  const badges = [];
+  if (u.name) {
+    badges.push(
+      `<span class="hero-unit" style="color:${u.color}">` +
+        (u.symbol ? `<img src="${u.symbol}" alt="" onerror="this.style.display='none'">` : "") +
+        `${escapeHtml(u.name)}</span>`
+    );
+  }
+  if (s.is_key_story) badges.push('<span class="hero-key">★ key story</span>');
+  if (badges.length) rows.push(`<div class="hero-row">${badges.join("")}</div>`);
   if (fc) {
-    chips.push(
-      `<span class="sum-chip focus"><img class="cic" src="${fc.icon}" alt="" ` +
-        `onerror="this.style.display='none'"><b style="color:${fc.color}">` +
-        `${escapeHtml(fc.en)}</b></span>`
+    rows.push(
+      `<div class="hero-row"><span class="hero-focus"><img src="${fc.icon}" alt="" ` +
+        `onerror="this.style.display='none'"><b style="color:${fc.color}">${escapeHtml(fc.en)}</b>` +
+        `</span><span class="hero-label">focus</span></div>`
     );
   }
-  const dur = durationLabel(s.started_at, s.ended_at);
-  if (dur) chips.push(`<span class="sum-chip">🗓 ${dur}</span>`);
-  if (s.jacket_url) {
-    chips.push(
-      `<span class="sum-chip song"><img class="jacket" src="${s.jacket_url}" alt="" ` +
-        `onerror="this.style.display='none'">${escapeHtml(s.song_title || "Theme song")}</span>`
-    );
-  } else if (s.song_title) {
-    chips.push(`<span class="sum-chip">🎵 ${escapeHtml(s.song_title)}</span>`);
+  if (s.song_title) {
+    rows.push(`<div class="hero-row muted"><span class="hero-song">🎵 ${escapeHtml(s.song_title)}</span></div>`);
   }
-  if (chips.length) {
-    const meta = document.createElement("div");
-    meta.className = "sum-meta";
-    meta.innerHTML = chips.join("");
-    frag.appendChild(meta);
-  }
+
+  hero.innerHTML =
+    artHtml + `<div class="sum-info">${rows.join("")}${regionPeriods(s.regions)}</div>`;
+  frag.appendChild(hero);
 
   const text = document.createElement("div");
   text.className = "answer-text";
@@ -163,6 +199,15 @@ function summaryBody(s) {
   decorateNames(text);
   frag.appendChild(text);
   return frag;
+}
+
+function fmtDateLong(ms) {
+  if (!ms) return "?";
+  return new Date(ms).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function durationLabel(start, end) {

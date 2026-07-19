@@ -114,11 +114,28 @@ a.cite:hover { text-decoration: underline; }
 .sum-card.open .sum-body { grid-template-rows: 1fr; }
 .sum-inner { overflow: hidden; min-height: 0; padding: 0 12px; }
 .sum-card.open .sum-inner { padding: 2px 12px 12px; }
-.sum-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
-.sum-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; background: #0c0e14; border: 1px solid #2b2f3a; font-size: 12px; color: var(--muted); }
-.sum-chip.focus, .sum-chip.song { padding-left: 3px; }
-.sum-chip .cic { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
-.sum-chip .jacket { width: 22px; height: 22px; border-radius: 4px; object-fit: cover; }
+/* album-hero header */
+.sum-hero { display: flex; gap: 14px; align-items: flex-start; margin: 6px 0 14px; }
+.sum-art { width: 116px; height: 116px; border-radius: 10px; object-fit: cover; flex-shrink: 0; box-shadow: 0 2px 12px #0007; background: #0c0e14; }
+.sum-hero.no-art .sum-art { display: none; }
+.sum-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.hero-title { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.3; }
+.hero-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.hero-row.muted { color: var(--muted); font-size: 12.5px; }
+.hero-unit { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; }
+.hero-unit img { width: 20px; height: 20px; object-fit: contain; }
+.hero-key { color: var(--key); font-size: 12px; font-weight: 600; }
+.hero-focus { display: inline-flex; align-items: center; gap: 6px; }
+.hero-focus img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
+.hero-label { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; }
+/* per-region event periods (sekai.best-style) */
+.region-block { margin-top: 6px; border-top: 1px solid #2b2f3a; padding-top: 8px; }
+.region-head { font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 4px; }
+.region-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 1px 0; }
+.region-row .flag { font-size: 15px; line-height: 1; width: 20px; text-align: center; flex-shrink: 0; }
+.region-row .rlabel { color: var(--muted); font-weight: 600; width: 26px; flex-shrink: 0; }
+.region-row .rperiod { color: var(--text); font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .sum-art { width: 84px; height: 84px; } }
 .sum-body .answer-text { font-size: 13.5px; line-height: 1.55; }
 /* inline color-coded entity mentions (fandom-wiki style) */
 .ent { font-weight: 600; white-space: nowrap; }
