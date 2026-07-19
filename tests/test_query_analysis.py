@@ -1,4 +1,4 @@
-from linkura_story_indexer.query.analysis import (
+from sekai_story_indexer.query.analysis import (
     CHRONOLOGY_INTENT,
     EXACT_EVIDENCE_INTENT,
     QUANTITATIVE_INTENT,

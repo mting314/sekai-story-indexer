@@ -2,9 +2,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from linkura_story_indexer.eval.io import load_golden_set, stable_json
-from linkura_story_indexer.eval.metrics import aggregate_metrics, diff_runs, evaluate_query
-from linkura_story_indexer.eval.models import (
+from sekai_story_indexer.eval.io import load_golden_set, stable_json
+from sekai_story_indexer.eval.metrics import aggregate_metrics, diff_runs, evaluate_query
+from sekai_story_indexer.eval.models import (
     AggregateMetrics,
     CandidateTrace,
     EvalRun,

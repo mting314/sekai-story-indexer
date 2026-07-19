@@ -6,12 +6,12 @@ from pydantic import ValidationError
 from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
-from linkura_story_indexer.indexer.chunker import build_retrieval_chunks
-from linkura_story_indexer.indexer.processor import StoryProcessor
-from linkura_story_indexer.indexer.source_store import SourceRecordStore
-from linkura_story_indexer.query import engine as query_engine
-from linkura_story_indexer.query.engine import RetrievalConfig, StoryQueryEngine
-from linkura_story_indexer.query.tools import (
+from sekai_story_indexer.indexer.chunker import build_retrieval_chunks
+from sekai_story_indexer.indexer.processor import StoryProcessor
+from sekai_story_indexer.indexer.source_store import SourceRecordStore
+from sekai_story_indexer.query import engine as query_engine
+from sekai_story_indexer.query.engine import RetrievalConfig, StoryQueryEngine
+from sekai_story_indexer.query.tools import (
     DIALOGUE_COUNTING_UNIT,
     QUERY_TOOL_REGISTRY,
     CountDialogueInput,

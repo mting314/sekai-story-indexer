@@ -18,8 +18,8 @@ touching pipeline shape. Quick wins 1, 2, 6, 7, 9 from v4:
 - [ ] Cache `chromadb.PersistentClient`, the collection handle,
       `GoogleModel`, and `genai.Client` as module-level singletons.
 - [ ] Move `CHAT_MODEL` / `EMBEDDING_MODEL` / `CHROMA_DB_PATH` to env
-      vars (`LINKURA_CHAT_MODEL`, `LINKURA_EMBEDDING_MODEL`,
-      `LINKURA_CHROMA_DB_PATH`) with sensible defaults.
+      vars (`SEKAI_CHAT_MODEL`, `SEKAI_EMBEDDING_MODEL`,
+      `SEKAI_CHROMA_DB_PATH`) with sensible defaults.
 - [ ] Soften the "strictly raw source text" claim in
       `query/engine.py` until the evidence gate (task 3) lands.
 - [ ] Drop `indent=2` on the State Ledger JSON dump in the system

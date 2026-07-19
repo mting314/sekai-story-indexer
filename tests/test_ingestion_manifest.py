@@ -4,15 +4,15 @@ from typing import Any
 
 import pytest
 
-from linkura_story_indexer import cli
-from linkura_story_indexer.indexer.chunker import (
+from sekai_story_indexer import cli
+from sekai_story_indexer.indexer.chunker import (
     CHUNKER_VERSION,
     MAX_CHUNK_CHARS,
     MIN_USEFUL_CHARS,
     TARGET_CHUNK_CHARS,
     build_retrieval_chunks,
 )
-from linkura_story_indexer.indexer.manifest import (
+from sekai_story_indexer.indexer.manifest import (
     RAW_EVIDENCE_SCHEMA_VERSION,
     SUMMARY_CACHE_SCHEMA_VERSION,
     ChunkerConfig,
@@ -22,9 +22,9 @@ from linkura_story_indexer.indexer.manifest import (
     hash_text,
     stable_hash,
 )
-from linkura_story_indexer.indexer.parser import PARSER_VERSION
-from linkura_story_indexer.indexer.processor import StoryProcessor
-from linkura_story_indexer.indexer.summarizer import (
+from sekai_story_indexer.indexer.parser import PARSER_VERSION
+from sekai_story_indexer.indexer.processor import StoryProcessor
+from sekai_story_indexer.indexer.summarizer import (
     EPISODE_SUMMARY_SECTIONS,
     PART_SUMMARY_SECTIONS,
     SUMMARIZATION_PROMPT_VERSION,
@@ -33,7 +33,7 @@ from linkura_story_indexer.indexer.summarizer import (
     extract_summary_sections,
     trim_previous_summary_context,
 )
-from linkura_story_indexer.lexical import LexicalIndex
+from sekai_story_indexer.lexical import LexicalIndex
 
 
 def _write_story_file(root: Path, relative_path: str, content: str) -> Path:
@@ -191,7 +191,7 @@ def test_summarizer_uses_configured_generation_agent(monkeypatch: pytest.MonkeyP
         return FakeAgent(instructions)
 
     monkeypatch.setattr(
-        "linkura_story_indexer.indexer.summarizer.create_generation_text_agent",
+        "sekai_story_indexer.indexer.summarizer.create_generation_text_agent",
         fake_create_generation_text_agent,
     )
 

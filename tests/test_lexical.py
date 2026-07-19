@@ -1,14 +1,14 @@
 from pathlib import Path
 from typing import Any
 
-from linkura_story_indexer import cli
-from linkura_story_indexer.lexical import (
+from sekai_story_indexer import cli
+from sekai_story_indexer.lexical import (
     LexicalIndex,
     expand_query_with_glossary,
     glossary_alias_groups,
     glossary_aliases_for,
 )
-from linkura_story_indexer.models.story import StoryMetadata, StoryNode
+from sekai_story_indexer.models.story import StoryMetadata, StoryNode
 
 
 def _metadata(**overrides: Any) -> dict[str, Any]:

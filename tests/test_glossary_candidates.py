@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from linkura_story_indexer.glossary_candidates import extract_glossary_candidates
+from sekai_story_indexer.glossary_candidates import extract_glossary_candidates
 
 
 def _write(path: Path, text: str) -> None:

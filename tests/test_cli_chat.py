@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 
-from linkura_story_indexer import cli
-from linkura_story_indexer.query.engine import StreamingQueryResult
+from sekai_story_indexer import cli
+from sekai_story_indexer.query.engine import StreamingQueryResult
 
 
 class RecordingConsole:

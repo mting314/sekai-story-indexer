@@ -1,9 +1,9 @@
 from typing import Any
 
-from linkura_story_indexer import database
-from linkura_story_indexer.query import engine as query_engine
-from linkura_story_indexer.query.analysis import analyze_query
-from linkura_story_indexer.query.engine import (
+from sekai_story_indexer import database
+from sekai_story_indexer.query import engine as query_engine
+from sekai_story_indexer.query.analysis import analyze_query
+from sekai_story_indexer.query.engine import (
     INSUFFICIENT_SOURCE_CONTEXT,
     RetrievalConfig,
     StoryQueryEngine,

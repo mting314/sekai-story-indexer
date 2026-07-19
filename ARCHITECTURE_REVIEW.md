@@ -446,9 +446,9 @@ The current code rebuilds clients repeatedly.
 
 Load them from environment variables with sensible defaults, such as:
 
-- `LINKURA_CHAT_MODEL`
-- `LINKURA_EMBEDDING_MODEL`
-- `LINKURA_CHROMA_DB_PATH`
+- `SEKAI_CHAT_MODEL`
+- `SEKAI_EMBEDDING_MODEL`
+- `SEKAI_CHROMA_DB_PATH`
 
 This makes model upgrades and deployment differences easier to manage.
 

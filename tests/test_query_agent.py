@@ -7,9 +7,9 @@ from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 
-from linkura_story_indexer.eval.io import stable_json
-from linkura_story_indexer.query import engine as query_engine
-from linkura_story_indexer.query.agent import (
+from sekai_story_indexer.eval.io import stable_json
+from sekai_story_indexer.query import engine as query_engine
+from sekai_story_indexer.query.agent import (
     AgentAnswer,
     AgentAnswerDraft,
     AgentToolCall,
@@ -19,12 +19,12 @@ from linkura_story_indexer.query.agent import (
     _agent_tool_payload,
     build_agent_toolset,
 )
-from linkura_story_indexer.query.engine import (
+from sekai_story_indexer.query.engine import (
     RetrievalConfig,
     RetrievalTraceResult,
     StoryQueryEngine,
 )
-from linkura_story_indexer.query.tools import ToolCandidate, ToolResult
+from sekai_story_indexer.query.tools import ToolCandidate, ToolResult
 
 
 def make_engine() -> StoryQueryEngine:
@@ -341,7 +341,7 @@ def test_query_agent_builds_model_with_agentic_factory(monkeypatch: Any) -> None
         return test_model
 
     monkeypatch.setattr(
-        "linkura_story_indexer.query.agent.create_agentic_generation_model",
+        "sekai_story_indexer.query.agent.create_agentic_generation_model",
         fake_create_agentic_generation_model,
     )
 

@@ -3,11 +3,11 @@ from typing import Any
 
 import pytest
 
-from linkura_story_indexer.indexer import extractor
-from linkura_story_indexer.indexer.extractor import StateExtractor
-from linkura_story_indexer.indexer.processor import StoryProcessor
-from linkura_story_indexer.indexer.source_store import SourceRecordStore
-from linkura_story_indexer.models.state import (
+from sekai_story_indexer.indexer import extractor
+from sekai_story_indexer.indexer.extractor import StateExtractor
+from sekai_story_indexer.indexer.processor import StoryProcessor
+from sekai_story_indexer.indexer.source_store import SourceRecordStore
+from sekai_story_indexer.models.state import (
     ExtractedStateFact,
     SceneStateExtraction,
     StateFact,

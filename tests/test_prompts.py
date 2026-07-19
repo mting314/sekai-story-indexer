@@ -2,7 +2,7 @@ from importlib.resources import files
 
 import pytest
 
-from linkura_story_indexer import prompts
+from sekai_story_indexer import prompts
 
 
 def test_packaged_prompt_resource_loads_after_working_directory_change(
@@ -13,7 +13,7 @@ def test_packaged_prompt_resource_loads_after_working_directory_change(
     prompt = prompts.load_prompt("answer_system.md")
 
     assert "# Answer policy" in prompt
-    assert files("linkura_story_indexer.prompts").joinpath("answer_raw_user.md").is_file()
+    assert files("sekai_story_indexer.prompts").joinpath("answer_raw_user.md").is_file()
 
 
 def test_raw_and_summary_system_policies_are_distinct() -> None:

@@ -2,17 +2,17 @@ from typing import Any, cast
 
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
 
-from linkura_story_indexer import database
-from linkura_story_indexer.database import EmbeddingDocument
+from sekai_story_indexer import database
+from sekai_story_indexer.database import EmbeddingDocument
 
 
 def test_model_and_chroma_env_defaults_and_overrides(monkeypatch):
-    monkeypatch.delenv("LINKURA_CHAT_MODEL", raising=False)
-    monkeypatch.delenv("LINKURA_INGEST_PROVIDER", raising=False)
-    monkeypatch.delenv("LINKURA_INGEST_MODEL", raising=False)
-    monkeypatch.delenv("LINKURA_ROUTER_MODEL", raising=False)
-    monkeypatch.delenv("LINKURA_EMBEDDING_MODEL", raising=False)
-    monkeypatch.delenv("LINKURA_CHROMA_DB_PATH", raising=False)
+    monkeypatch.delenv("SEKAI_CHAT_MODEL", raising=False)
+    monkeypatch.delenv("SEKAI_INGEST_PROVIDER", raising=False)
+    monkeypatch.delenv("SEKAI_INGEST_MODEL", raising=False)
+    monkeypatch.delenv("SEKAI_ROUTER_MODEL", raising=False)
+    monkeypatch.delenv("SEKAI_EMBEDDING_MODEL", raising=False)
+    monkeypatch.delenv("SEKAI_CHROMA_DB_PATH", raising=False)
 
     assert database.get_chat_model_name() == database.DEFAULT_CHAT_MODEL
     assert database.get_generation_provider_name() == database.DEFAULT_GENERATION_PROVIDER
@@ -21,12 +21,12 @@ def test_model_and_chroma_env_defaults_and_overrides(monkeypatch):
     assert database.get_embedding_model_name() == database.DEFAULT_EMBEDDING_MODEL
     assert database.get_chroma_db_path() == database.DEFAULT_CHROMA_DB_PATH
 
-    monkeypatch.setenv("LINKURA_CHAT_MODEL", "custom-chat")
-    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
-    monkeypatch.setenv("LINKURA_INGEST_MODEL", "custom-ingest")
-    monkeypatch.setenv("LINKURA_ROUTER_MODEL", "custom-router")
-    monkeypatch.setenv("LINKURA_EMBEDDING_MODEL", "custom-embedding")
-    monkeypatch.setenv("LINKURA_CHROMA_DB_PATH", "./custom_chroma")
+    monkeypatch.setenv("SEKAI_CHAT_MODEL", "custom-chat")
+    monkeypatch.setenv("SEKAI_INGEST_PROVIDER", "openai")
+    monkeypatch.setenv("SEKAI_INGEST_MODEL", "custom-ingest")
+    monkeypatch.setenv("SEKAI_ROUTER_MODEL", "custom-router")
+    monkeypatch.setenv("SEKAI_EMBEDDING_MODEL", "custom-embedding")
+    monkeypatch.setenv("SEKAI_CHROMA_DB_PATH", "./custom_chroma")
 
     assert database.get_chat_model_name() == "custom-chat"
     assert database.get_generation_provider_name() == "openai"
@@ -37,16 +37,16 @@ def test_model_and_chroma_env_defaults_and_overrides(monkeypatch):
 
 
 def test_generation_model_falls_back_to_chat_model(monkeypatch):
-    monkeypatch.delenv("LINKURA_INGEST_MODEL", raising=False)
-    monkeypatch.setenv("LINKURA_CHAT_MODEL", "fallback-chat")
+    monkeypatch.delenv("SEKAI_INGEST_MODEL", raising=False)
+    monkeypatch.setenv("SEKAI_CHAT_MODEL", "fallback-chat")
 
     assert database.get_generation_model_name() == "fallback-chat"
 
 
 def test_router_model_falls_back_to_openai_generation_model(monkeypatch):
-    monkeypatch.delenv("LINKURA_ROUTER_MODEL", raising=False)
-    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
-    monkeypatch.setenv("LINKURA_INGEST_MODEL", "gpt-5-mini")
+    monkeypatch.delenv("SEKAI_ROUTER_MODEL", raising=False)
+    monkeypatch.setenv("SEKAI_INGEST_PROVIDER", "openai")
+    monkeypatch.setenv("SEKAI_INGEST_MODEL", "gpt-5-mini")
 
     assert database.get_router_model_name() == "gpt-5-mini"
 
@@ -54,8 +54,8 @@ def test_router_model_falls_back_to_openai_generation_model(monkeypatch):
 def test_generation_model_uses_google_by_default(monkeypatch):
     database.reset_client_caches()
     monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
-    monkeypatch.delenv("LINKURA_INGEST_PROVIDER", raising=False)
-    monkeypatch.setenv("LINKURA_INGEST_MODEL", "gemini-custom")
+    monkeypatch.delenv("SEKAI_INGEST_PROVIDER", raising=False)
+    monkeypatch.setenv("SEKAI_INGEST_MODEL", "gemini-custom")
 
     class FakeGoogleProvider:
         def __init__(self, api_key: str):
@@ -79,8 +79,8 @@ def test_generation_model_uses_google_by_default(monkeypatch):
 
 def test_generation_model_uses_openai_when_selected(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
-    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
-    monkeypatch.setenv("LINKURA_INGEST_MODEL", "gpt-5-mini")
+    monkeypatch.setenv("SEKAI_INGEST_PROVIDER", "openai")
+    monkeypatch.setenv("SEKAI_INGEST_MODEL", "gpt-5-mini")
     calls: list[str | None] = []
 
     def fake_create_openai_model(model_name: str | None = None) -> str:
@@ -94,7 +94,7 @@ def test_generation_model_uses_openai_when_selected(monkeypatch):
 
 
 def test_generation_model_honors_model_override(monkeypatch):
-    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
+    monkeypatch.setenv("SEKAI_INGEST_PROVIDER", "openai")
     calls: list[str | None] = []
 
     def fake_create_openai_model(model_name: str | None = None) -> str:
@@ -110,10 +110,10 @@ def test_generation_model_honors_model_override(monkeypatch):
 def test_agentic_generation_model_uses_responses_api_for_openai(monkeypatch):
     database.reset_client_caches()
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
-    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
-    monkeypatch.setenv("LINKURA_INGEST_MODEL", "gpt-5.6-luna")
+    monkeypatch.setenv("SEKAI_INGEST_PROVIDER", "openai")
+    monkeypatch.setenv("SEKAI_INGEST_MODEL", "gpt-5.6-luna")
     monkeypatch.setenv("OPENAI_BASE_URL", "https://example.test/v1")
-    monkeypatch.delenv("LINKURA_OPENAI_API", raising=False)
+    monkeypatch.delenv("SEKAI_OPENAI_API", raising=False)
 
     model = database.create_agentic_generation_model()
 
@@ -135,8 +135,8 @@ def test_agentic_generation_model_uses_responses_api_for_openai(monkeypatch):
 
 
 def test_agentic_generation_model_uses_google_for_google_provider(monkeypatch):
-    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "google")
-    monkeypatch.setenv("LINKURA_INGEST_MODEL", "gemini-agent")
+    monkeypatch.setenv("SEKAI_INGEST_PROVIDER", "google")
+    monkeypatch.setenv("SEKAI_INGEST_MODEL", "gemini-agent")
     calls: list[str | None] = []
 
     def fake_create_google_model(model_name: str | None = None) -> str:
@@ -150,9 +150,9 @@ def test_agentic_generation_model_uses_google_for_google_provider(monkeypatch):
 
 
 def test_agentic_generation_model_chat_escape_hatch(monkeypatch):
-    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
-    monkeypatch.setenv("LINKURA_INGEST_MODEL", "gpt-5.6-luna")
-    monkeypatch.setenv("LINKURA_OPENAI_API", "chat")
+    monkeypatch.setenv("SEKAI_INGEST_PROVIDER", "openai")
+    monkeypatch.setenv("SEKAI_INGEST_MODEL", "gpt-5.6-luna")
+    monkeypatch.setenv("SEKAI_OPENAI_API", "chat")
     calls: list[str | None] = []
 
     def fake_create_openai_model(model_name: str | None = None) -> str:
@@ -166,8 +166,8 @@ def test_agentic_generation_model_chat_escape_hatch(monkeypatch):
 
 
 def test_agentic_generation_model_honors_model_override(monkeypatch):
-    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
-    monkeypatch.delenv("LINKURA_OPENAI_API", raising=False)
+    monkeypatch.setenv("SEKAI_INGEST_PROVIDER", "openai")
+    monkeypatch.delenv("SEKAI_OPENAI_API", raising=False)
     calls: list[str | None] = []
 
     def fake_create_openai_responses_model(model_name: str | None = None) -> str:
@@ -187,22 +187,22 @@ def test_agentic_generation_model_honors_model_override(monkeypatch):
 def test_generation_settings_validate_only_selected_provider(monkeypatch):
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
-    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
-    monkeypatch.setenv("LINKURA_INGEST_MODEL", "gpt-5-mini")
+    monkeypatch.setenv("SEKAI_INGEST_PROVIDER", "openai")
+    monkeypatch.setenv("SEKAI_INGEST_MODEL", "gpt-5-mini")
 
     database.initialize_generation_settings()
 
 
 def test_openai_generation_requires_openai_model_when_chat_model_is_unset(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
-    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
-    monkeypatch.delenv("LINKURA_INGEST_MODEL", raising=False)
-    monkeypatch.delenv("LINKURA_CHAT_MODEL", raising=False)
+    monkeypatch.setenv("SEKAI_INGEST_PROVIDER", "openai")
+    monkeypatch.delenv("SEKAI_INGEST_MODEL", raising=False)
+    monkeypatch.delenv("SEKAI_CHAT_MODEL", raising=False)
 
     try:
         database.initialize_generation_settings()
     except ValueError as exc:
-        assert "LINKURA_INGEST_MODEL" in str(exc)
+        assert "SEKAI_INGEST_MODEL" in str(exc)
     else:
         raise AssertionError("OpenAI generation should require an OpenAI model")
 
@@ -210,8 +210,8 @@ def test_openai_generation_requires_openai_model_when_chat_model_is_unset(monkey
 def test_ingest_settings_still_require_google_for_embeddings(monkeypatch):
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
-    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
-    monkeypatch.setenv("LINKURA_INGEST_MODEL", "gpt-5-mini")
+    monkeypatch.setenv("SEKAI_INGEST_PROVIDER", "openai")
+    monkeypatch.setenv("SEKAI_INGEST_MODEL", "gpt-5-mini")
 
     try:
         database.initialize_ingest_settings()
@@ -224,8 +224,8 @@ def test_ingest_settings_still_require_google_for_embeddings(monkeypatch):
 def test_query_settings_still_require_google_for_embeddings(monkeypatch):
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
-    monkeypatch.setenv("LINKURA_INGEST_PROVIDER", "openai")
-    monkeypatch.setenv("LINKURA_INGEST_MODEL", "gpt-5-mini")
+    monkeypatch.setenv("SEKAI_INGEST_PROVIDER", "openai")
+    monkeypatch.setenv("SEKAI_INGEST_MODEL", "gpt-5-mini")
 
     try:
         database.initialize_query_settings()
@@ -289,7 +289,7 @@ def test_client_and_model_helpers_return_singletons(monkeypatch):
 def test_embed_texts_batches_single_sdk_call_for_batch(monkeypatch):
     database.reset_client_caches()
     monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
-    monkeypatch.setenv("LINKURA_EMBEDDING_MODEL", "text-embedding-004")
+    monkeypatch.setenv("SEKAI_EMBEDDING_MODEL", "text-embedding-004")
 
     calls: list[dict[str, Any]] = []
 
@@ -326,7 +326,7 @@ def test_embed_texts_batches_single_sdk_call_for_batch(monkeypatch):
 def test_embed_texts_respects_batch_size(monkeypatch):
     database.reset_client_caches()
     monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
-    monkeypatch.setenv("LINKURA_EMBEDDING_MODEL", "text-embedding-004")
+    monkeypatch.setenv("SEKAI_EMBEDDING_MODEL", "text-embedding-004")
 
     batch_lengths: list[int] = []
 
@@ -357,7 +357,7 @@ def test_embed_texts_respects_batch_size(monkeypatch):
 def test_embed_texts_uses_inline_document_format_for_gemini_embedding_2(monkeypatch):
     database.reset_client_caches()
     monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
-    monkeypatch.delenv("LINKURA_EMBEDDING_MODEL", raising=False)
+    monkeypatch.delenv("SEKAI_EMBEDDING_MODEL", raising=False)
 
     calls: list[dict[str, Any]] = []
 
@@ -418,7 +418,7 @@ def test_embed_texts_uses_inline_document_format_for_gemini_embedding_2(monkeypa
 def test_embed_texts_uses_inline_query_format_for_gemini_embedding_2(monkeypatch):
     database.reset_client_caches()
     monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
-    monkeypatch.delenv("LINKURA_EMBEDDING_MODEL", raising=False)
+    monkeypatch.delenv("SEKAI_EMBEDDING_MODEL", raising=False)
 
     calls: list[dict[str, Any]] = []
 
@@ -462,7 +462,7 @@ def test_embed_texts_uses_inline_query_format_for_gemini_embedding_2(monkeypatch
 def test_embed_texts_falls_back_when_batch_response_count_mismatches(monkeypatch):
     database.reset_client_caches()
     monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
-    monkeypatch.setenv("LINKURA_EMBEDDING_MODEL", "text-embedding-004")
+    monkeypatch.setenv("SEKAI_EMBEDDING_MODEL", "text-embedding-004")
 
     call_contents: list[list[str]] = []
 

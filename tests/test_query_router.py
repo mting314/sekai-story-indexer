@@ -4,14 +4,14 @@ from typing import Any
 
 import pytest
 
-from linkura_story_indexer.cli import _router_debug_lines
-from linkura_story_indexer.query import engine as query_engine
-from linkura_story_indexer.query.engine import (
+from sekai_story_indexer.cli import _router_debug_lines
+from sekai_story_indexer.query import engine as query_engine
+from sekai_story_indexer.query.engine import (
     RetrievalConfig,
     RetrievalTraceResult,
     StoryQueryEngine,
 )
-from linkura_story_indexer.query.router import (
+from sekai_story_indexer.query.router import (
     FixtureQueryRouter,
     RouterOutput,
     _compressed_numbers,

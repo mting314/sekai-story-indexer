@@ -1,10 +1,10 @@
 from pathlib import Path
 from typing import Any
 
-from linkura_story_indexer import cli
-from linkura_story_indexer.database import RETRIEVAL_DOCUMENT, EmbeddingInput
-from linkura_story_indexer.indexer.processor import StoryProcessor
-from linkura_story_indexer.models.story import StoryMetadata, StoryNode
+from sekai_story_indexer import cli
+from sekai_story_indexer.database import RETRIEVAL_DOCUMENT, EmbeddingInput
+from sekai_story_indexer.indexer.processor import StoryProcessor
+from sekai_story_indexer.models.story import StoryMetadata, StoryNode
 
 
 class FakeCollection:

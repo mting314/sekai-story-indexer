@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from linkura_story_indexer.story_order import load_story_order
-from linkura_story_indexer.summary_export import (
+from sekai_story_indexer.story_order import load_story_order
+from sekai_story_indexer.summary_export import (
     build_summary_reader_data,
     export_production_summary_reader,
     export_summary_reader,

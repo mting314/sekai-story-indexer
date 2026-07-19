@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from linkura_story_indexer.indexer.chunker import build_retrieval_chunks
-from linkura_story_indexer.indexer.processor import StoryProcessor
+from sekai_story_indexer.indexer.chunker import build_retrieval_chunks
+from sekai_story_indexer.indexer.processor import StoryProcessor
 
 
 def _write_story_file(root: Path, relative_path: str, content: str) -> Path:

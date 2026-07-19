@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from linkura_story_indexer.indexer.parser import UNKNOWN_SPEAKER, StoryParser
-from linkura_story_indexer.indexer.processor import StoryProcessor
+from sekai_story_indexer.indexer.parser import UNKNOWN_SPEAKER, StoryParser
+from sekai_story_indexer.indexer.processor import StoryProcessor
 
 
 def test_parser_splits_scenes():

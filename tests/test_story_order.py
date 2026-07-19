@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from linkura_story_indexer import cli
-from linkura_story_indexer.indexer.processor import StoryProcessor
-from linkura_story_indexer.indexer.summarizer import HierarchicalSummarizer
-from linkura_story_indexer.story_order import StoryOrderConfigError, load_story_order
+from sekai_story_indexer import cli
+from sekai_story_indexer.indexer.processor import StoryProcessor
+from sekai_story_indexer.indexer.summarizer import HierarchicalSummarizer
+from sekai_story_indexer.story_order import StoryOrderConfigError, load_story_order
 
 
 def _write_story_file(root: Path, relative_path: str, content: str = "text") -> Path:

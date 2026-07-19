@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import json
 
-from linkura_story_indexer.query.agent import FixtureQueryAgent
-from linkura_story_indexer.query.audit import (
+from sekai_story_indexer.query.agent import FixtureQueryAgent
+from sekai_story_indexer.query.audit import (
     AuditFlag,
     AuditReport,
     FixtureAnswerAuditor,
     build_audit_payload,
     render_audit_flags,
 )
-from linkura_story_indexer.query.engine import RetrievalConfig, StoryQueryEngine
+from sekai_story_indexer.query.engine import RetrievalConfig, StoryQueryEngine
 
 
 def make_engine(auditor: FixtureAnswerAuditor) -> StoryQueryEngine:

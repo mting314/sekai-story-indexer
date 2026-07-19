@@ -1,4 +1,4 @@
-# Gemini File Search for `linkura-story-indexer` — Evaluation
+# Gemini File Search for `sekai-story-indexer` — Evaluation
 
 Discussion notes evaluating whether to adopt Google's Gemini File Search
 (<https://ai.google.dev/gemini-api/docs/file-search>) and how it would interact

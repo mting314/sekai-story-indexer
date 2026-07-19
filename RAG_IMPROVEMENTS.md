@@ -84,8 +84,8 @@ Q&A should be gated on at least one raw evidence chunk.
    `chromadb.PersistentClient`, the collection handle, `GoogleModel`,
    `genai.Client`. Currently rebuilt on every call.
 7. **Make model names configurable** via env vars with sensible
-   defaults: `LINKURA_CHAT_MODEL`, `LINKURA_EMBEDDING_MODEL`,
-   `LINKURA_CHROMA_DB_PATH`. `gemini-3-flash-preview` and
+   defaults: `SEKAI_CHAT_MODEL`, `SEKAI_EMBEDDING_MODEL`,
+   `SEKAI_CHROMA_DB_PATH`. `gemini-3-flash-preview` and
    `gemini-embedding-2` are preview SKUs hardcoded in `database.py`.
 8. **Tighten State Ledger injection.** Inject only ledger slices for
    arcs the question is actually about (from query analysis), not for

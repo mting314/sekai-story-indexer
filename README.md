@@ -1,29 +1,55 @@
-# linkura-story-indexer
-Scripts to index the LLLL story
+# sekai-story-indexer
+
+Hierarchical-RAG story indexer for **Hatsune Miku: Colorful Stage! (Project
+Sekai)**. Fork of [`linkura-story-indexer`](https://github.com/ahuei123456/linkura-story-indexer),
+retargeted from Hasunosora to Project Sekai. See **[PLAN.md](PLAN.md)** for the
+roadmap, **[DESIGN.md](DESIGN.md)** for architecture rationale, and
+**[CLAUDE.md](CLAUDE.md)** for a quick orientation.
+
+## Fetching story data
+
+Story text comes from the Sekai-World master DB + sekai.best asset CDN (same
+source as the `autosub` project's `fetch_event.py`):
+
+```bash
+indexer fetch --limit 5          # earliest 5 events, for a smoke test
+indexer fetch                     # all events
+indexer fetch --event-id 151      # a specific event
+```
+
+This writes `story/<unit>/<content_type>/<arc_slug>/<NN_episode>.md`,
+auto-generates `story_order.yaml` in chronological (release) order, and writes
+`events_index.json`. The CDN hosts are external — run where egress is allowed.
+
+Then run `indexer ingest` / `indexer query` as below.
+
+---
+
+_(Inherited linkura usage follows; env vars, commands, and prompts are shared.)_
 
 ## Generation Models
 
 Ingest summarization and `extract-state` world-state generation use the
 configured generation provider:
 
-- `LINKURA_INGEST_PROVIDER=google|openai` (default: `google`)
-- `LINKURA_INGEST_MODEL=<model name>`
+- `SEKAI_INGEST_PROVIDER=google|openai` (default: `google`)
+- `SEKAI_INGEST_MODEL=<model name>`
 - `OPENAI_BASE_URL=<compatible endpoint>` (optional, for OpenAI-compatible Chat
   Completions endpoints)
 
-If `LINKURA_INGEST_MODEL` is unset, generation falls back to
-`LINKURA_CHAT_MODEL`, then the repo default Gemini chat model. Query answer
+If `SEKAI_INGEST_MODEL` is unset, generation falls back to
+`SEKAI_CHAT_MODEL`, then the repo default Gemini chat model. Query answer
 generation uses the same configured provider and model, and LLM routing uses
 the same provider. When
-`LINKURA_INGEST_PROVIDER=openai`, set `LINKURA_INGEST_MODEL` or set
-`LINKURA_CHAT_MODEL` to an OpenAI model name so the default Gemini model is not
+`SEKAI_INGEST_PROVIDER=openai`, set `SEKAI_INGEST_MODEL` or set
+`SEKAI_CHAT_MODEL` to an OpenAI model name so the default Gemini model is not
 sent to OpenAI. Google generation requires `GOOGLE_API_KEY`. OpenAI generation
 requires `OPENAI_API_KEY`.
 
 Embeddings are separate and still use the Google GenAI embedding path controlled
-by `LINKURA_EMBEDDING_MODEL` (default: `gemini-embedding-2`). Running `ingest`
+by `SEKAI_EMBEDDING_MODEL` (default: `gemini-embedding-2`). Running `ingest`
 and retrieval through `query` or `chat` therefore always requires
-`GOOGLE_API_KEY`, even when `LINKURA_INGEST_PROVIDER=openai`.
+`GOOGLE_API_KEY`, even when `SEKAI_INGEST_PROVIDER=openai`.
 
 ## Querying
 
@@ -40,8 +66,8 @@ multi-step tool-calling loop that can combine glossary lookup, retrieval,
 point-in-time State Ledger checks, and exact SQL dialogue counts. Counting
 questions in agentic mode must use `count_dialogue`; the answer is never an
 LLM estimate. Agentic mode uses at most eight model requests by default; set
-`LINKURA_AGENT_REQUEST_LIMIT` to change the cap. The router model is controlled
-by `LINKURA_ROUTER_MODEL`. With the Google provider it defaults to
+`SEKAI_AGENT_REQUEST_LIMIT` to change the cap. The router model is controlled
+by `SEKAI_ROUTER_MODEL`. With the Google provider it defaults to
 `gemini-3.1-flash-lite-preview`; with the OpenAI provider it defaults to the
 configured generation model.
 
@@ -71,7 +97,7 @@ indexer chat --routing-mode off
 ### Answer prompts
 
 Static answer-generation instructions are Markdown resources in
-`src/linkura_story_indexer/prompts`. Edit those files to revise answer policy;
+`src/sekai_story_indexer/prompts`. Edit those files to revise answer policy;
 keep questions, retrieved context, glossary entries, and State Ledger facts as
 dynamic renderer inputs. Increment `PROMPT_VERSION` in the prompt module for a
 behavioral change so evaluations and future traces can identify the revision.
