@@ -195,9 +195,10 @@ def test_asset_urls():
 def test_build_catalog_enriches_and_numbers_nicknames():
     from sekai_story_indexer.source.catalog import build_catalog
 
+    # marathon events (a focus event must be a marathon with single-unit 4* cards)
     events = [
-        {"id": 6, "name": "Lyric", "startAt": 2000},
-        {"id": 2, "name": "Marionette", "startAt": 1000},
+        {"id": 6, "name": "Lyric", "startAt": 2000, "eventType": "marathon"},
+        {"id": 2, "name": "Marionette", "startAt": 1000, "eventType": "marathon"},
     ]
     stories_by_event = {
         6: {"id": 106, "eventId": 6, "assetbundleName": "ab6",
@@ -208,8 +209,13 @@ def test_build_catalog_enriches_and_numbers_nicknames():
         106: [{"unit": "street", "eventStoryUnitRelation": "main"}],
         102: [{"unit": "school_refusal", "eventStoryUnitRelation": "main"}],
     }
-    # focus comes from the event banner character now: Kohane(9) / Mafuyu(18)
-    banner_char_by_event = {6: 9, 2: 18}
+    banner_char_by_event = {6: 9, 2: 18}  # Kohane(9) / Mafuyu(18)
+    # single-unit 4* cards -> these qualify as focus events
+    event_card_ids = {6: [901], 2: [902]}
+    cards_by_id = {
+        901: {"id": 901, "characterId": 9, "cardRarityType": "rarity_4"},   # VBS
+        902: {"id": 902, "characterId": 18, "cardRarityType": "rarity_4"},  # N25
+    }
     music_by_event = {6: {"title": "Hibana", "assetbundleName": "m6"}}
 
     cat = build_catalog(
@@ -217,6 +223,8 @@ def test_build_catalog_enriches_and_numbers_nicknames():
         stories_by_event=stories_by_event,
         story_units_by_story_id=story_units_by_story_id,
         banner_char_by_event=banner_char_by_event,
+        event_card_ids=event_card_ids,
+        cards_by_id=cards_by_id,
         music_by_event=music_by_event,
     )
     # chronological
@@ -261,3 +269,24 @@ def test_build_catalog_no_focus_when_no_banner():
     assert r["focus_character_id"] == 0
     assert r["focus_character"] == ""
     assert r["nickname"] is None
+
+
+def test_cross_unit_collab_is_not_a_focus_event():
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    events = [{"id": 22, "name": "Picnic", "startAt": 1000, "eventType": "marathon"}]
+    stories = {22: {"id": 122, "eventId": 22, "assetbundleName": "ab", "eventStoryEpisodes": []}}
+    su = {122: [{"unit": "school_refusal", "eventStoryUnitRelation": "main"}]}
+    banner = {22: 19}  # Ena on banner
+    # 4* cards span two units (N25 Ena + MMJ Airi) -> collab, not a focus event
+    event_card_ids = {22: [1, 2]}
+    cards_by_id = {
+        1: {"id": 1, "characterId": 19, "cardRarityType": "rarity_4"},  # Ena / N25
+        2: {"id": 2, "characterId": 7, "cardRarityType": "rarity_4"},   # Airi / MMJ
+    }
+    cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
+                        music_by_event={}, banner_char_by_event=banner,
+                        event_card_ids=event_card_ids, cards_by_id=cards_by_id)
+    r = cat[0]
+    assert r["is_focus_event"] is False
+    assert r["nickname"] is None and r["focus_character"] == ""

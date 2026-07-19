@@ -15,7 +15,7 @@ identical by construction.
 from __future__ import annotations
 
 from .assets import event_banner_url, event_logo_url, music_jacket_url
-from .constants import CHARACTER_ID_TO_JP
+from .constants import CHARACTER_ID_TO_JP, CHARACTER_ID_TO_UNIT
 from .nicknames import assign_focus_nicknames
 from .relevance import classify_event
 from .transform import (
@@ -70,6 +70,18 @@ def event_record(
     }
 
 
+def _focus_units(event_id: int, event_card_ids: dict, cards_by_id: dict) -> set[str]:
+    """Units (excluding Virtual Singer) of an event's featured 4★ cards."""
+    units: set[str] = set()
+    for cid in event_card_ids.get(event_id, []):
+        card = cards_by_id.get(cid, {})
+        if card.get("cardRarityType") in ("rarity_4", "rarity_birthday"):
+            u = CHARACTER_ID_TO_UNIT.get(card.get("characterId"))
+            if u and u != "virtual_singer":
+                units.add(u)
+    return units
+
+
 def build_catalog(
     events: list[dict],
     *,
@@ -77,29 +89,40 @@ def build_catalog(
     story_units_by_story_id: dict[int, list[dict]],
     music_by_event: dict[int, dict],
     banner_char_by_event: dict[int, int] | None = None,
-    **_ignored: object,  # tolerate extra table keys (event_card_ids, cards_by_id)
+    event_card_ids: dict[int, list[int]] | None = None,
+    cards_by_id: dict[int, dict] | None = None,
+    **_ignored: object,
 ) -> list[dict]:
     """Full enriched, chronologically-sorted catalog with nicknames assigned.
 
-    Focus character comes from the event's banner (``banner_char_by_event``);
-    events without a banner get no focus/nickname (crossover/anniversary).
+    A true *focus event* (which counts toward a character's kaho5-style nickname
+    number) is a ``marathon`` event whose featured 4★ cards are all from ONE unit
+    — this excludes cross-unit collabs, Cheerful Carnival, and World Link, which
+    have a banner character but aren't anyone's solo focus event. Non-focus events
+    carry no focus/nickname.
     """
     banner_char_by_event = banner_char_by_event or {}
+    event_card_ids = event_card_ids or {}
+    cards_by_id = cards_by_id or {}
     records: list[dict] = []
     for event in events:
         story = stories_by_event.get(event["id"])
         story_units = (
             story_units_by_story_id.get(story["id"], []) if story else []
         )
-        records.append(
-            event_record(
-                event,
-                story,
-                story_units=story_units,
-                focus_id=banner_char_by_event.get(event["id"], 0),
-                music=music_by_event.get(event["id"]),
-            )
+        rec = event_record(
+            event,
+            story,
+            story_units=story_units,
+            focus_id=banner_char_by_event.get(event["id"], 0),
+            music=music_by_event.get(event["id"]),
         )
+        units = _focus_units(event["id"], event_card_ids, cards_by_id)
+        rec["is_focus_event"] = rec["event_type"] == "marathon" and len(units) == 1
+        if not rec["is_focus_event"]:  # not a solo focus -> no focus attribution
+            rec["focus_character_id"] = 0
+            rec["focus_character"] = ""
+        records.append(rec)
 
     nicknames = assign_focus_nicknames(
         [
