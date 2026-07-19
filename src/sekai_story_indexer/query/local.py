@@ -269,7 +269,19 @@ def build_local_engine(
     if events_index:
         indexed_arcs = {r["arc_slug"] for r in events_index if r.get("indexed") and r.get("arc_slug")}
         if indexed_arcs:
-            nodes = [n for n in nodes if n.metadata.arc_id in indexed_arcs]
+            # The indexed-only contract governs EVENT content (timeline may lead
+            # ingest). Non-event content (unit/card/area) is queryable once on disk.
+            nodes = [
+                n
+                for n in nodes
+                if n.metadata.content_type != "event" or n.metadata.arc_id in indexed_arcs
+            ]
     if glossary is None:
         glossary = _load_glossary(story_root)
+    # Tier-1 unit overviews (synopsis-level) are always available, even for
+    # events whose full text isn't indexed yet.
+    if events_index:
+        from .summaries import build_unit_overviews
+
+        nodes = nodes + build_unit_overviews(events_index)
     return LocalQueryEngine(nodes, events_index, glossary)

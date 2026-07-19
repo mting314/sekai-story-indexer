@@ -11,6 +11,7 @@ them is permitted.
 
 from __future__ import annotations
 
+import http.client
 import json
 import ssl
 import time
@@ -19,6 +20,9 @@ import urllib.request
 from typing import Any
 
 from .constants import ASSET_CDN, MASTER_DB
+
+# Transient network faults worth retrying (incl. partial reads from the CDN).
+_RETRYABLE = (urllib.error.URLError, TimeoutError, http.client.IncompleteRead, ConnectionError, OSError)
 
 _UA = {"User-Agent": "sekai-story-indexer/0.1 (+fetch)"}
 
@@ -46,7 +50,7 @@ def fetch_json(url: str, *, retries: int = 3, backoff: float = 1.5) -> Any:
             req = urllib.request.Request(url, headers=_UA)
             with urllib.request.urlopen(req, timeout=30, context=_SSL_CONTEXT) as resp:
                 return json.loads(resp.read())
-        except (urllib.error.URLError, TimeoutError) as exc:  # pragma: no cover - network
+        except _RETRYABLE as exc:  # pragma: no cover - network
             last_exc = exc
             if attempt < retries - 1:
                 time.sleep(backoff ** attempt)
@@ -99,6 +103,12 @@ def cards() -> list[dict]:
 
 def event_scenario(asset_bundle: str, scenario_id: str) -> dict:
     url = f"{ASSET_CDN}/event_story/{asset_bundle}/scenario/{scenario_id}.asset"
+    return fetch_json(url)
+
+
+def unit_story_scenario(chapter_asset_bundle: str, scenario_id: str) -> dict:
+    """Unit-story scenario asset. Path keyed by the CHAPTER's assetbundleName."""
+    url = f"{ASSET_CDN}/scenario/unitstory/{chapter_asset_bundle}/{scenario_id}.asset"
     return fetch_json(url)
 
 

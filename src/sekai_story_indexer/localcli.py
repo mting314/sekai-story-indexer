@@ -35,6 +35,15 @@ def fetch(
     typer.echo(f"Fetched {len(plans)} events into {story_root}")
 
 
+@app.command("fetch-unit-stories")
+def fetch_unit_stories_command(story_root: Path = typer.Option(Path("story"))):
+    """Fetch the units' main (formation) stories into story/<unit>/unit/…"""
+    from .source.fetcher import fetch_unit_stories
+
+    n = fetch_unit_stories(story_root)
+    typer.echo(f"Wrote {n} unit-story episodes into {story_root}")
+
+
 @app.command()
 def ask(
     question: str,

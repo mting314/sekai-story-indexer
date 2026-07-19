@@ -16,7 +16,7 @@ import yaml
 
 from . import client
 from .catalog import build_catalog
-from .constants import CHARACTER_ID_TO_JP
+from .constants import CHARACTER_ID_TO_JP, DB_UNIT_TO_SLUG
 from .transform import (
     arc_slug,
     episode_filename,
@@ -26,6 +26,7 @@ from .transform import (
     resolve_unit,
     resolve_unit_from_story_units,
     scenario_to_lines,
+    slugify,
     song_info,
     tree_relpath,
 )
@@ -143,6 +144,47 @@ def story_order_doc(plans: list[EventPlan]) -> dict:
     }
 
 
+def fetch_unit_stories(
+    story_root: Path,
+    *,
+    scenario_fetch: Callable[[str, str], dict] | None = None,
+    log: Callable[[str], None] = print,
+) -> int:
+    """Fetch the units' main (non-event) stories into
+    ``story/<unit>/unit/<NN-chapter>/<NN-episode>.md``. Returns episodes written.
+
+    Unit stories are the formation arcs (Phase 5). They're not events, so they
+    carry ``content_type='unit'`` and aren't in the events index; the query
+    layer treats non-event content as always-queryable once on disk.
+    """
+    story_root = Path(story_root)
+    fetch_scenario = scenario_fetch or client.unit_story_scenario
+    written = 0
+    for us in client.unit_stories():
+        unit = DB_UNIT_TO_SLUG.get((us.get("unit") or "").lower(), "mixed")
+        for chapter in us.get("chapters", []):
+            ch_no = chapter.get("chapterNo", 0)
+            ch_slug = f"{ch_no:02d}-{slugify(chapter.get('title', '')) or 'chapter'}"
+            ch_bundle = chapter["assetbundleName"]
+            for ep in sorted(chapter.get("episodes", []), key=lambda e: e.get("episodeNo", 0)):
+                try:
+                    scenario = fetch_scenario(ch_bundle, ep["scenarioId"])
+                except Exception as exc:
+                    log(f"  skip {unit}/{ch_slug} {ep['scenarioId']}: {exc}")
+                    continue
+                lines = scenario_to_lines(scenario)
+                title = f"{ep.get('episodeNo', 0)}. {ep.get('title', '')}".strip()
+                markdown = render_episode_markdown(title, [lines])
+                fname = episode_filename(ep.get("episodeNo", 0), ep.get("title", ""))
+                out = story_root / tree_relpath(unit, "unit", ch_slug, fname)
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(markdown, encoding="utf-8")
+                written += 1
+            log(f"wrote {unit}/unit/{ch_slug} ({len(chapter.get('episodes', []))} episodes)")
+    log(f"unit stories: {written} episodes")
+    return written
+
+
 def fetch_and_write(
     story_root: Path,
     *,
@@ -186,14 +228,20 @@ def fetch_and_write(
             cards_by_id=cards_by_id,
             music=music_by_event.get(event["id"]),
         )
+        ok = 0
         for ep in plan.episodes:
-            scenario = fetch_scenario(ep.asset_bundle, ep.scenario_id)
+            try:
+                scenario = fetch_scenario(ep.asset_bundle, ep.scenario_id)
+            except Exception as exc:  # one bad episode must not abort the run
+                log(f"  skip {plan.arc_slug} ep {ep.scenario_id}: {exc}")
+                continue
             lines = scenario_to_lines(scenario)
             markdown = render_episode_markdown(ep.title, [lines])
             out_path = story_root / ep.relpath
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_text(markdown, encoding="utf-8")
-        log(f"wrote {plan.unit}/{plan.arc_slug} ({len(plan.episodes)} episodes)")
+            ok += 1
+        log(f"wrote {plan.unit}/{plan.arc_slug} ({ok}/{len(plan.episodes)} episodes)")
         plans.append(plan)
 
     # emit ordering (covers written trees) + a COMPLETE events index (all events,

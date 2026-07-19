@@ -106,11 +106,15 @@ even the filesystem sorted chronologically). Hand-authored content still uses
 - [x] **Phase 1b — Processor & model.** `unit`/`content_type`/`plot_weight`/
   `event_id`/`started_at` on `StoryMetadata`; `extract_hierarchy` reads the
   Sekai tree.
-- [ ] **Phase 2 — Bottom-up indexing.** Run the inherited chunker/summarizer over
-  fetched events; add the **Unit-tier** summary rollup; verify Chroma upsert +
-  manifest incrementality.
-- [ ] **Phase 3 — Relevance classifier.** LLM pass writing `plot_weight`;
-  retrieval boost weighting; unit-scoped State Ledger.
+- [~] **Phase 2 — Bottom-up indexing.** Unit-tier summaries DONE for the local
+  backend (`query/summaries.py`: deterministic overviews from event outlines,
+  Tier-1 nodes, retrievable). The **LLM Refine** summarizer + Chroma upsert /
+  manifest incrementality is the inherited full-engine path — needs a keyed run
+  (raised).
+- [x] **Phase 3 — Relevance classifier.** `source/relevance.py` heuristic
+  `plot_weight` (high/medium/filler), set on every fetch, wired into the local
+  retrieval boost + citations; `sekai classify` command. (LLM refinement of the
+  weights is a later upgrade using the same features.)
 - [x] **Phase 1c — Event context enrichment.** Focus character (eventCards→cards
   featured limited card), commissioned song (eventMusics→musics), and CDN image
   URLs (event logo/banner, music jacket) captured into `events_index.json`.
@@ -132,19 +136,27 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   `answer_parts` (text + clickable quote blocks) and `citations[].excerpt`; the
   web app renders quotes inline and opens a side panel with the full scene on
   click. (Full engine gains the same structure in Phase 4.)
-- [ ] **Phase 4 — Full-engine scoping.** Port the same nickname/unit scoping into
-  the production Google/Chroma engine as metadata filters; run the golden set
-  against `--backend full`; extend `ALLOWED_STORY_TYPES`/tier labels for Sekai.
-- [ ] **Phase 5 — Content beyond events.** Main stories, Unit stories, Card
-  side-stories (bulk), Area conversations via additional fetcher sources.
-- [ ] **Phase 6 — Translation & audit.** Reuse glossary + State Ledger
-  constraint injection + audit loop; temporal filtering to avoid "knowing the
-  future."
+- [~] **Phase 4 — Full-engine scoping.** Shared resolver `query/scoping.py`
+  (`ScopeIndex` + `chroma_where`) DONE and wired into the local engine + per-unit
+  golden cases; `unit`/`arc_id` already flow into Chroma metadata (via
+  `model_dump`), so `chroma_where` filters are ready. Injecting the filter into
+  `engine.py`'s query call + a keyed golden run against `--backend full` is
+  raised (untestable here). `ALLOWED_STORY_TYPES` is fine — content_type maps to
+  Main/Side.
+- [~] **Phase 5 — Content beyond events.** **Unit stories DONE** (real fetch:
+  `sekai fetch-unit-stories` → `story/<unit>/unit/…`, tested); non-event content
+  is always-queryable. Card side-stories + Area conversations: modeled/scaffolded,
+  fetch flows not yet built (raised — same pattern as unit stories).
+- [~] **Phase 6 — Translation & audit.** Inherited full-engine feature: the
+  translation prompts + `--audit` loop already exist (`query/audit.py`, prompts)
+  and consume our Sekai `glossary.json` + State Ledger. Needs a keyed run to
+  exercise (raised). Deterministic offline translation isn't attempted — name
+  substitution inside JP sentences isn't genuinely useful without the LLM.
 
 ## 5. Known follow-ups / accuracy notes
-* Featured-character → unit resolution currently reads `event["unit"]` then a
-  best-effort `eventCards.json` scan; for accuracy join
-  `eventCards → cards → gameCharacters`.
-* `card`/`area`/`unit` content types are modeled but not yet fetched (Phase 5).
-* The inherited test suite is still Hasunosora-shaped and will be ported to
-  Sekai fixtures as each phase lands (see TASKS.md).
+* Card/Area fetch flows (Phase 5 remainder) — mirror `fetch_unit_stories`.
+* Full-engine: join `events_index` plot_weight into node metadata at ingest so
+  the boost applies there too; inject `chroma_where(scope)` into the query.
+* The inherited test suite is still Hasunosora-shaped (needs chromadb to even
+  collect); Sekai tests are the `test_sekai_source/local_query/scoping/eval_local/
+  webapp_api/content_and_summaries` files.
