@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sekai_story_indexer.source.constants import UNIT_NAMES, UNIT_SLUGS
@@ -28,7 +28,7 @@ from sekai_story_indexer.source.transform import is_key_event_story, resolve_uni
 def _date(ts_ms: int) -> str:
     if not ts_ms:
         return "????-??-??"
-    return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+    return datetime.fromtimestamp(ts_ms / 1000, tz=UTC).strftime("%Y-%m-%d")
 
 
 def rows_from_index(index_path: Path) -> list[dict]:
@@ -73,9 +73,18 @@ def render(rows: list[dict]) -> str:
         if not items:
             continue
         lines.append(f"\n## {UNIT_NAMES.get(unit, unit)}  ({len(items)} key stories)")
-        lines.append(f"{'date':<12} {'id':>4}  name")
+        lines.append(f"{'date':<12} {'nick':>7} {'id':>4}  name")
         for r in items:
-            lines.append(f"{_date(r.get('started_at', 0)):<12} {r['event_id']:>4}  {r['name']}")
+            nick = r.get("nickname") or ""
+            line = f"{_date(r.get('started_at', 0)):<12} {nick:>7} {r['event_id']:>4}  {r['name']}"
+            extras = []
+            if r.get("focus_character"):
+                extras.append(f"★{r['focus_character']}")
+            if r.get("song_title"):
+                extras.append(f"🎵{r['song_title']}")
+            if extras:
+                line += "  — " + "  ".join(extras)
+            lines.append(line)
     return "\n".join(lines) if lines else "(no key stories found)"
 
 

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sekai Story Indexer</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Project Sekai — Story Indexer</h1>
+    <p class="sub">Ask about the story, or browse the event timeline. Try a nickname like <code>kasa5</code>.</p>
+  </header>
+
+  <main>
+    <section id="chat" class="panel">
+      <h2>Ask</h2>
+      <div id="scope-hint" class="scope-hint hidden"></div>
+      <div id="messages" class="messages"></div>
+      <form id="ask-form">
+        <input id="question" type="text" autocomplete="off"
+               placeholder="e.g. How does Kohane's confidence change across VBS?" />
+        <button type="submit">Ask</button>
+      </form>
+    </section>
+
+    <section id="timeline-section" class="panel">
+      <h2>Event timeline</h2>
+      <div id="unit-filters" class="filters"></div>
+      <div id="timeline" class="timeline"></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

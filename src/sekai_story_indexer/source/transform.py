@@ -119,6 +119,35 @@ def is_key_event_story(story_units: list[dict]) -> bool:
     return any(r.get("eventStoryUnitRelation") == "main" for r in story_units)
 
 
+def focus_character_id(event_card_ids: list[int], cards_by_id: dict[int, dict]) -> int:
+    """The event's focus character = character of its featured limited 4★ card.
+
+    Among the event's cards, prefer ``rarity_4`` (and birthday) cards and take the
+    earliest-released one as the debut/limited focus. Returns 0 if unresolvable.
+    This is what the community nickname system counts.
+    """
+    cards = [cards_by_id[cid] for cid in event_card_ids if cid in cards_by_id]
+    if not cards:
+        return 0
+    featured = [c for c in cards if c.get("cardRarityType") in ("rarity_4", "rarity_birthday")]
+    pool = featured or cards
+    pool.sort(key=lambda c: c.get("releaseAt", 0))
+    return pool[0].get("characterId", 0)
+
+
+def song_info(music: dict | None) -> dict:
+    """Flatten a ``musics.json`` record into commissioned-song fields."""
+    if not music:
+        return {}
+    return {
+        "song_title": music.get("title", ""),
+        "song_composer": music.get("composer", ""),
+        "song_lyricist": music.get("lyricist", ""),
+        "song_arranger": music.get("arranger", ""),
+        "song_assetbundle": music.get("assetbundleName", ""),
+    }
+
+
 def scenario_to_lines(scenario: dict) -> list[tuple[str, str]]:
     """Extract ordered ``(speaker, text)`` tuples from a scenario ``.asset``.
 

@@ -111,7 +111,17 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   manifest incrementality.
 - [ ] **Phase 3 — Relevance classifier.** LLM pass writing `plot_weight`;
   retrieval boost weighting; unit-scoped State Ledger.
-- [ ] **Phase 4 — Retrieval & query.** `--unit` scoping end-to-end; per-unit
+- [x] **Phase 1c — Event context enrichment.** Focus character (eventCards→cards
+  featured limited card), commissioned song (eventMusics→musics), and CDN image
+  URLs (event logo/banner, music jacket) captured into `events_index.json`.
+- [x] **Phase 1d — Community nicknames.** `kasa5`/`mizu3` system: data-driven
+  per-character focus numbering + editable abbreviation map (`nicknames.py` /
+  `nicknames.json`), resolver, and nicknames written into the index.
+- [x] **Phase 1e — Web app.** `webapp/` FastAPI + vanilla-JS SPA: chat over the
+  query engine + unit-filterable event timeline with CDN visuals, nicknames,
+  focus character, and song.
+- [ ] **Phase 4 — Retrieval & query.** `--unit`/`--event` and **nickname**
+  scoping end-to-end (resolve `kasa5` → event_id → metadata filter); per-unit
   golden eval sets; extend `ALLOWED_STORY_TYPES`/tier labels for Sekai.
 - [ ] **Phase 5 — Content beyond events.** Main stories, Unit stories, Card
   side-stories (bulk), Area conversations via additional fetcher sources.

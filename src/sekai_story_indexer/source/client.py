@@ -68,6 +68,16 @@ def musics() -> list[dict]:
     return fetch_json(f"{MASTER_DB}/musics.json")
 
 
+def event_cards() -> list[dict]:
+    """eventCards.json: eventId -> cardId, for focus-character resolution."""
+    return fetch_json(f"{MASTER_DB}/eventCards.json")
+
+
+def cards() -> list[dict]:
+    """cards.json: id -> {characterId, cardRarityType, releaseAt, ...}."""
+    return fetch_json(f"{MASTER_DB}/cards.json")
+
+
 # --- asset CDN --------------------------------------------------------------
 
 def event_scenario(asset_bundle: str, scenario_id: str) -> dict:

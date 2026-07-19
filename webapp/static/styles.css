@@ -1,0 +1,63 @@
+:root {
+  --bg: #0f1117;
+  --panel: #171a23;
+  --card: #1e222d;
+  --text: #e6e8ee;
+  --muted: #9aa0ad;
+  --accent: #33ccff;
+  --key: #ffcc4d;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+header { padding: 20px 24px 8px; }
+header h1 { margin: 0; font-size: 20px; }
+header .sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--accent); }
+
+main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 16px 24px 32px;
+  align-items: start;
+}
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+.panel { background: var(--panel); border-radius: 12px; padding: 16px; }
+.panel h2 { margin: 0 0 12px; font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+
+/* chat */
+.messages { display: flex; flex-direction: column; gap: 8px; min-height: 180px; max-height: 55vh; overflow-y: auto; margin-bottom: 12px; }
+.msg { padding: 9px 12px; border-radius: 10px; max-width: 90%; white-space: pre-wrap; line-height: 1.4; font-size: 14px; }
+.msg.user { align-self: flex-end; background: var(--accent); color: #04222b; }
+.msg.assistant { align-self: flex-start; background: var(--card); }
+.msg.system { align-self: center; background: transparent; color: var(--muted); font-size: 12.5px; }
+#ask-form { display: flex; gap: 8px; }
+#ask-form input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #2b2f3a; background: #0c0e14; color: var(--text); }
+#ask-form button { padding: 10px 16px; border: 0; border-radius: 8px; background: var(--accent); color: #04222b; font-weight: 600; cursor: pointer; }
+.scope-hint { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+.scope-hint a { color: var(--accent); }
+.hidden { display: none; }
+
+/* timeline */
+.filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.chip { padding: 5px 11px; border-radius: 999px; border: 1px solid #2b2f3a; background: transparent; color: var(--muted); cursor: pointer; font-size: 12.5px; }
+.chip.active { background: var(--accent); color: #04222b; border-color: var(--accent); font-weight: 600; }
+.timeline { display: flex; flex-direction: column; gap: 8px; max-height: 70vh; overflow-y: auto; }
+.event-card { display: flex; gap: 12px; align-items: center; background: var(--card); border-radius: 10px; padding: 8px 10px; cursor: pointer; border-left: 3px solid transparent; }
+.event-card:hover { outline: 1px solid #2b2f3a; }
+.event-card.key { border-left-color: var(--key); }
+.event-card .logo { width: 92px; height: 52px; object-fit: contain; flex-shrink: 0; }
+.event-card .meta { min-width: 0; }
+.event-card .top { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.event-card .date { font-variant-numeric: tabular-nums; }
+.event-card .nick { color: var(--accent); font-weight: 600; }
+.event-card .key-badge { background: var(--key); color: #3a2b00; border-radius: 4px; padding: 0 5px; font-size: 10.5px; font-weight: 700; }
+.event-card .name { font-size: 14px; margin: 1px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-card .focus, .event-card .song { font-size: 12px; color: var(--muted); }
+.empty { color: var(--muted); font-size: 13px; }

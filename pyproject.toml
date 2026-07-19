@@ -16,6 +16,12 @@ dependencies = [
     "sudachidict-core>=20260428",
 ]
 
+[project.optional-dependencies]
+web = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+]
+
 [project.scripts]
 indexer = "sekai_story_indexer.cli:main"
 

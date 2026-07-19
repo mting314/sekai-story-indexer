@@ -15,14 +15,19 @@ from pathlib import Path
 import yaml
 
 from . import client
+from .assets import event_banner_url, event_logo_url, music_jacket_url
+from .constants import CHARACTER_ID_TO_JP
+from .nicknames import assign_focus_nicknames
 from .transform import (
     arc_slug,
     episode_filename,
+    focus_character_id,
     is_key_event_story,
     render_episode_markdown,
     resolve_unit,
     resolve_unit_from_story_units,
     scenario_to_lines,
+    song_info,
     tree_relpath,
 )
 
@@ -50,6 +55,10 @@ class EventPlan:
     started_at: int
     outline: str
     is_key_story: bool = False
+    asset_bundle: str = ""
+    focus_character_id: int = 0
+    focus_character: str = ""
+    song: dict = field(default_factory=dict)
     episodes: list[EpisodePlan] = field(default_factory=list)
 
 
@@ -60,6 +69,9 @@ def plan_event(
     content_type: str = "event",
     story_units: list[dict] | None = None,
     event_characters: dict[int, list[int]] | None = None,
+    event_card_ids: list[int] | None = None,
+    cards_by_id: dict[int, dict] | None = None,
+    music: dict | None = None,
 ) -> EventPlan:
     """Pure: turn one event + its eventStories record into a write plan.
 
@@ -79,6 +91,9 @@ def plan_event(
     is_key = is_key_event_story(story_units)
     slug = arc_slug(event_id, name)
     asset_bundle = story["assetbundleName"]
+
+    focus_id = focus_character_id(event_card_ids or [], cards_by_id or {})
+    song = song_info(music)
 
     episodes: list[EpisodePlan] = []
     for ep in sorted(story.get("eventStoryEpisodes", []), key=lambda e: e["episodeNo"]):
@@ -101,6 +116,10 @@ def plan_event(
         started_at=event.get("startAt", 0),
         outline=story.get("outline", ""),
         is_key_story=is_key,
+        asset_bundle=asset_bundle,
+        focus_character_id=focus_id,
+        focus_character=CHARACTER_ID_TO_JP.get(focus_id, ""),
+        song=song,
         episodes=episodes,
     )
 
@@ -153,6 +172,25 @@ def fetch_and_write(
     except Exception:  # pragma: no cover - optional table / offline
         story_units_by_story_id = {}
 
+    # Focus character (eventCards -> cards) and commissioned song (eventMusics ->
+    # musics). All optional; enrichment degrades gracefully if a table is absent.
+    cards_by_id: dict[int, dict] = {}
+    event_card_ids: dict[int, list[int]] = {}
+    music_by_event: dict[int, dict] = {}
+    try:
+        cards_by_id = {c["id"]: c for c in client.cards()}
+        for row in client.event_cards():
+            event_card_ids.setdefault(row["eventId"], []).append(row["cardId"])
+    except Exception:  # pragma: no cover - optional table / offline
+        cards_by_id, event_card_ids = {}, {}
+    try:
+        musics_by_id = {m["id"]: m for m in client.musics()}
+        for row in client.event_musics():
+            if row["eventId"] not in music_by_event and row["musicId"] in musics_by_id:
+                music_by_event[row["eventId"]] = musics_by_id[row["musicId"]]
+    except Exception:  # pragma: no cover - optional table / offline
+        music_by_event = {}
+
     selected = [e for e in events if not event_ids or e["id"] in event_ids]
     selected.sort(key=lambda e: (e.get("startAt", 0), e["id"]))
     if limit:
@@ -165,7 +203,12 @@ def fetch_and_write(
             log(f"skip event {event['id']} ({event.get('name')}): no eventStories record")
             continue
         plan = plan_event(
-            event, story, story_units=story_units_by_story_id.get(story["id"], [])
+            event,
+            story,
+            story_units=story_units_by_story_id.get(story["id"], []),
+            event_card_ids=event_card_ids.get(event["id"], []),
+            cards_by_id=cards_by_id,
+            music=music_by_event.get(event["id"]),
         )
         for ep in plan.episodes:
             scenario = fetch_scenario(ep.asset_bundle, ep.scenario_id)
@@ -183,6 +226,19 @@ def fetch_and_write(
         yaml.safe_dump(story_order_doc(plans), allow_unicode=True, sort_keys=False),
         encoding="utf-8",
     )
+    # Assign community nicknames (kasa5, mizu3, …) from focus characters,
+    # numbering each character's focus events in release order.
+    nicknames = assign_focus_nicknames(
+        [
+            {
+                "event_id": p.event_id,
+                "focus_character_id": p.focus_character_id,
+                "started_at": p.started_at,
+            }
+            for p in plans
+        ]
+    )
+
     index_path = story_root.parent / "events_index.json"
     index_path.write_text(
         json.dumps(
@@ -197,6 +253,18 @@ def fetch_and_write(
                     "outline": p.outline,
                     "is_key_story": p.is_key_story,
                     "plot_weight": "unrated",
+                    "focus_character_id": p.focus_character_id,
+                    "focus_character": p.focus_character,
+                    "nickname": (nicknames.get(p.event_id) or {}).get("nickname"),
+                    "focus_index": (nicknames.get(p.event_id) or {}).get("focus_index"),
+                    **p.song,
+                    "logo_url": event_logo_url(p.asset_bundle) if p.asset_bundle else "",
+                    "banner_url": event_banner_url(p.asset_bundle) if p.asset_bundle else "",
+                    "jacket_url": (
+                        music_jacket_url(p.song["song_assetbundle"])
+                        if p.song.get("song_assetbundle")
+                        else ""
+                    ),
                     "episodes": len(p.episodes),
                 }
                 for p in plans

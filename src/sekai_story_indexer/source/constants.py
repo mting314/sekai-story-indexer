@@ -51,6 +51,18 @@ CHARACTER_ID_TO_UNIT: dict[int, str] = {
     24: "virtual_singer", 25: "virtual_singer", 26: "virtual_singer",
 }
 
+# Canonical master-DB ``gameCharacters.json`` id -> Japanese name. Ids are fixed
+# game constants (1-20 unit members in unit order, 21-26 Virtual Singers).
+CHARACTER_ID_TO_JP: dict[int, str] = {
+    1: "星乃一歌", 2: "天馬咲希", 3: "望月穂波", 4: "日野森志歩",
+    5: "花里みのり", 6: "桐谷遥", 7: "桃井愛莉", 8: "日野森雫",
+    9: "小豆沢こはね", 10: "白石杏", 11: "東雲彰人", 12: "青柳冬弥",
+    13: "天馬司", 14: "鳳えむ", 15: "草薙寧々", 16: "神代類",
+    17: "宵崎奏", 18: "朝比奈まふゆ", 19: "東雲絵名", 20: "暁山瑞希",
+    21: "初音ミク", 22: "鏡音リン", 23: "鏡音レン", 24: "巡音ルカ",
+    25: "MEIKO", 26: "KAITO",
+}
+
 # The master-DB ``unit`` string values (as used on gameCharacters / events) that
 # map onto our slugs, for sources that carry an explicit unit field.
 DB_UNIT_TO_SLUG: dict[str, str] = {

@@ -1,16 +1,24 @@
 from pathlib import Path
 
 from sekai_story_indexer.indexer.processor import StoryProcessor
+from sekai_story_indexer.source.assets import event_logo_url, music_jacket_url
 from sekai_story_indexer.source.fetcher import plan_event, story_order_doc
+from sekai_story_indexer.source.nicknames import (
+    assign_focus_nicknames,
+    nickname_for,
+    resolve_nickname,
+)
 from sekai_story_indexer.source.transform import (
     arc_slug,
     episode_filename,
+    focus_character_id,
     is_key_event_story,
     render_episode_markdown,
     resolve_unit,
     resolve_unit_from_story_units,
     scenario_to_lines,
     slugify,
+    song_info,
     tree_relpath,
 )
 
@@ -135,3 +143,50 @@ def test_processor_reads_sekai_tree_and_populates_unit(tmp_path: Path):
     assert meta.story_type == "Side"
     assert meta.episode_number == 1
     assert meta.parent_year_id == "vivid_bad_squad|0151-grow-glorious"
+
+
+def test_resolve_nickname_roundtrip():
+    # Tsukasa=13, Mizuki=20 (user-confirmed abbreviations)
+    assert resolve_nickname("kasa5") == (13, 5)
+    assert resolve_nickname("mizu3") == (20, 3)
+    assert resolve_nickname("kasa-5") == (13, 5)
+    assert resolve_nickname("KASA 5") == (13, 5)
+    assert resolve_nickname("nope99") is None
+    assert nickname_for(13, 5) == "kasa5"
+
+
+def test_assign_focus_nicknames_numbers_per_character_chronologically():
+    events = [
+        {"event_id": 30, "focus_character_id": 13, "started_at": 3000},
+        {"event_id": 10, "focus_character_id": 13, "started_at": 1000},
+        {"event_id": 20, "focus_character_id": 20, "started_at": 2000},
+        {"event_id": 40, "focus_character_id": 0, "started_at": 4000},  # no focus -> skipped
+    ]
+    nn = assign_focus_nicknames(events)
+    assert nn[10]["nickname"] == "kasa1"
+    assert nn[30]["nickname"] == "kasa2"  # later date -> 2nd Tsukasa focus
+    assert nn[20]["nickname"] == "mizu1"
+    assert 40 not in nn
+
+
+def test_focus_character_id_picks_featured_limited_card():
+    cards = {
+        100: {"id": 100, "characterId": 13, "cardRarityType": "rarity_2", "releaseAt": 5},
+        101: {"id": 101, "characterId": 13, "cardRarityType": "rarity_4", "releaseAt": 10},
+        102: {"id": 102, "characterId": 15, "cardRarityType": "rarity_4", "releaseAt": 20},
+    }
+    # earliest rarity_4 wins -> Tsukasa (13)
+    assert focus_character_id([100, 101, 102], cards) == 13
+    assert focus_character_id([], cards) == 0
+
+
+def test_song_info_flattens_music_record():
+    info = song_info({"title": "S", "composer": "C", "lyricist": "L", "arranger": "A", "assetbundleName": "ab"})
+    assert info["song_title"] == "S"
+    assert info["song_assetbundle"] == "ab"
+    assert song_info(None) == {}
+
+
+def test_asset_urls():
+    assert event_logo_url("event_grow").endswith("/event/event_grow/logo/logo.webp")
+    assert music_jacket_url("m01").endswith("/music/jacket/m01/m01.webp")
