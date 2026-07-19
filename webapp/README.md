@@ -10,6 +10,11 @@ small FastAPI backend.
   built / keys aren't set, it returns a clear message and the timeline still
   works.
 * Clicking an event scopes your next question to it.
+* Each event shows an **indexed indicator**: a filled green dot = queryable in
+  chat now; a hollow dot + dimmed card = on the timeline but not yet ingested
+  (chat-answerable after the next `scripts/sync.sh`). A legend at the top counts
+  each. Clicking a pending event explains it's not queryable yet instead of
+  scoping. This reflects the timeline-leads-index design (see `../DESIGN.md`).
 
 ## Run
 

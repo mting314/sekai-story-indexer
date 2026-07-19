@@ -16,7 +16,8 @@
     "logo_url": "https://storage.sekai.best/sekai-jp-assets/event/event_ba01/logo/logo.webp",
     "banner_url": "",
     "jacket_url": "",
-    "episodes": 8
+    "episodes": 8,
+    "indexed": false
   },
   {
     "event_id": 5,
@@ -35,7 +36,8 @@
     "logo_url": "https://storage.sekai.best/sekai-jp-assets/event/event_mmj01/logo/logo.webp",
     "banner_url": "",
     "jacket_url": "",
-    "episodes": 8
+    "episodes": 8,
+    "indexed": true
   },
   {
     "event_id": 2,
@@ -54,6 +56,7 @@
     "logo_url": "https://storage.sekai.best/sekai-jp-assets/event/event_ns01/logo/logo.webp",
     "banner_url": "",
     "jacket_url": "",
-    "episodes": 8
+    "episodes": 8,
+    "indexed": true
   }
 ]

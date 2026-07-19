@@ -53,20 +53,33 @@ function renderTimeline() {
   const rows = state.events.filter(
     (e) => state.activeUnit === "all" || e.unit === state.activeUnit
   );
+  const nIndexed = rows.filter((e) => e.indexed).length;
   el.innerHTML = "";
+
+  const legend = document.createElement("div");
+  legend.className = "legend";
+  legend.innerHTML =
+    `<span class="dot indexed"></span> queryable in chat (${nIndexed}) ` +
+    `&nbsp;·&nbsp; <span class="dot pending"></span> on timeline, indexing pending (${rows.length - nIndexed})`;
+  el.appendChild(legend);
+
   for (const e of rows) {
     const card = document.createElement("div");
-    card.className = "event-card" + (e.is_key_story ? " key" : "");
+    card.className =
+      "event-card" + (e.is_key_story ? " key" : "") + (e.indexed ? " indexed" : " pending");
     const logo = e.logo_url
       ? `<img class="logo" loading="lazy" src="${e.logo_url}" alt="" onerror="this.style.display='none'">`
       : "";
     const nick = e.nickname ? `<span class="nick">${e.nickname}</span>` : "";
     const song = e.song_title ? `<div class="song">🎵 ${e.song_title}</div>` : "";
     const focus = e.focus_character ? `<div class="focus">★ ${e.focus_character}</div>` : "";
+    const status = e.indexed
+      ? '<span class="status-dot indexed" title="Queryable in chat now"></span>'
+      : '<span class="status-dot pending" title="On the timeline; chat-answerable after the next ingest"></span>';
     card.innerHTML = `
       ${logo}
       <div class="meta">
-        <div class="top"><span class="date">${fmtDate(e.started_at)}</span>${nick}
+        <div class="top">${status}<span class="date">${fmtDate(e.started_at)}</span>${nick}
           ${e.is_key_story ? '<span class="key-badge">key</span>' : ""}</div>
         <div class="name">${e.name}</div>
         ${focus}${song}
@@ -78,6 +91,13 @@ function renderTimeline() {
 }
 
 function setScope(e) {
+  if (!e.indexed) {
+    addMessage(
+      "system",
+      `“${e.name}” isn't indexed yet — it's on the timeline but won't be chat-answerable until the next ingest.`
+    );
+    return;
+  }
   state.scopeEventId = e.event_id;
   const hint = document.getElementById("scope-hint");
   hint.classList.remove("hidden");
