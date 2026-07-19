@@ -53,6 +53,22 @@ def ask(
         typer.echo(f"  · {c['unit']} · {c['arc_id']} · {c['episode']} (score {c['score']})")
 
 
+@app.command()
+def classify(events_index: Path = typer.Option(Path("events_index.json"))):
+    """(Re)compute plot_weight for every event in the index (heuristic; no LLM)."""
+    import collections
+
+    from .source.relevance import classify_catalog
+
+    rows = _events(events_index)
+    classify_catalog(rows)
+    events_index.write_text(
+        json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    dist = collections.Counter(r["plot_weight"] for r in rows)
+    typer.echo(f"classified {len(rows)} events: {dict(dist)}")
+
+
 @app.command("eval")
 def eval_command(golden: Path = typer.Option(Path("eval/golden_local.json"))):
     """Run the local regression eval; non-zero exit on any regression."""

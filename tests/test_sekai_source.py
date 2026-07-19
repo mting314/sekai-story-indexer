@@ -234,3 +234,17 @@ def test_build_catalog_enriches_and_numbers_nicknames():
     assert lyric["episodes"] == 2
     assert lyric["has_story"] is True
     assert lyric["logo_url"].endswith("/event/ab6/logo/logo.webp")
+
+
+def test_plot_weight_classifier():
+    from sekai_story_indexer.source.relevance import classify_event, weight_factor
+
+    # key + single unit + focus + song -> high
+    assert classify_event({"is_key_story": True, "unit": "leo_need",
+                           "focus_character": "x", "song_title": "s"}) == "high"
+    # key crossover -> medium
+    assert classify_event({"is_key_story": True, "unit": "mixed"}) == "medium"
+    # not key -> filler (still indexed)
+    assert classify_event({"is_key_story": False, "unit": "leo_need"}) == "filler"
+    # boost ordering: high > medium > filler, filler never zero
+    assert weight_factor("high") > weight_factor("medium") > weight_factor("filler") > 0

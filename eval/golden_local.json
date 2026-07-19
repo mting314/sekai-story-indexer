@@ -46,6 +46,18 @@
       "question": "What is the story of akito1 about?",
       "expect_no_answer": true,
       "answer_contains_any": ["not indexed"]
+    },
+    {
+      "id": "nickname-mafu1",
+      "question": "What happens to Mafuyu in mafu1?",
+      "expect_scope_arc": "0002-marionette",
+      "expect_arc": "0002-marionette"
+    },
+    {
+      "id": "unit-filter-nightcord",
+      "question": "Why has Mafuyu disappeared?",
+      "unit": "nightcord",
+      "expect_unit": "nightcord"
     }
   ]
 }

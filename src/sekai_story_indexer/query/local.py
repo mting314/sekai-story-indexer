@@ -21,10 +21,11 @@ from pathlib import Path
 
 from ..indexer.processor import StoryProcessor
 from ..models.story import StoryNode
+from ..source.relevance import weight_factor
+from .scoping import ScopeIndex
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 _CJK_RE = re.compile(r"[぀-ヿ㐀-鿿]")
-_NICK_TOKEN_RE = re.compile(r"[a-z]+\d+", re.IGNORECASE)
 
 
 def tokenize(text: str) -> list[str]:
@@ -63,14 +64,12 @@ class LocalQueryEngine:
         self._idf: dict[str, float] = {
             term: math.log(1 + n_docs / (1 + count)) for term, count in df.items()
         }
-        # nickname / event scoping lookups from the enriched events index
-        self._arc_by_nick: dict[str, str] = {}
-        self._arc_by_event: dict[int, str] = {}
+        # shared scope resolver (nickname/unit/event) + plot-weight lookup
+        self._scope_index = ScopeIndex(events_index)
+        self._weight_by_arc: dict[str, str] = {}
         for row in events_index or []:
             if row.get("arc_slug"):
-                self._arc_by_event[row["event_id"]] = row["arc_slug"]
-                if row.get("nickname"):
-                    self._arc_by_nick[row["nickname"].lower()] = row["arc_slug"]
+                self._weight_by_arc[row["arc_slug"]] = row.get("plot_weight", "unrated")
         # Cross-lingual bridge: the corpus is JP but questions may be EN (or vice
         # versa). From the glossary (JP<->EN) build trigger->add token expansions
         # so a name in one language also searches the other.
@@ -106,17 +105,6 @@ class LocalQueryEngine:
         return expanded
 
     # -- scoping -------------------------------------------------------------
-    def _detect_scope(self, question: str) -> tuple[str | None, str | None]:
-        """Infer (unit, arc_id) scope from nickname tokens in the question."""
-        for tok in _NICK_TOKEN_RE.findall(question):
-            arc = self._arc_by_nick.get(tok.lower())
-            if arc:
-                unit = next(
-                    (n.metadata.unit for n in self.nodes if n.metadata.arc_id == arc), None
-                )
-                return unit, arc
-        return None, None
-
     def _candidate_indices(self, unit: str | None, arc_id: str | None) -> list[int]:
         out = []
         for i, node in enumerate(self.nodes):
@@ -143,6 +131,8 @@ class LocalQueryEngine:
             tf = self._tf[i]
             score = sum(tf.get(t, 0) * self._idf[t] for t in q_tokens)
             if score > 0:
+                # boost plot-heavy scenes, de-prioritize filler (never drop it)
+                score *= weight_factor(self._weight_by_arc.get(self.nodes[i].metadata.arc_id))
                 scored.append((score, i))
         # deterministic tie-break: score desc, then stable source order
         scored.sort(key=lambda s: (-s[0], self._sort_key(self.nodes[s[1]])))
@@ -162,9 +152,8 @@ class LocalQueryEngine:
         event_id: int | None = None,
         k: int = 5,
     ) -> dict:
-        arc_id = self._arc_by_event.get(event_id) if event_id else None
-        if not unit and not arc_id:
-            unit, arc_id = self._detect_scope(question)
+        scope = self._scope_index.resolve(question, unit=unit, event_id=event_id)
+        unit, arc_id = scope.unit, scope.arc_id
 
         hits = self.retrieve(question, k=k, unit=unit, arc_id=arc_id)
         if not hits:
@@ -225,6 +214,7 @@ class LocalQueryEngine:
                 "episode": h.metadata.episode_name,
                 "scene_index": h.metadata.scene_index,
                 "score": round(score, 4),
+                "plot_weight": self._weight_by_arc.get(h.metadata.arc_id, "unrated"),
                 "quote": best_quote.get(i, ""),
                 "excerpt": h.text,
             }

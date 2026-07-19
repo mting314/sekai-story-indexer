@@ -17,6 +17,7 @@ from __future__ import annotations
 from .assets import event_banner_url, event_logo_url, music_jacket_url
 from .constants import CHARACTER_ID_TO_JP
 from .nicknames import assign_focus_nicknames
+from .relevance import classify_event
 from .transform import (
     arc_slug,
     focus_character_id,
@@ -108,6 +109,7 @@ def build_catalog(
         nn = nicknames.get(r["event_id"]) or {}
         r["nickname"] = nn.get("nickname")
         r["focus_index"] = nn.get("focus_index")
+        r["plot_weight"] = classify_event(r)  # our relevance verdict (heuristic)
 
     records.sort(key=lambda r: (r.get("started_at", 0), r["event_id"]))
     return records
