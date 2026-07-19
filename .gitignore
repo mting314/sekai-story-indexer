@@ -219,6 +219,7 @@ config.json
 chroma_db/
 Linkura Summaries.zip
 summaries_cache.json
+event_summaries.json
 world_state.json
 lexical_index.db
 source_records.db
