@@ -50,6 +50,7 @@ def event_record(
         "event_id": event_id,
         "name": name,
         "unit": unit,
+        "event_type": event.get("eventType", ""),
         "content_type": "event",
         "arc_slug": arc_slug(event_id, name),
         "started_at": event.get("startAt", 0),
@@ -116,5 +117,36 @@ def build_catalog(
         r["focus_index"] = nn.get("focus_index")
         r["plot_weight"] = classify_event(r)  # our relevance verdict (heuristic)
 
+    _assign_world_links(records)
     records.sort(key=lambda r: (r.get("started_at", 0), r["event_id"]))
     return records
+
+
+# A World Link (world_bloom) campaign spans several separate events ("parts")
+# released over ~a season; a new campaign starts after a long gap. Number them
+# "World Link N Part M" and expose a `wlN-M` alias for scoping.
+_WORLD_LINK_GAP_MS = 120 * 24 * 3600 * 1000  # 120 days
+
+
+def _assign_world_links(records: list[dict]) -> None:
+    wl = sorted(
+        (r for r in records if r.get("event_type") == "world_bloom"),
+        key=lambda r: (r.get("started_at", 0), r["event_id"]),
+    )
+    series = part = 0
+    prev_at: int | None = None
+    for r in wl:
+        at = r.get("started_at", 0)
+        if prev_at is None or at - prev_at > _WORLD_LINK_GAP_MS:
+            series += 1
+            part = 1
+        else:
+            part += 1
+        prev_at = at
+        r["world_link_series"] = series
+        r["world_link_part"] = part
+        r["world_link_label"] = f"World Link {series} Part {part}"
+        r["wl_alias"] = f"wl{series}-{part}"
+        # banner-less World Link parts get the wl alias as their nickname
+        if not r.get("nickname"):
+            r["nickname"] = r["wl_alias"]

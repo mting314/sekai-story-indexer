@@ -170,7 +170,9 @@ class LocalQueryEngine:
         event_name = row.get("name") or m.arc_id
         nickname = row.get("nickname")
         ep_title = self._episode_title(node)
-        label = f"{unit_name} — {event_name}"
+        wl = row.get("world_link_label")  # e.g. "World Link 3 Part 1"
+        display_event = f"{event_name} ({wl})" if wl else event_name
+        label = f"{unit_name} — {display_event}"
         if nickname:
             label += f" [{nickname}]"
         if ep_title:

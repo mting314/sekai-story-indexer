@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-_NICK_TOKEN_RE = re.compile(r"[a-z]+\d+", re.IGNORECASE)
+_NICK_TOKEN_RE = re.compile(r"[a-z]+\d+(?:-\d+)?", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -38,6 +38,8 @@ class ScopeIndex:
             self.by_event[row["event_id"]] = row
             if row.get("nickname"):
                 self.by_nick[row["nickname"].lower()] = row
+            if row.get("wl_alias"):  # World Link alias, e.g. "wl3-1"
+                self.by_nick[row["wl_alias"].lower()] = row
 
     def resolve(
         self,
