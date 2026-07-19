@@ -14,9 +14,14 @@ dependencies = [
     "typer>=0.24.2",
     "sudachipy>=0.6.11",
     "sudachidict-core>=20260428",
+    # web app is a first-class surface, so keep it in base deps: `uv sync`
+    # alone yields a runnable `sekai serve`.
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
 ]
 
 [project.optional-dependencies]
+# retained as an alias for back-compat; web deps are in base dependencies now.
 web = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",

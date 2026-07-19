@@ -72,8 +72,16 @@ def serve(
     events_index: Path = typer.Option(Path("events_index.json")),
 ):
     """Launch the web app (chat + event timeline)."""
+    import importlib.util
     import os
     import sys
+
+    if importlib.util.find_spec("fastapi") is None:
+        typer.secho(
+            "fastapi/uvicorn not installed. Run: uv sync   (or: uv pip install fastapi uvicorn)",
+            fg="red",
+        )
+        raise typer.Exit(code=1)
 
     import uvicorn
 
