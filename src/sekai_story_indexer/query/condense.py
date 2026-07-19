@@ -41,7 +41,9 @@ def condense(question: str, history: list[dict] | None, *, model: str | None = N
         resp = client.models.generate_content(
             model=model,
             contents=_PROMPT.format(convo=convo, latest=question),
-            config=types.GenerateContentConfig(temperature=0.0, max_output_tokens=256),
+            # ample budget: Gemini-3 flash spends output tokens on thinking, which
+            # otherwise truncates the rewritten question mid-sentence.
+            config=types.GenerateContentConfig(temperature=0.0, max_output_tokens=2048),
         )
         rewritten = (resp.text or "").strip().strip('"')
         return rewritten or question
