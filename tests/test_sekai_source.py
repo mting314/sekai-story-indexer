@@ -208,19 +208,15 @@ def test_build_catalog_enriches_and_numbers_nicknames():
         106: [{"unit": "street", "eventStoryUnitRelation": "main"}],
         102: [{"unit": "school_refusal", "eventStoryUnitRelation": "main"}],
     }
-    event_card_ids = {6: [901], 2: [902]}
-    cards_by_id = {
-        901: {"id": 901, "characterId": 9, "cardRarityType": "rarity_4", "releaseAt": 1},
-        902: {"id": 902, "characterId": 18, "cardRarityType": "rarity_4", "releaseAt": 1},
-    }
+    # focus comes from the event banner character now: Kohane(9) / Mafuyu(18)
+    banner_char_by_event = {6: 9, 2: 18}
     music_by_event = {6: {"title": "Hibana", "assetbundleName": "m6"}}
 
     cat = build_catalog(
         events,
         stories_by_event=stories_by_event,
         story_units_by_story_id=story_units_by_story_id,
-        event_card_ids=event_card_ids,
-        cards_by_id=cards_by_id,
+        banner_char_by_event=banner_char_by_event,
         music_by_event=music_by_event,
     )
     # chronological
@@ -248,3 +244,20 @@ def test_plot_weight_classifier():
     assert classify_event({"is_key_story": False, "unit": "leo_need"}) == "filler"
     # boost ordering: high > medium > filler, filler never zero
     assert weight_factor("high") > weight_factor("medium") > weight_factor("filler") > 0
+
+
+def test_build_catalog_no_focus_when_no_banner():
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    events = [{"id": 99, "name": "Anniversary", "startAt": 500}]
+    stories = {99: {"id": 199, "eventId": 99, "assetbundleName": "ab99", "eventStoryEpisodes": []}}
+    su = {199: [{"unit": "light_sound", "eventStoryUnitRelation": "sub"},
+                {"unit": "idol", "eventStoryUnitRelation": "sub"}]}
+    cat = build_catalog(
+        events, stories_by_event=stories, story_units_by_story_id=su,
+        music_by_event={}, banner_char_by_event={},  # no banner -> no focus
+    )
+    r = cat[0]
+    assert r["focus_character_id"] == 0
+    assert r["focus_character"] == ""
+    assert r["nickname"] is None

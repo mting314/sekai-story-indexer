@@ -20,7 +20,6 @@ from .nicknames import assign_focus_nicknames
 from .relevance import classify_event
 from .transform import (
     arc_slug,
-    focus_character_id,
     is_key_event_story,
     resolve_unit_from_story_units,
     song_info,
@@ -32,17 +31,19 @@ def event_record(
     story: dict | None,
     *,
     story_units: list[dict],
-    event_card_ids: list[int],
-    cards_by_id: dict[int, dict],
+    focus_id: int,
     music: dict | None,
 ) -> dict:
     """Enriched timeline record for one event (no nickname yet — that needs the
-    full set for per-character numbering; added by :func:`build_catalog`)."""
+    full set for per-character numbering; added by :func:`build_catalog`).
+
+    ``focus_id`` is the event's banner character (0 = no single focus, e.g.
+    crossover/anniversary events) — the authoritative signal for focus/nickname.
+    """
     event_id = event["id"]
     name = event.get("name", str(event_id))
     asset_bundle = (story or {}).get("assetbundleName", "") or event.get("assetbundleName", "")
     unit = resolve_unit_from_story_units(story_units) if story_units else "mixed"
-    focus_id = focus_character_id(event_card_ids, cards_by_id)
     song = song_info(music)
     episodes = story.get("eventStoryEpisodes", []) if story else []
     return {
@@ -73,11 +74,16 @@ def build_catalog(
     *,
     stories_by_event: dict[int, dict],
     story_units_by_story_id: dict[int, list[dict]],
-    event_card_ids: dict[int, list[int]],
-    cards_by_id: dict[int, dict],
     music_by_event: dict[int, dict],
+    banner_char_by_event: dict[int, int] | None = None,
+    **_ignored: object,  # tolerate extra table keys (event_card_ids, cards_by_id)
 ) -> list[dict]:
-    """Full enriched, chronologically-sorted catalog with nicknames assigned."""
+    """Full enriched, chronologically-sorted catalog with nicknames assigned.
+
+    Focus character comes from the event's banner (``banner_char_by_event``);
+    events without a banner get no focus/nickname (crossover/anniversary).
+    """
+    banner_char_by_event = banner_char_by_event or {}
     records: list[dict] = []
     for event in events:
         story = stories_by_event.get(event["id"])
@@ -89,8 +95,7 @@ def build_catalog(
                 event,
                 story,
                 story_units=story_units,
-                event_card_ids=event_card_ids.get(event["id"], []),
-                cards_by_id=cards_by_id,
+                focus_id=banner_char_by_event.get(event["id"], 0),
                 music=music_by_event.get(event["id"]),
             )
         )

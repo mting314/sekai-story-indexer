@@ -112,6 +112,12 @@ def unit_story_scenario(chapter_asset_bundle: str, scenario_id: str) -> dict:
     return fetch_json(url)
 
 
+def game_character_units() -> list[dict]:
+    """gameCharacterUnits.json: id -> gameCharacterId (a character can belong to
+    several units, so this maps a character-unit id back to the character)."""
+    return fetch_json(f"{MASTER_DB}/gameCharacterUnits.json")
+
+
 # --- grouped bundle ---------------------------------------------------------
 
 def load_catalog_tables() -> dict:
@@ -147,10 +153,24 @@ def load_catalog_tables() -> dict:
     except Exception:  # pragma: no cover - optional/offline
         music_by_event = {}
 
+    # Authoritative focus character = the event's banner character
+    # (eventStories.bannerGameCharacterUnitId -> gameCharacterUnits -> characterId).
+    # Absent (~5 events) means no single focus (crossover/anniversary).
+    banner_char_by_event: dict[int, int] = {}
+    try:
+        gcu = {u["id"]: u["gameCharacterId"] for u in game_character_units()}
+        for s in stories:
+            b = s.get("bannerGameCharacterUnitId")
+            if b and b in gcu:
+                banner_char_by_event[s["eventId"]] = gcu[b]
+    except Exception:  # pragma: no cover - optional/offline
+        banner_char_by_event = {}
+
     return {
         "events": events_list,
         "stories_by_event": stories_by_event,
         "story_units_by_story_id": story_units_by_story_id,
+        "banner_char_by_event": banner_char_by_event,
         "event_card_ids": event_card_ids,
         "cards_by_id": cards_by_id,
         "music_by_event": music_by_event,
