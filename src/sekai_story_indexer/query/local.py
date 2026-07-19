@@ -47,7 +47,12 @@ def load_story_nodes(root: str | Path) -> list[StoryNode]:
 
 
 class LocalQueryEngine:
-    def __init__(self, nodes: list[StoryNode], events_index: list[dict] | None = None):
+    def __init__(
+        self,
+        nodes: list[StoryNode],
+        events_index: list[dict] | None = None,
+        glossary: dict | None = None,
+    ):
         self.nodes = nodes
         self._tokens: list[list[str]] = [tokenize(n.text) for n in nodes]
         self._tf: list[Counter] = [Counter(t) for t in self._tokens]
@@ -66,6 +71,39 @@ class LocalQueryEngine:
                 self._arc_by_event[row["event_id"]] = row["arc_slug"]
                 if row.get("nickname"):
                     self._arc_by_nick[row["nickname"].lower()] = row["arc_slug"]
+        # Cross-lingual bridge: the corpus is JP but questions may be EN (or vice
+        # versa). From the glossary (JP<->EN) build trigger->add token expansions
+        # so a name in one language also searches the other.
+        # - characters: trigger on ANY single name-token (>=3 chars), since users
+        #   type "Mafuyu", not the full "Mafuyu Asahina".
+        # - units/terms: require the FULL phrase, to avoid common-word triggers
+        #   ("bad" in "Vivid BAD SQUAD").
+        self._expansions: list[tuple[frozenset[str], list[str]]] = []
+        glossary = glossary or {}
+        for jp, en in (glossary.get("characters") or {}).items():
+            jp_toks, en_toks = tokenize(jp), tokenize(en)
+            for et in en_toks:
+                if len(et) >= 3:
+                    self._expansions.append((frozenset({et}), jp_toks))
+            if jp_toks and en_toks:
+                self._expansions.append((frozenset(jp_toks), en_toks))
+        for section in ("units", "locations_and_terms"):
+            for jp, en in (glossary.get(section) or {}).items():
+                jp_toks, en_toks = tokenize(jp), tokenize(en)
+                if jp_toks and en_toks:
+                    self._expansions.append((frozenset(en_toks), jp_toks))
+                    self._expansions.append((frozenset(jp_toks), en_toks))
+
+    def _expand_tokens(self, tokens: list[str]) -> list[str]:
+        """Augment query tokens with glossary equivalents whose trigger appears."""
+        if not self._expansions:
+            return tokens
+        present = set(tokens)
+        expanded = list(tokens)
+        for trigger, additions in self._expansions:
+            if trigger <= present:
+                expanded.extend(additions)
+        return expanded
 
     # -- scoping -------------------------------------------------------------
     def _detect_scope(self, question: str) -> tuple[str | None, str | None]:
@@ -98,7 +136,7 @@ class LocalQueryEngine:
         unit: str | None = None,
         arc_id: str | None = None,
     ) -> list[tuple[StoryNode, float]]:
-        q_tokens = [t for t in tokenize(question) if t in self._idf]
+        q_tokens = [t for t in self._expand_tokens(tokenize(question)) if t in self._idf]
         candidates = self._candidate_indices(unit, arc_id)
         scored: list[tuple[float, int]] = []
         for i in candidates:
@@ -148,7 +186,7 @@ class LocalQueryEngine:
 
         top, _ = hits[0]
         m = top.metadata
-        q_tokens = set(tokenize(question))
+        q_tokens = set(self._expand_tokens(tokenize(question)))
         # Extractive answer: gather query-overlapping lines from across the top
         # hits (not just #1), ranked by overlap × scene score, so supporting
         # evidence in a lower-ranked scene of the same arc still surfaces. Track
@@ -213,16 +251,35 @@ class LocalQueryEngine:
         }
 
 
+def _load_glossary(story_root: Path) -> dict | None:
+    """Find glossary.json near the story tree or in the cwd (best-effort)."""
+    import json
+
+    for candidate in (Path("glossary.json"), story_root.parent / "glossary.json"):
+        if candidate.exists():
+            try:
+                return json.loads(candidate.read_text(encoding="utf-8"))
+            except Exception:
+                return None
+    return None
+
+
 def build_local_engine(
     story_root: str | Path,
     events_index: list[dict] | None = None,
+    glossary: dict | None = None,
 ) -> LocalQueryEngine:
     """Build the engine over the story tree, restricted to arcs the index marks
     ``indexed`` (the queryable contract: timeline may list more than chat can
-    answer). If no index is given, all parsed nodes are queryable."""
+    answer). If no index is given, all parsed nodes are queryable. A glossary
+    (JP<->EN) enables cross-lingual queries; auto-loaded from glossary.json if
+    not passed."""
+    story_root = Path(story_root)
     nodes = load_story_nodes(story_root)
     if events_index:
         indexed_arcs = {r["arc_slug"] for r in events_index if r.get("indexed") and r.get("arc_slug")}
         if indexed_arcs:
             nodes = [n for n in nodes if n.metadata.arc_id in indexed_arcs]
-    return LocalQueryEngine(nodes, events_index)
+    if glossary is None:
+        glossary = _load_glossary(story_root)
+    return LocalQueryEngine(nodes, events_index, glossary)

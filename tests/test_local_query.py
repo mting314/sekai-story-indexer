@@ -62,3 +62,17 @@ def test_empty_query_returns_no_match_gracefully():
     eng = LocalQueryEngine([], [])
     r = eng.query("anything")
     assert r["citations"] == []
+
+
+def test_glossary_bridge_enables_cross_lingual_query(tmp_path):
+    # JP corpus, EN question -> should still retrieve via the glossary bridge
+    d = tmp_path / "story" / "nightcord" / "event" / "0002-x"
+    d.mkdir(parents=True)
+    (d / "01.md").write_text("# 1\n\nまふゆ: わたしは朝比奈まふゆだよ。\n", encoding="utf-8")
+    idx = [{"event_id": 2, "arc_slug": "0002-x", "indexed": True, "unit": "nightcord"}]
+    glossary = {"characters": {"朝比奈まふゆ": "Mafuyu Asahina"}}
+    eng = build_local_engine(tmp_path / "story", idx, glossary)
+    # bare English given name must reach the Japanese scene
+    r = eng.query("What happens to Mafuyu?")
+    assert r["citations"], "glossary bridge should let an EN name hit JP text"
+    assert r["citations"][0]["arc_id"] == "0002-x"
