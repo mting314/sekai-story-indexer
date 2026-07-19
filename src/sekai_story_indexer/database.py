@@ -13,8 +13,11 @@ from pydantic_ai.providers.google import GoogleProvider
 
 load_dotenv()
 
-DEFAULT_CHAT_MODEL = "gemini-3-flash-preview"
-DEFAULT_ROUTER_MODEL = "gemini-3.1-flash-lite-preview"
+# gemini-flash-latest: stable alias, available to new keys. (The previous
+# default gemini-3-flash-preview returns 503s under load; gemini-2.5-* now 404
+# for new API keys.) Override with SEKAI_CHAT_MODEL / SEKAI_INGEST_MODEL.
+DEFAULT_CHAT_MODEL = "gemini-flash-latest"
+DEFAULT_ROUTER_MODEL = "gemini-flash-latest"
 DEFAULT_GENERATION_PROVIDER = "google"
 DEFAULT_EMBEDDING_MODEL = "gemini-embedding-2"
 DEFAULT_CHROMA_DB_PATH = "./chroma_db"

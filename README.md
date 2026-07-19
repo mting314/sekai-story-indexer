@@ -56,6 +56,20 @@ Point `--story-root`/`--events-index` at your real `story/` + `events_index.json
 (from `indexer fetch`) once you've fetched. For the production RAG answer quality,
 run `sekai serve --backend full` with the full deps + `GOOGLE_API_KEY`.
 
+### Full backend (Gemini + Chroma) — model & quota notes
+Put `GOOGLE_API_KEY=...` in the repo-root `.env` (AI Studio key; `AQ.`- and
+`AIza`-prefixed keys both work). `database.py` resolves `.env` from the repo
+root, not the cwd.
+
+* **Model:** default is `gemini-flash-latest` (stable, available to new keys).
+  `gemini-2.5-*` now 404 for new keys and `gemini-3-flash-preview` 503s under
+  load — override via `SEKAI_CHAT_MODEL` / `SEKAI_INGEST_MODEL` if needed.
+* **Quota:** `indexer ingest` makes many generation calls (tiered summaries).
+  The **free tier caps generate-requests at ~20/day**, so even a couple of events
+  will hit `RESOURCE_EXHAUSTED`. Enable billing on the key for a real ingest.
+  The pipeline itself is verified working end-to-end (parse → chunk → Tier-3
+  summaries → embeddings); the free-tier cap is the only blocker to a full run.
+
 ## Tests & evals
 
 ```bash
