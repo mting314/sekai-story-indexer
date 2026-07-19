@@ -94,3 +94,10 @@ main {
 a.cite { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.9em; padding: 0 1px; }
 a.cite:hover { text-decoration: underline; }
 .sb-body mark { background: #ffcc4d55; color: var(--text); border-radius: 3px; padding: 0 2px; }
+.tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+.tab { padding: 5px 12px; border: 0; border-radius: 8px 8px 0 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent; }
+.tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.summary-card { background: var(--card); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.summary-card .top { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.summary-card .name { color: var(--text); font-size: 13.5px; }
+.summary-card .answer-text { font-size: 13.5px; }

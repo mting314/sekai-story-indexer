@@ -10,9 +10,11 @@ A Tier-1 (unit) rollup over event summaries can be layered on top later.
 
 from __future__ import annotations
 
+import json
 import os
 from collections import defaultdict
 from collections.abc import Callable
+from pathlib import Path
 
 from ..models.story import StoryMetadata, StoryNode
 from ..source.constants import UNIT_NAMES
@@ -45,11 +47,25 @@ def summarize_events(
     story_order=None,
     model: str | None = None,
     summarize: Callable[[str, str, str, str], str] | None = None,
+    cache_path: str | Path | None = None,
     log: Callable[[str], None] = print,
 ) -> list[StoryNode]:
-    """One Tier-2 summary StoryNode per event (grouped by parent_year_id)."""
+    """One Tier-2 summary StoryNode per event (grouped by parent_year_id).
+
+    ``cache_path`` (e.g. event_summaries.json) makes this a readable, resumable
+    text cache keyed by arc_id: cached events are reused (no re-spend), new ones
+    appended and written incrementally. The web app's Summaries reader displays it.
+    """
     model = model or os.getenv("SEKAI_INGEST_MODEL") or os.getenv("SEKAI_CHAT_MODEL") or "gemini-flash-latest"
     do = summarize or (lambda n, u, b, m: _summarize_text(n, u, b, m))
+
+    cache: dict[str, str] = {}
+    cache_file = Path(cache_path) if cache_path else None
+    if cache_file and cache_file.exists():
+        try:
+            cache = json.loads(cache_file.read_text(encoding="utf-8"))
+        except Exception:
+            cache = {}
 
     groups: dict[str, list[StoryNode]] = defaultdict(list)
     for node in raw_nodes:
@@ -62,12 +78,20 @@ def summarize_events(
             key=lambda n: (n.metadata.episode_number, n.metadata.scene_index)
         )
         base = nodes[0].metadata
-        body = "\n".join(n.text for n in nodes)
-        try:
-            text = do(base.arc_id, base.unit, body, model)
-        except Exception as exc:  # one event's failure must not abort the run
-            log(f"  skip summary {base.unit}/{base.arc_id}: {exc}")
-            continue
+        if base.arc_id in cache:  # resumable: reuse cached summary text
+            text = cache[base.arc_id]
+        else:
+            body = "\n".join(n.text for n in nodes)
+            try:
+                text = do(base.arc_id, base.unit, body, model)
+            except Exception as exc:  # one event's failure must not abort the run
+                log(f"  skip summary {base.unit}/{base.arc_id}: {exc}")
+                continue
+            if text and cache_file:
+                cache[base.arc_id] = text
+                cache_file.write_text(
+                    json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
         if not text:
             continue
         meta = StoryMetadata(

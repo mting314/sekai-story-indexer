@@ -94,6 +94,37 @@ def events() -> list[dict]:
     return load_events()
 
 
+def _summaries_path() -> Path:
+    env = os.environ.get("SEKAI_EVENT_SUMMARIES")
+    candidates = [Path(env)] if env else [Path("event_summaries.json"), HERE.parent / "event_summaries.json"]
+    return next((p for p in candidates if p.exists()), candidates[-1])
+
+
+@app.get("/api/summaries")
+def summaries() -> list[dict]:
+    """Browsable event summaries (from event_summaries.json), joined with the
+    events index for names/nicknames/dates, chronologically sorted."""
+    path = _summaries_path()
+    if not path.exists():
+        return []
+    by_arc = json.loads(path.read_text(encoding="utf-8"))
+    events_by_arc = {e.get("arc_slug"): e for e in load_events()}
+    out = []
+    for arc_id, text in by_arc.items():
+        e = events_by_arc.get(arc_id, {})
+        out.append({
+            "arc_id": arc_id,
+            "name": e.get("name", arc_id),
+            "unit": e.get("unit", "unknown"),
+            "nickname": e.get("nickname"),
+            "started_at": e.get("started_at", 0),
+            "logo_url": e.get("logo_url", ""),
+            "summary": text,
+        })
+    out.sort(key=lambda r: (r.get("started_at", 0), r["arc_id"]))
+    return out
+
+
 class QueryRequest(BaseModel):
     question: str
     unit: str | None = None
@@ -155,6 +186,11 @@ def _query_local(req: QueryRequest) -> dict:
     result.setdefault("intent", intent)
     result["resolved_question"] = q
     result["error"] = None
+
+    # Pre-computed summaries are returned as-is — no re-summarizing raw scenes.
+    if result.get("pre_summarized"):
+        result["generated"] = True
+        return result
 
     if GENERATE and result.get("citations"):
         from sekai_story_indexer.query.generate import generate_answer

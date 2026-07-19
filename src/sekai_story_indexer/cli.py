@@ -751,6 +751,7 @@ def ingest(
         console.print("Generating one summary per event story (--summaries event)...")
         summary_nodes = summarize_events(
             raw_nodes, story_order=story_order,
+            cache_path="event_summaries.json",  # readable + resumable
             log=lambda m: console.print(f"[dim]{m}[/dim]"),
         )
         console.print(f"Generated {len(summary_nodes)} event summaries.")

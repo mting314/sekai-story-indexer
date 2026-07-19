@@ -91,7 +91,10 @@ def _state_ledger_str(arc_ids: set[str] | None = None, path: str = "world_state.
     return "\n".join(lines) or "None available."
 
 
-def _context(citations: list[dict], max_chars: int = 8000) -> str:
+def _context(citations: list[dict], max_chars: int = 120_000) -> str:
+    # Large cap: Gemini handles ~1M tokens. 8k truncated a full event to its first
+    # ~4 episodes, producing summaries that stopped mid-story. A whole event
+    # (~8 episodes) is well under this.
     blocks, used = [], 0
     for c in citations:
         excerpt = c.get("excerpt") or c.get("quote") or ""

@@ -1,7 +1,10 @@
 // Sekai Story Indexer — minimal vanilla-JS front end.
 // Timeline reads /api/events; chat posts /api/query. No build step.
 
-const state = { events: [], units: [], activeUnit: "all", scopeEventId: null, history: [] };
+const state = {
+  events: [], units: [], activeUnit: "all", scopeEventId: null, history: [],
+  view: "timeline", summaries: null,
+};
 
 async function boot() {
   const [units, events] = await Promise.all([
@@ -10,6 +13,8 @@ async function boot() {
   ]);
   state.units = units;
   state.events = events;
+  document.getElementById("tab-timeline").onclick = () => { state.view = "timeline"; renderCurrentView(); };
+  document.getElementById("tab-summaries").onclick = () => { state.view = "summaries"; renderCurrentView(); };
   renderFilters();
   renderTimeline();
   if (!events.length) {
@@ -37,9 +42,48 @@ function renderFilters() {
     b.onclick = () => {
       state.activeUnit = c.slug;
       renderFilters();
-      renderTimeline();
+      renderCurrentView();
     };
     el.appendChild(b);
+  }
+}
+
+function renderCurrentView() {
+  const tl = document.getElementById("timeline");
+  const sm = document.getElementById("summaries");
+  const isSummaries = state.view === "summaries";
+  tl.classList.toggle("hidden", isSummaries);
+  sm.classList.toggle("hidden", !isSummaries);
+  document.getElementById("tab-timeline").classList.toggle("active", !isSummaries);
+  document.getElementById("tab-summaries").classList.toggle("active", isSummaries);
+  if (isSummaries) renderSummaries();
+  else renderTimeline();
+}
+
+async function renderSummaries() {
+  const el = document.getElementById("summaries");
+  if (state.summaries === null) {
+    el.innerHTML = '<p class="empty">Loading…</p>';
+    state.summaries = await fetch("/api/summaries").then((r) => r.json());
+  }
+  const rows = state.summaries.filter(
+    (s) => state.activeUnit === "all" || s.unit === state.activeUnit
+  );
+  if (!rows.length) {
+    el.innerHTML =
+      '<p class="empty">No event summaries yet — run <code>indexer ingest --summaries event</code>.</p>';
+    return;
+  }
+  el.innerHTML = "";
+  for (const s of rows) {
+    const card = document.createElement("div");
+    card.className = "summary-card";
+    const nick = s.nickname ? `<span class="nick">${s.nickname}</span>` : "";
+    card.innerHTML =
+      `<div class="top"><span class="date">${fmtDate(s.started_at)}</span>${nick}` +
+      `<span class="name">${s.name}</span></div>` +
+      `<div class="answer-text">${renderMarkdown(s.summary)}</div>`;
+    el.appendChild(card);
   }
 }
 

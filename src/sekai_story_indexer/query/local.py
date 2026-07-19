@@ -66,8 +66,12 @@ class LocalQueryEngine:
         nodes: list[StoryNode],
         events_index: list[dict] | None = None,
         glossary: dict | None = None,
+        event_summaries: dict[str, str] | None = None,
     ):
         self.nodes = nodes
+        # pre-computed event summaries {arc_id: text} (from event_summaries.json) —
+        # used to answer 'summarize X' cheaply instead of re-reading raw scenes.
+        self._event_summaries: dict[str, str] = event_summaries or {}
         self._tokens: list[list[str]] = [tokenize(n.text) for n in nodes]
         self._tf: list[Counter] = [Counter(t) for t in self._tokens]
         df: Counter = Counter()
@@ -355,6 +359,28 @@ class LocalQueryEngine:
         idxs = idxs[:max_scenes]
         citations = [self._citation(self.nodes[i], r + 1) for r, i in enumerate(idxs)]
         label = scope.label or citations[0]["label"]
+
+        # Prefer PRE-COMPUTED event summaries (the point of ingest-time summaries):
+        # return them directly — no re-reading raw scenes, no per-query LLM cost.
+        scoped_arcs = list(scope.arc_ids) or ([scope.arc_id] if scope.arc_id else [])
+        pre = [(a, self._event_summaries[a]) for a in scoped_arcs if a in self._event_summaries]
+        if pre:
+            if len(pre) == 1:
+                body = pre[0][1]
+            else:  # multi-part (World Link): stitch the per-part summaries
+                body = "\n\n".join(
+                    f"**{self._meta_by_arc.get(a, {}).get('name', a)}**\n{t}" for a, t in pre
+                )
+            return {
+                "answer": body,
+                "answer_parts": [{"type": "text", "text": body}],
+                "citations": citations,
+                "scope": scope.as_dict(),
+                "backend": "local",
+                "intent": "summarize",
+                "pre_summarized": True,  # webapp: don't re-generate over raw scenes
+            }
+
         return {
             "answer": f"Summary of {label}",
             "answer_parts": [{"type": "text", "text": f"Summary of {label}"}],
@@ -494,4 +520,18 @@ def build_local_engine(
         from .summaries import build_unit_overviews
 
         nodes = nodes + build_unit_overviews(events_index)
-    return LocalQueryEngine(nodes, events_index, glossary)
+    # Pre-computed event summaries (arc_id -> text), if built by `indexer ingest`.
+    event_summaries = _load_event_summaries(story_root)
+    return LocalQueryEngine(nodes, events_index, glossary, event_summaries)
+
+
+def _load_event_summaries(story_root: Path) -> dict[str, str]:
+    import json
+
+    for candidate in (Path("event_summaries.json"), story_root.parent / "event_summaries.json"):
+        if candidate.exists():
+            try:
+                return json.loads(candidate.read_text(encoding="utf-8"))
+            except Exception:
+                return {}
+    return {}
