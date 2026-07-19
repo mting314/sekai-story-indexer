@@ -3,16 +3,19 @@
 
 const state = {
   events: [], units: [], activeUnit: "all", scopeEventId: null, history: [],
-  view: "timeline", summaries: null,
+  view: "timeline", summaries: null, meta: { characters: {}, units: {} }, entityRe: null,
 };
 
 async function boot() {
-  const [units, events] = await Promise.all([
+  const [units, events, meta] = await Promise.all([
     fetch("/api/units").then((r) => r.json()),
     fetch("/api/events").then((r) => r.json()),
+    fetch("/static/meta.json").then((r) => r.json()).catch(() => ({ characters: {}, units: {} })),
   ]);
   state.units = units;
   state.events = events;
+  state.meta = meta;
+  buildEntityIndex();
   document.getElementById("tab-timeline").onclick = () => { state.view = "timeline"; renderCurrentView(); };
   document.getElementById("tab-summaries").onclick = () => { state.view = "summaries"; renderCurrentView(); };
   renderFilters();
@@ -75,15 +78,175 @@ async function renderSummaries() {
     return;
   }
   el.innerHTML = "";
-  for (const s of rows) {
-    const card = document.createElement("div");
-    card.className = "summary-card";
-    const nick = s.nickname ? `<span class="nick">${s.nickname}</span>` : "";
-    card.innerHTML =
-      `<div class="top"><span class="date">${fmtDate(s.started_at)}</span>${nick}` +
-      `<span class="name">${s.name}</span></div>` +
-      `<div class="answer-text">${renderMarkdown(s.summary)}</div>`;
-    el.appendChild(card);
+  const list = document.createElement("div");
+  list.className = "sum-list";
+  for (const s of rows) list.appendChild(summaryCard(s));
+  el.appendChild(list);
+}
+
+// Collapsed event card: unit symbol + accent color, date, nickname, name.
+// Click to expand -> focus character, duration, focus song, decorated summary.
+function summaryCard(s) {
+  const u = state.meta.units[s.unit] || {};
+  const card = document.createElement("div");
+  card.className = "sum-card";
+  card.style.setProperty("--unit-color", u.color || "#888");
+
+  const sym = u.symbol
+    ? `<img class="usym" src="${u.symbol}" alt="" onerror="this.style.display='none'">`
+    : "";
+  const nick = s.nickname ? `<span class="nick">${escapeHtml(s.nickname)}</span>` : "";
+  const key = s.is_key_story ? '<span class="keytag" title="Key story">★</span>' : "";
+
+  const head = document.createElement("button");
+  head.type = "button";
+  head.className = "sum-head";
+  head.innerHTML =
+    `${sym}<span class="sum-date">${fmtDate(s.started_at)}</span>${nick}` +
+    `<span class="sum-name">${escapeHtml(s.name)}</span>${key}` +
+    `<span class="chev">▸</span>`;
+
+  const body = document.createElement("div");
+  body.className = "sum-body hidden";
+
+  head.addEventListener("click", () => {
+    const collapsed = body.classList.toggle("hidden");
+    head.classList.toggle("open", !collapsed);
+    if (!body.dataset.filled) {
+      body.appendChild(summaryBody(s));
+      body.dataset.filled = "1";
+    }
+  });
+
+  card.appendChild(head);
+  card.appendChild(body);
+  return card;
+}
+
+function summaryBody(s) {
+  const frag = document.createDocumentFragment();
+
+  const chips = [];
+  const fc = state.meta.characters[s.focus_character_id];
+  if (fc) {
+    chips.push(
+      `<span class="sum-chip focus"><img class="cic" src="${fc.icon}" alt="" ` +
+        `onerror="this.style.display='none'"><b style="color:${fc.color}">` +
+        `${escapeHtml(fc.en)}</b></span>`
+    );
+  }
+  const dur = durationLabel(s.started_at, s.ended_at);
+  if (dur) chips.push(`<span class="sum-chip">🗓 ${dur}</span>`);
+  if (s.song_title) chips.push(`<span class="sum-chip">🎵 ${escapeHtml(s.song_title)}</span>`);
+  if (chips.length) {
+    const meta = document.createElement("div");
+    meta.className = "sum-meta";
+    meta.innerHTML = chips.join("");
+    frag.appendChild(meta);
+  }
+
+  const text = document.createElement("div");
+  text.className = "answer-text";
+  text.innerHTML = renderMarkdown(s.summary);
+  decorateNames(text);
+  frag.appendChild(text);
+  return frag;
+}
+
+function durationLabel(start, end) {
+  if (!start) return "";
+  if (!end) return fmtDate(start);
+  const days = Math.round((end - start) / 86400000);
+  return `${fmtDate(start)} → ${fmtDate(end)}${days > 0 ? ` · ${days}d` : ""}`;
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(
+    /[&<>"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])
+  );
+}
+
+// Build a name -> {color, icon, kind} index + one regex over all character
+// (full + given) and unit names, longest-first. Used to color-code + icon-tag
+// entity mentions inside summary text (fandom-wiki style).
+function buildEntityIndex() {
+  const entries = [];
+  for (const c of Object.values(state.meta.characters || {})) {
+    const ent = { kind: "char", color: c.color, icon: c.icon };
+    entries.push([c.en, ent]);
+    const given = c.en.split(" ")[0];
+    if (given && given.length >= 3 && given !== c.en) entries.push([given, ent]);
+  }
+  const aliases = {
+    leo_need: ["Leo/need"],
+    more_more_jump: ["MORE MORE JUMP!", "MORE MORE JUMP", "MoreMoreJump"],
+    vivid_bad_squad: ["Vivid BAD SQUAD", "Vivid Bad Squad", "VBS"],
+    wonderlands_showtime: [
+      "Wonderlands×Showtime",
+      "Wonderlands x Showtime",
+      "Wonderlands Showtime",
+    ],
+    nightcord: ["Nightcord at 25:00", "25-ji, Nightcord de.", "Nightcord"],
+    virtual_singer: ["Virtual Singer", "VIRTUAL SINGER"],
+  };
+  for (const [slug, u] of Object.entries(state.meta.units || {})) {
+    const ent = { kind: "unit", color: u.color, icon: u.symbol };
+    for (const a of aliases[slug] || [u.name]) entries.push([a, ent]);
+  }
+  entries.sort((a, b) => b[0].length - a[0].length);
+  state.entityMap = {};
+  for (const [n, e] of entries) {
+    const k = n.toLowerCase();
+    if (!(k in state.entityMap)) state.entityMap[k] = e;
+  }
+  const alts = entries.map(([n]) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  state.entityRe = alts.length
+    ? new RegExp("(?<![A-Za-z0-9])(" + alts.join("|") + ")(?![A-Za-z0-9])", "gi")
+    : null;
+}
+
+// Walk text nodes only (never tag attributes/citations) and wrap entity
+// mentions with a colored span + inline icon.
+function decorateNames(root) {
+  if (!state.entityRe) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  const targets = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.parentElement && node.parentElement.closest("a,.ent,code")) continue;
+    state.entityRe.lastIndex = 0;
+    if (state.entityRe.test(node.nodeValue)) targets.push(node);
+  }
+  for (const tn of targets) {
+    const txt = tn.nodeValue;
+    const frag = document.createDocumentFragment();
+    state.entityRe.lastIndex = 0;
+    let last = 0;
+    let m;
+    while ((m = state.entityRe.exec(txt))) {
+      const ent = state.entityMap[m[1].toLowerCase()];
+      if (!ent) continue;
+      if (m.index > last) frag.appendChild(document.createTextNode(txt.slice(last, m.index)));
+      const span = document.createElement("span");
+      span.className = "ent " + ent.kind;
+      span.style.color = ent.color;
+      if (ent.icon) {
+        const img = document.createElement("img");
+        img.className = "ent-ic";
+        img.src = ent.icon;
+        img.alt = "";
+        img.onerror = function () {
+          this.style.display = "none";
+        };
+        span.appendChild(img);
+      }
+      span.appendChild(document.createTextNode(m[1]));
+      frag.appendChild(span);
+      last = m.index + m[1].length;
+    }
+    if (last < txt.length) frag.appendChild(document.createTextNode(txt.slice(last)));
+    tn.parentNode.replaceChild(frag, tn);
   }
 }
 
