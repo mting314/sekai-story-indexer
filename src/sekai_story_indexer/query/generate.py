@@ -27,6 +27,16 @@ from ..prompts import render_system_prompt, render_user_prompt
 load_dotenv()  # pick up GOOGLE_API_KEY from the repo-root .env
 
 
+# Chat-appropriate length control — the original answer prompt has none.
+_STYLE = (
+    "\n\n# Response style\n"
+    "Answer concisely: lead with a direct 2–4 sentence answer to exactly what was "
+    "asked, citing inline. Do NOT give an episode-by-episode recap unless the user "
+    "explicitly asks to 'summarize in detail', 'episode by episode', or 'everything'. "
+    "Prefer plain prose over headings and bullet lists for short answers."
+)
+
+
 def generation_available() -> bool:
     return bool(os.getenv("GOOGLE_API_KEY"))
 
@@ -111,6 +121,8 @@ def generate_answer(
             state_ledger=_state_ledger_str(arc_ids),
             year_summaries="None available (local retrieval mode).",
         )
+        # The original prompt has no length control; add chat-appropriate brevity.
+        system += _STYLE
         user = render_user_prompt(
             context_kind="raw", question=question, context=_context(citations)
         )
