@@ -83,6 +83,8 @@ class LocalQueryEngine:
         #   ("bad" in "Vivid BAD SQUAD").
         self._expansions: list[tuple[frozenset[str], list[str]]] = []
         glossary = glossary or {}
+        # character list (jp full name, en) for deterministic count targeting
+        self._characters: list[tuple[str, str]] = list((glossary.get("characters") or {}).items())
         for jp, en in (glossary.get("characters") or {}).items():
             jp_toks, en_toks = tokenize(jp), tokenize(en)
             for et in en_toks:
@@ -257,28 +259,10 @@ class LocalQueryEngine:
         best_quote: dict[int, str] = {}
         for _, line, hit_idx in quotes:
             best_quote.setdefault(hit_idx, line)
-        citations = []
-        for i, (h, score) in enumerate(hits):
-            loc = self.human_location(h)
-            citations.append(
-                {
-                    "ref": i + 1,
-                    "label": loc["label"],  # human one-liner for the UI
-                    "unit_name": loc["unit_name"],
-                    "event_name": loc["event_name"],
-                    "nickname": loc["nickname"],
-                    "episode_title": loc["episode_title"],
-                    # raw ids retained for programmatic use
-                    "unit": h.metadata.unit,
-                    "arc_id": h.metadata.arc_id,
-                    "episode": h.metadata.episode_name,
-                    "scene_index": h.metadata.scene_index,
-                    "score": round(score, 4),
-                    "plot_weight": self._weight_by_arc.get(h.metadata.arc_id, "unrated"),
-                    "quote": best_quote.get(i, ""),
-                    "excerpt": h.text,
-                }
-            )
+        citations = [
+            self._citation(h, i + 1, score=score, quote=best_quote.get(i, ""))
+            for i, (h, score) in enumerate(hits)
+        ]
 
         label = citations[0]["label"]
         answer_parts: list[dict] = [{"type": "text", "text": f"From {label}:"}]
@@ -293,6 +277,111 @@ class LocalQueryEngine:
             "scope": {"unit": unit, "arc_id": arc_id},
             "backend": "local",
         }
+
+    def _citation(self, node: StoryNode, ref: int, *, score: float = 0.0, quote: str = "") -> dict:
+        loc = self.human_location(node)
+        m = node.metadata
+        return {
+            "ref": ref,
+            "label": loc["label"],
+            "unit_name": loc["unit_name"],
+            "event_name": loc["event_name"],
+            "nickname": loc["nickname"],
+            "episode_title": loc["episode_title"],
+            "unit": m.unit,
+            "arc_id": m.arc_id,
+            "episode": m.episode_name,
+            "scene_index": m.scene_index,
+            "score": round(score, 4),
+            "plot_weight": self._weight_by_arc.get(m.arc_id, "unrated"),
+            "quote": quote,
+            "excerpt": node.text,
+        }
+
+    # -- intent-routed paths -------------------------------------------------
+    def summarize(
+        self, question: str, *, unit: str | None = None, event_id: int | None = None,
+        max_scenes: int = 16,
+    ) -> dict:
+        """Deterministic 'summarize <entity>' path: resolve the entity and pull
+        its WHOLE scope in reading order (no lexical top-k), so the summary is
+        complete. Falls back to general retrieval if no entity is resolved."""
+        scope = self._scope_index.resolve(question, unit=unit, event_id=event_id)
+        unit, arc_id = scope.unit, scope.arc_id
+        idxs = self._candidate_indices(unit, arc_id) if (unit or arc_id) else []
+        if not idxs:
+            return self.query(question, unit=unit, event_id=event_id)  # general fallback
+        idxs.sort(key=lambda i: self._sort_key(self.nodes[i]))
+        idxs = idxs[:max_scenes]
+        citations = [self._citation(self.nodes[i], r + 1) for r, i in enumerate(idxs)]
+        label = citations[0]["label"]
+        return {
+            "answer": f"Summary of {label}",
+            "answer_parts": [{"type": "text", "text": f"Summary of {label}"}],
+            "citations": citations,
+            "scope": {"unit": unit, "arc_id": arc_id},
+            "backend": "local",
+            "intent": "summarize",
+        }
+
+    def _resolve_count_target(self, question: str) -> tuple[str, str] | None:
+        """Return (jp_full_name, en_name) of the character the count is about.
+        Matches a JP name-fragment (users type the given name, e.g. 'まふゆ') or an
+        EN name token from the question."""
+        q_tokens = set(tokenize(question))
+        jp_runs = _CJK_RE.findall(question)
+        jp_bigrams = {"".join(pair) for pair in zip(jp_runs, jp_runs[1:])}
+        for jp, en in self._characters:
+            if jp in question or any(bg in jp for bg in jp_bigrams):
+                return jp, en
+            if any(len(t) >= 3 and t in q_tokens for t in tokenize(en)):
+                return jp, en
+        return None
+
+    def count_dialogue(
+        self, question: str, *, unit: str | None = None, event_id: int | None = None
+    ) -> dict:
+        """Exact dialogue-line count for a character in scope — deterministic,
+        never an LLM estimate (mirrors the original's count_dialogue tool)."""
+        scope = self._scope_index.resolve(question, unit=unit, event_id=event_id)
+        target = self._resolve_count_target(question)
+        if not target:
+            msg = "Tell me which character to count lines for."
+            return {"answer": msg, "answer_parts": [{"type": "text", "text": msg}],
+                    "citations": [], "scope": scope.as_dict(), "backend": "local",
+                    "intent": "count"}
+        jp, en = target
+        en_tokens = {t for t in en.lower().split() if len(t) >= 2}
+        idxs = self._candidate_indices(scope.unit, scope.arc_id)
+        n = sum(
+            1
+            for i in idxs
+            for turn in self.nodes[i].dialogue_turns
+            if _speaker_is(turn.speaker, jp, en_tokens)
+        )
+        where = ""
+        if scope.arc_id:
+            row = self._meta_by_arc.get(scope.arc_id, {})
+            where = f" in {row.get('name', scope.arc_id)}"
+        elif scope.unit:
+            where = f" in {UNIT_NAMES.get(scope.unit, scope.unit)}"
+        answer = f"{en} has {n} dialogue line{'s' if n != 1 else ''}{where}."
+        return {
+            "answer": answer,
+            "answer_parts": [{"type": "text", "text": answer}],
+            "citations": [], "count": n, "scope": scope.as_dict(),
+            "backend": "local", "intent": "count",
+        }
+
+
+def _speaker_is(speaker: str, jp_full: str, en_tokens: set[str]) -> bool:
+    """Match a scene speaker (JP given name like 'こはね', or an EN name in the
+    sample corpus) to a target character (jp full name + EN name tokens)."""
+    if not speaker:
+        return False
+    if speaker in jp_full:  # JP given-name is a substring of the full name
+        return True
+    return speaker.lower() in en_tokens
 
 
 def _load_glossary(story_root: Path) -> dict | None:

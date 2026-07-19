@@ -132,8 +132,21 @@ GENERATE = os.environ.get("SEKAI_GENERATE", "1") != "0"
 
 
 def _query_local(req: QueryRequest) -> dict:
+    from sekai_story_indexer.query.intent import classify
+
     engine = _get_local_engine()
-    result = engine.query(req.question, unit=req.unit, event_id=req.event_id)
+    intent = classify(req.question)
+
+    # Deterministic paths for common shapes (mirrors the original's routing).
+    if intent == "count":
+        result = engine.count_dialogue(req.question, unit=req.unit, event_id=req.event_id)
+        result["error"] = None
+        return result  # exact count — never LLM-generated
+    if intent == "summarize":
+        result = engine.summarize(req.question, unit=req.unit, event_id=req.event_id)
+    else:
+        result = engine.query(req.question, unit=req.unit, event_id=req.event_id)
+    result.setdefault("intent", intent)
     result["error"] = None
 
     if GENERATE and result.get("citations"):
