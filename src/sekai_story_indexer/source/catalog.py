@@ -54,6 +54,7 @@ def event_record(
         "content_type": "event",
         "arc_slug": arc_slug(event_id, name),
         "started_at": event.get("startAt", 0),
+        "ended_at": event.get("aggregateAt", 0),
         "outline": (story or {}).get("outline", ""),
         "is_key_story": is_key_event_story(story_units),
         "plot_weight": "unrated",
