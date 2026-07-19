@@ -111,12 +111,21 @@ class LocalQueryEngine:
         return expanded
 
     # -- scoping -------------------------------------------------------------
-    def _candidate_indices(self, unit: str | None, arc_id: str | None) -> list[int]:
+    def _candidate_indices(
+        self,
+        unit: str | None,
+        arc_id: str | None,
+        arc_ids: tuple[str, ...] = (),
+    ) -> list[int]:
+        arc_set = set(arc_ids)
         out = []
         for i, node in enumerate(self.nodes):
-            if unit and node.metadata.unit != unit:
+            m = node.metadata
+            if unit and m.unit != unit:
                 continue
-            if arc_id and node.metadata.arc_id != arc_id:
+            if arc_id and m.arc_id != arc_id:
+                continue
+            if arc_set and m.arc_id not in arc_set:
                 continue
             out.append(i)
         return out
@@ -129,9 +138,10 @@ class LocalQueryEngine:
         k: int = 5,
         unit: str | None = None,
         arc_id: str | None = None,
+        arc_ids: tuple[str, ...] = (),
     ) -> list[tuple[StoryNode, float]]:
         q_tokens = [t for t in self._expand_tokens(tokenize(question)) if t in self._idf]
-        candidates = self._candidate_indices(unit, arc_id)
+        candidates = self._candidate_indices(unit, arc_id, arc_ids)
         scored: list[tuple[float, int]] = []
         for i in candidates:
             tf = self._tf[i]
@@ -194,11 +204,13 @@ class LocalQueryEngine:
         k: int = 5,
     ) -> dict:
         scope = self._scope_index.resolve(question, unit=unit, event_id=event_id)
-        unit, arc_id = scope.unit, scope.arc_id
+        unit, arc_id, arc_ids = scope.unit, scope.arc_id, scope.arc_ids
 
-        hits = self.retrieve(question, k=k, unit=unit, arc_id=arc_id)
+        hits = self.retrieve(question, k=k, unit=unit, arc_id=arc_id, arc_ids=arc_ids)
         if not hits:
-            candidates = self._candidate_indices(unit, arc_id) if arc_id else []
+            candidates = (
+                self._candidate_indices(unit, arc_id, arc_ids) if (arc_id or arc_ids) else []
+            )
             if arc_id and not candidates:
                 msg = (
                     f"That event ({arc_id}) is on the timeline but not indexed yet, "
@@ -208,7 +220,7 @@ class LocalQueryEngine:
                     "answer": msg,
                     "answer_parts": [{"type": "text", "text": msg}],
                     "citations": [],
-                    "scope": {"unit": unit, "arc_id": arc_id},
+                    "scope": scope.as_dict(),
                     "backend": "local",
                 }
             if candidates:
@@ -223,7 +235,7 @@ class LocalQueryEngine:
                     "answer": msg,
                     "answer_parts": [{"type": "text", "text": msg}],
                     "citations": [],
-                    "scope": {"unit": unit, "arc_id": arc_id},
+                    "scope": scope.as_dict(),
                     "backend": "local",
                 }
 
@@ -274,7 +286,7 @@ class LocalQueryEngine:
             "answer": answer,
             "answer_parts": answer_parts,
             "citations": citations,
-            "scope": {"unit": unit, "arc_id": arc_id},
+            "scope": scope.as_dict(),
             "backend": "local",
         }
 
@@ -307,19 +319,32 @@ class LocalQueryEngine:
         its WHOLE scope in reading order (no lexical top-k), so the summary is
         complete. Falls back to general retrieval if no entity is resolved."""
         scope = self._scope_index.resolve(question, unit=unit, event_id=event_id)
-        unit, arc_id = scope.unit, scope.arc_id
-        idxs = self._candidate_indices(unit, arc_id) if (unit or arc_id) else []
+        idxs = (
+            self._candidate_indices(scope.unit, scope.arc_id, scope.arc_ids)
+            if (scope.unit or scope.arc_id or scope.arc_ids)
+            else []
+        )
         if not idxs:
             return self.query(question, unit=unit, event_id=event_id)  # general fallback
-        idxs.sort(key=lambda i: self._sort_key(self.nodes[i]))
+        # chronological across parts (arc_slugs are zero-padded by date)
+        idxs.sort(key=lambda i: (self.nodes[i].metadata.arc_id, *self._sort_key(self.nodes[i])[2:]))
+        if scope.arc_ids:  # multi-part: sample evenly so every part is represented
+            per_arc = max(1, max_scenes // len(scope.arc_ids))
+            picked, seen = [], {}
+            for i in idxs:
+                a = self.nodes[i].metadata.arc_id
+                if seen.get(a, 0) < per_arc:
+                    picked.append(i)
+                    seen[a] = seen.get(a, 0) + 1
+            idxs = picked
         idxs = idxs[:max_scenes]
         citations = [self._citation(self.nodes[i], r + 1) for r, i in enumerate(idxs)]
-        label = citations[0]["label"]
+        label = scope.label or citations[0]["label"]
         return {
             "answer": f"Summary of {label}",
             "answer_parts": [{"type": "text", "text": f"Summary of {label}"}],
             "citations": citations,
-            "scope": {"unit": unit, "arc_id": arc_id},
+            "scope": scope.as_dict(),
             "backend": "local",
             "intent": "summarize",
         }
@@ -352,7 +377,7 @@ class LocalQueryEngine:
                     "intent": "count"}
         jp, en = target
         en_tokens = {t for t in en.lower().split() if len(t) >= 2}
-        idxs = self._candidate_indices(scope.unit, scope.arc_id)
+        idxs = self._candidate_indices(scope.unit, scope.arc_id, scope.arc_ids)
         n = sum(
             1
             for i in idxs
@@ -360,7 +385,9 @@ class LocalQueryEngine:
             if _speaker_is(turn.speaker, jp, en_tokens)
         )
         where = ""
-        if scope.arc_id:
+        if scope.label:
+            where = f" in {scope.label}"
+        elif scope.arc_id:
             row = self._meta_by_arc.get(scope.arc_id, {})
             where = f" in {row.get('name', scope.arc_id)}"
         elif scope.unit:
