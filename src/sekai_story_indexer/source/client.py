@@ -12,6 +12,7 @@ them is permitted.
 from __future__ import annotations
 
 import json
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -22,12 +23,28 @@ from .constants import ASSET_CDN, MASTER_DB
 _UA = {"User-Agent": "sekai-story-indexer/0.1 (+fetch)"}
 
 
+def _ssl_context() -> ssl.SSLContext:
+    """Verified TLS context. Prefer certifi's CA bundle when available — many
+    freshly-created venvs (e.g. uv on macOS) have no system CA bundle wired up,
+    which otherwise fails with CERTIFICATE_VERIFY_FAILED. Falls back to the
+    stdlib default (honouring SSL_CERT_FILE) when certifi isn't installed."""
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:  # pragma: no cover - certifi optional
+        return ssl.create_default_context()
+
+
+_SSL_CONTEXT = _ssl_context()
+
+
 def fetch_json(url: str, *, retries: int = 3, backoff: float = 1.5) -> Any:
     last_exc: Exception | None = None
     for attempt in range(retries):
         try:
             req = urllib.request.Request(url, headers=_UA)
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=30, context=_SSL_CONTEXT) as resp:
                 return json.loads(resp.read())
         except (urllib.error.URLError, TimeoutError) as exc:  # pragma: no cover - network
             last_exc = exc
