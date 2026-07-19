@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-import re
-from collections.abc import Sequence
+from collections.abc import ItemsView, Sequence
 from dataclasses import dataclass, field
 from inspect import Parameter, Signature
 from typing import Any, Literal
@@ -40,16 +39,15 @@ class AgentAnswerDraft(BaseModel):
     answer: str = Field(..., min_length=1)
     cited_ids: list[str] = Field(default_factory=list)
 
-    # Keeping extras out of the generated schema lets older fixture models that still return
-    # cited_labels be read during the transition.  QueryAgent resolves those labels to IDs before
-    # exposing the public answer shape.
+    # TODO(issue-73): remove this compatibility allowance once legacy fixture models no longer
+    # return cited_labels. QueryAgent resolves those labels to IDs before exposing the public shape.
     model_config = ConfigDict(extra="allow")
 
 
 class EvidenceRegistry:
     """Assign stable, run-local IDs to the evidence candidates shown to the model."""
 
-    def __init__(self, engine: Any | None = None) -> None:
+    def __init__(self, engine: Any) -> None:
         self.engine = engine
         self._candidates: dict[str, ToolCandidate] = {}
         self._ids_by_key: dict[tuple[Any, ...], str] = {}
@@ -76,29 +74,10 @@ class EvidenceRegistry:
         return file_path, scene_start, scene_end
 
     def _summary_episode_value(self, metadata: dict[str, Any]) -> str:
-        helper = getattr(self.engine, "_summary_episode_value", None)
-        if callable(helper):
-            return str(helper(metadata))
-        if metadata.get("summary_level") == 1:
-            return "ALL_EPISODES"
-        episode_number = metadata.get("episode_number")
-        if isinstance(episode_number, int) and episode_number > 0:
-            return str(episode_number)
-        episode_name = metadata.get("episode_name")
-        if isinstance(episode_name, str):
-            match = re.search(r"第(\d+)話", episode_name)
-            if match:
-                return match.group(1)
-        return str(metadata.get("episode", "unknown"))
+        return str(self.engine._summary_episode_value(metadata))
 
     def _summary_part_label(self, metadata: dict[str, Any]) -> str:
-        helper = getattr(self.engine, "_summary_part_label", None)
-        if callable(helper):
-            return str(helper(metadata))
-        if metadata.get("summary_level") in {1, 2}:
-            return "ALL_PARTS"
-        part = metadata.get("part_name")
-        return part if isinstance(part, str) and part else "unknown"
+        return str(self.engine._summary_part_label(metadata))
 
     def _identity_keys(self, candidate: ToolCandidate) -> list[tuple[Any, ...]]:
         metadata = candidate.metadata
@@ -157,7 +136,7 @@ class EvidenceRegistry:
         """Resolve a model-provided ID, returning None for unknown IDs."""
         return self._candidates.get(evidence_id)
 
-    def items(self):
+    def items(self) -> ItemsView[str, ToolCandidate]:
         return self._candidates.items()
 
     def source_block(self, candidate: ToolCandidate) -> dict[str, Any]:
@@ -203,7 +182,7 @@ class AgentRunResult:
     tool_calls: list[AgentToolCall]
     stop_reason: AgentStopReason
     model_name: str
-    registry: EvidenceRegistry = field(default_factory=EvidenceRegistry)
+    registry: EvidenceRegistry
     request_count: int = 0
     fallback_reason: str | None = None
     model_cited_ids: list[str] = field(default_factory=list)
@@ -223,10 +202,9 @@ class AgentRunResult:
 
 def _agent_tool_payload(
     result: ToolResult,
-    registry: EvidenceRegistry | None = None,
+    registry: EvidenceRegistry,
 ) -> dict[str, Any]:
     """Return the small, model-facing subset of a full tool result."""
-    registry = registry or EvidenceRegistry()
     payload: dict[str, Any] = {}
     if result.candidates:
         payload["candidates"] = [
@@ -396,7 +374,6 @@ class QueryAgent:
         self.model_name = model_name or get_generation_model_name()
         self.model = model
         self._last_request_count = 0
-        self._active_registry: EvidenceRegistry | None = None
 
     def _instructions(self, engine: Any | None) -> str:
         return _agent_instructions(engine)
@@ -407,9 +384,9 @@ class QueryAgent:
         *,
         engine: Any,
         final_top_k: int,
-        recorder: list[Any],
+        recorder: list[AgentToolCall],
+        registry: EvidenceRegistry,
     ) -> AgentAnswerDraft | AgentAnswer:
-        registry = self._active_registry or EvidenceRegistry(engine)
         agent: Agent[None, AgentAnswerDraft] = Agent(
             self.model or create_agentic_generation_model(self.model_name),
             output_type=AgentAnswerDraft,
@@ -432,9 +409,8 @@ class QueryAgent:
         question: str,
         final_top_k: int,
         recorder: list[AgentToolCall],
-        registry: EvidenceRegistry | None = None,
+        registry: EvidenceRegistry,
     ) -> None:
-        registry = registry or self._active_registry or EvidenceRegistry(engine)
         spec = QUERY_TOOL_REGISTRY["vector_search_raw"]
         args = SearchRawInput(query=question, top_k=final_top_k)
         step = len(recorder) + 1
@@ -518,7 +494,6 @@ class QueryAgent:
         recorder: list[AgentToolCall] = []
         self._last_request_count = 0
         registry = EvidenceRegistry(engine)
-        self._active_registry = registry
         raw_answer: AgentAnswerDraft | AgentAnswer
         stop_reason: AgentStopReason
         fallback_reason: str | None = None
@@ -528,22 +503,33 @@ class QueryAgent:
                 engine=engine,
                 final_top_k=final_top_k,
                 recorder=recorder,
+                registry=registry,
             )
             stop_reason = "final_answer"
         except UsageLimitExceeded as exc:
             fallback_reason = str(exc)
             if not recorder:
-                self._fallback_dispatch(engine, question, final_top_k, recorder)
+                self._fallback_dispatch(
+                    engine,
+                    question,
+                    final_top_k,
+                    recorder,
+                    registry,
+                )
             raw_answer = AgentAnswerDraft(answer=_answer_from_tool_calls(recorder))
             stop_reason = "usage_limit"
         except Exception as exc:
             fallback_reason = str(exc)
             if not recorder:
-                self._fallback_dispatch(engine, question, final_top_k, recorder)
+                self._fallback_dispatch(
+                    engine,
+                    question,
+                    final_top_k,
+                    recorder,
+                    registry,
+                )
             raw_answer = AgentAnswerDraft(answer=_answer_from_tool_calls(recorder))
             stop_reason = "model_error"
-        finally:
-            self._active_registry = None
 
         draft = self._coerce_draft(raw_answer, registry)
         answer, model_cited_ids, cited_ids, unresolved_ids = self._resolve_draft(draft, registry)
@@ -602,11 +588,11 @@ class FixtureQueryAgent(QueryAgent):
         *,
         engine: Any,
         final_top_k: int,
-        recorder: list[Any],
+        recorder: list[AgentToolCall],
+        registry: EvidenceRegistry,
     ) -> AgentAnswerDraft | AgentAnswer:
         if self._error is not None:
             raise self._error
-        registry = self._active_registry or EvidenceRegistry(engine)
         for tool_name, raw_args in self.calls:
             spec = QUERY_TOOL_REGISTRY.get(tool_name)
             if spec is None:

@@ -12,6 +12,7 @@ from linkura_story_indexer.query import engine as query_engine
 from linkura_story_indexer.query.agent import (
     AgentAnswer,
     AgentAnswerDraft,
+    AgentToolCall,
     EvidenceRegistry,
     FixtureQueryAgent,
     QueryAgent,
@@ -96,6 +97,26 @@ def test_evidence_registry_reuses_raw_spans_and_summary_tiers() -> None:
     assert registry.resolve("missing") is None
 
 
+def test_evidence_registry_reuses_summary_search_and_location_results() -> None:
+    engine = make_engine()
+    registry = EvidenceRegistry(engine)
+    vector_candidate = summary_candidate()
+    fetched_candidate = ToolCandidate(
+        text="fetched summary evidence",
+        citation_label="same summary tier",
+        metadata={
+            "arc_id": "103",
+            "story_type": "Main",
+            "summary_level": 2,
+            "episode_number": 1,
+        },
+        rank=1,
+    )
+
+    assert registry.register(vector_candidate) == "e1"
+    assert registry.register(fetched_candidate) == "e1"
+
+
 def test_agent_payload_uses_ids_and_compact_source_blocks() -> None:
     engine = make_engine()
     registry = EvidenceRegistry(engine)
@@ -177,6 +198,26 @@ def test_agent_trace_selects_only_model_cited_candidates(monkeypatch: Any) -> No
     tool_payload = trace.stages["agent"].metadata["tool_calls"][0]
     assert [candidate["id"] for candidate in tool_payload["candidates"]] == ["e1", "e2"]
     assert trace.stages["agent"].metadata["model_cited_ids"] == ["e2"]
+
+
+def test_successful_uncited_answer_keeps_final_evidence_empty(monkeypatch: Any) -> None:
+    engine = make_engine()
+
+    def fake_retrieve(*args: Any, **kwargs: Any) -> RetrievalTraceResult:
+        return RetrievalTraceResult(nodes=[raw_node()], stages={})
+
+    monkeypatch.setattr(engine, "retrieve_raw_nodes_with_trace", fake_retrieve)
+    monkeypatch.setattr(engine, "_fetch_raw_text", lambda metadata: "")
+    engine.query_agent = FixtureQueryAgent(
+        calls=[("vector_search_raw", {"query": "question", "top_k": 1})],
+        answer=AgentAnswerDraft(answer="insufficient context", cited_ids=[]),
+    )
+
+    trace = engine.retrieve_with_trace("question", answer_mode=True)
+
+    assert trace.answer_text == "insufficient context"
+    assert trace.stages["final_top_k"].candidates == []
+    assert trace.final_citation_labels == []
 
 
 def test_function_model_can_follow_raw_payload_into_get_scene_and_cite_id(
@@ -423,7 +464,8 @@ def test_usage_limit_falls_back_to_one_raw_search(monkeypatch: Any) -> None:
             *,
             engine: Any,
             final_top_k: int,
-            recorder: list[Any],
+            recorder: list[AgentToolCall],
+            registry: EvidenceRegistry,
         ) -> AgentAnswer:
             from pydantic_ai.exceptions import UsageLimitExceeded
 
