@@ -76,3 +76,13 @@ def test_glossary_bridge_enables_cross_lingual_query(tmp_path):
     r = eng.query("What happens to Mafuyu?")
     assert r["citations"], "glossary bridge should let an EN name hit JP text"
     assert r["citations"][0]["arc_id"] == "0002-x"
+
+
+def test_scoped_query_falls_back_to_opening_when_no_lexical_overlap():
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    # koha1 scopes to 0006-lyric (indexed); gibberish content words won't match,
+    # so it should still return that event's opening scenes, not empty.
+    r = eng.query("koha1 zzqqxx")
+    assert r["scope"]["arc_id"] == "0006-lyric"
+    assert r["citations"], "scoped query should fall back to opening scenes"
+    assert all(c["arc_id"] == "0006-lyric" for c in r["citations"])

@@ -157,21 +157,34 @@ class LocalQueryEngine:
 
         hits = self.retrieve(question, k=k, unit=unit, arc_id=arc_id)
         if not hits:
-            # distinguish "resolved to an event that isn't indexed yet" from a miss
-            if arc_id and not self._candidate_indices(unit, arc_id):
+            candidates = self._candidate_indices(unit, arc_id) if arc_id else []
+            if arc_id and not candidates:
                 msg = (
                     f"That event ({arc_id}) is on the timeline but not indexed yet, "
                     "so it isn't chat-answerable until the next ingest."
                 )
+                return {
+                    "answer": msg,
+                    "answer_parts": [{"type": "text", "text": msg}],
+                    "citations": [],
+                    "scope": {"unit": unit, "arc_id": arc_id},
+                    "backend": "local",
+                }
+            if candidates:
+                # Scoped to an event (e.g. a nickname) but the query had no lexical
+                # overlap (common for a generic EN question over JP text) — show the
+                # event's opening scenes rather than nothing.
+                candidates.sort(key=lambda idx: self._sort_key(self.nodes[idx]))
+                hits = [(self.nodes[idx], 0.0) for idx in candidates[:k]]
             else:
                 msg = "No matching story content found for that query."
-            return {
-                "answer": msg,
-                "answer_parts": [{"type": "text", "text": msg}],
-                "citations": [],
-                "scope": {"unit": unit, "arc_id": arc_id},
-                "backend": "local",
-            }
+                return {
+                    "answer": msg,
+                    "answer_parts": [{"type": "text", "text": msg}],
+                    "citations": [],
+                    "scope": {"unit": unit, "arc_id": arc_id},
+                    "backend": "local",
+                }
 
         top, _ = hits[0]
         m = top.metadata
