@@ -51,6 +51,33 @@ def _load_glossary() -> dict | None:
     return None
 
 
+def _state_ledger_str(arc_ids: set[str] | None = None, path: str = "world_state.json") -> str:
+    """Load the State Ledger (built by `indexer extract-state`) and format facts
+    relevant to the retrieved arcs. Dormant (returns 'None available') until the
+    ledger exists — matching the full engine's grounding once it's built."""
+    p = Path(path)
+    if not p.exists():
+        p = Path(__file__).resolve().parents[3] / path
+    if not p.exists():
+        return "None available (run `indexer extract-state` to build it)."
+    try:
+        facts = json.loads(p.read_text(encoding="utf-8")).get("facts", [])
+    except Exception:
+        return "None available."
+    if arc_ids:
+        scoped = [f for f in facts if f.get("arc") in arc_ids]
+        facts = scoped or facts
+    lines = []
+    for f in facts[:80]:
+        tgt = f.get("target")
+        lines.append(
+            f"- {f.get('subject','')} {f.get('predicate','')}"
+            + (f" {tgt}" if tgt else "")
+            + f": {f.get('object','')}"
+        )
+    return "\n".join(lines) or "None available."
+
+
 def _context(citations: list[dict], max_chars: int = 8000) -> str:
     blocks, used = [], 0
     for c in citations:
@@ -77,10 +104,11 @@ def generate_answer(
         from google import genai
         from google.genai import types
 
+        arc_ids = {c.get("arc_id") for c in citations if c.get("arc_id")}
         system = render_system_prompt(
             context_kind="raw",
             glossary=_glossary_str(glossary if glossary is not None else _load_glossary()),
-            state_ledger="None available (local retrieval mode).",
+            state_ledger=_state_ledger_str(arc_ids),
             year_summaries="None available (local retrieval mode).",
         )
         user = render_user_prompt(
