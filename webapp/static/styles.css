@@ -107,13 +107,18 @@ a.cite:hover { text-decoration: underline; }
 .sum-head .nick { color: var(--unit-color, var(--accent)); font-weight: 700; flex-shrink: 0; }
 .sum-head .sum-name { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .sum-head .keytag { color: var(--key); flex-shrink: 0; }
-.sum-head .chev { color: var(--muted); flex-shrink: 0; transition: transform .15s; }
-.sum-head.open .chev { transform: rotate(90deg); }
-.sum-body { padding: 4px 12px 12px; }
+.sum-head .chev { color: var(--muted); flex-shrink: 0; transition: transform .2s ease; }
+.sum-card.open .sum-head .chev { transform: rotate(90deg); }
+/* animated expand/collapse via grid-template-rows 0fr -> 1fr */
+.sum-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
+.sum-card.open .sum-body { grid-template-rows: 1fr; }
+.sum-inner { overflow: hidden; min-height: 0; padding: 0 12px; }
+.sum-card.open .sum-inner { padding: 2px 12px 12px; }
 .sum-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
 .sum-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; background: #0c0e14; border: 1px solid #2b2f3a; font-size: 12px; color: var(--muted); }
-.sum-chip.focus { padding-left: 3px; }
+.sum-chip.focus, .sum-chip.song { padding-left: 3px; }
 .sum-chip .cic { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
+.sum-chip .jacket { width: 22px; height: 22px; border-radius: 4px; object-fit: cover; }
 .sum-body .answer-text { font-size: 13.5px; line-height: 1.55; }
 /* inline color-coded entity mentions (fandom-wiki style) */
 .ent { font-weight: 600; white-space: nowrap; }

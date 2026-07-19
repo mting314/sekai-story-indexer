@@ -106,15 +106,20 @@ function summaryCard(s) {
     `<span class="sum-name">${escapeHtml(s.name)}</span>${key}` +
     `<span class="chev">▸</span>`;
 
+  // Animated expand/collapse: the body is a grid that transitions 0fr -> 1fr;
+  // the inner wrapper clips overflow so height animates smoothly.
   const body = document.createElement("div");
-  body.className = "sum-body hidden";
+  body.className = "sum-body";
+  const inner = document.createElement("div");
+  inner.className = "sum-inner";
+  body.appendChild(inner);
 
   head.addEventListener("click", () => {
-    const collapsed = body.classList.toggle("hidden");
-    head.classList.toggle("open", !collapsed);
-    if (!body.dataset.filled) {
-      body.appendChild(summaryBody(s));
-      body.dataset.filled = "1";
+    const open = card.classList.toggle("open");
+    head.setAttribute("aria-expanded", String(open));
+    if (open && !inner.dataset.filled) {
+      inner.appendChild(summaryBody(s));
+      inner.dataset.filled = "1";
     }
   });
 
@@ -137,7 +142,14 @@ function summaryBody(s) {
   }
   const dur = durationLabel(s.started_at, s.ended_at);
   if (dur) chips.push(`<span class="sum-chip">🗓 ${dur}</span>`);
-  if (s.song_title) chips.push(`<span class="sum-chip">🎵 ${escapeHtml(s.song_title)}</span>`);
+  if (s.jacket_url) {
+    chips.push(
+      `<span class="sum-chip song"><img class="jacket" src="${s.jacket_url}" alt="" ` +
+        `onerror="this.style.display='none'">${escapeHtml(s.song_title || "Theme song")}</span>`
+    );
+  } else if (s.song_title) {
+    chips.push(`<span class="sum-chip">🎵 ${escapeHtml(s.song_title)}</span>`);
+  }
   if (chips.length) {
     const meta = document.createElement("div");
     meta.className = "sum-meta";
@@ -172,11 +184,20 @@ function escapeHtml(s) {
 // entity mentions inside summary text (fandom-wiki style).
 function buildEntityIndex() {
   const entries = [];
+  // Short given names (e.g. "An") collide with English words, so we don't put
+  // them in the always-on pass. Instead we color them only in summaries whose
+  // text also contains the character's FULL name ("An Shiraishi") — the full
+  // mention "licenses" the short form. Case-sensitive, so the article "an" is
+  // never matched. See decorateNames() pass 2.
+  state.shortGiven = [];
   for (const c of Object.values(state.meta.characters || {})) {
     const ent = { kind: "char", color: c.color, icon: c.icon };
     entries.push([c.en, ent]);
     const given = c.en.split(" ")[0];
-    if (given && given.length >= 3 && given !== c.en) entries.push([given, ent]);
+    if (given && given !== c.en) {
+      if (given.length >= 3) entries.push([given, ent]);
+      else state.shortGiven.push({ given, full: c.en, ent });
+    }
   }
   const aliases = {
     leo_need: ["Leo/need"],
@@ -200,31 +221,34 @@ function buildEntityIndex() {
     const k = n.toLowerCase();
     if (!(k in state.entityMap)) state.entityMap[k] = e;
   }
+  for (const sg of state.shortGiven) state.entityMap[sg.given.toLowerCase()] = sg.ent;
   const alts = entries.map(([n]) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   state.entityRe = alts.length
     ? new RegExp("(?<![A-Za-z0-9])(" + alts.join("|") + ")(?![A-Za-z0-9])", "gi")
     : null;
 }
 
-// Walk text nodes only (never tag attributes/citations) and wrap entity
-// mentions with a colored span + inline icon.
-function decorateNames(root) {
-  if (!state.entityRe) return;
+const _esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Walk text nodes only (never tag attributes/citations) and wrap regex matches
+// with a colored span + inline icon. Idempotent: skips already-decorated spans.
+function _decoratePass(root, re) {
+  if (!re) return;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
   const targets = [];
   let node;
   while ((node = walker.nextNode())) {
     if (node.parentElement && node.parentElement.closest("a,.ent,code")) continue;
-    state.entityRe.lastIndex = 0;
-    if (state.entityRe.test(node.nodeValue)) targets.push(node);
+    re.lastIndex = 0;
+    if (re.test(node.nodeValue)) targets.push(node);
   }
   for (const tn of targets) {
     const txt = tn.nodeValue;
     const frag = document.createDocumentFragment();
-    state.entityRe.lastIndex = 0;
+    re.lastIndex = 0;
     let last = 0;
     let m;
-    while ((m = state.entityRe.exec(txt))) {
+    while ((m = re.exec(txt))) {
       const ent = state.entityMap[m[1].toLowerCase()];
       if (!ent) continue;
       if (m.index > last) frag.appendChild(document.createTextNode(txt.slice(last, m.index)));
@@ -247,6 +271,24 @@ function decorateNames(root) {
     }
     if (last < txt.length) frag.appendChild(document.createTextNode(txt.slice(last)));
     tn.parentNode.replaceChild(frag, tn);
+  }
+}
+
+function decorateNames(root) {
+  // Pass 1: full names, given names (>=3 chars) and unit names, case-insensitive.
+  _decoratePass(root, state.entityRe);
+  // Pass 2: short given names ("An"), but ONLY when the full name is present in
+  // this summary, and matched case-sensitively so the article "an" is untouched.
+  const shorts = state.shortGiven || [];
+  if (shorts.length) {
+    const text = root.textContent || "";
+    const lower = text.toLowerCase();
+    const licensed = shorts.filter((sg) => lower.includes(sg.full.toLowerCase()));
+    if (licensed.length) {
+      const alts = licensed.map((sg) => _esc(sg.given)).join("|");
+      const re = new RegExp("(?<![A-Za-z0-9])(" + alts + ")(?![A-Za-z0-9])", "g");
+      _decoratePass(root, re);
+    }
   }
 }
 
@@ -402,13 +444,28 @@ function renderAssistant(container, res) {
 function renderMarkdown(src) {
   const esc = (s) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const inline = (s) =>
-    esc(s)
+  const inline = (s) => {
+    s = esc(s);
+    // Backslash-escaped markdown punctuation (e.g. "Cheerful\\*Days") -> an
+    // HTML entity, so it renders literally and the emphasis regexes below
+    // never treat it as a "*".
+    s = s.replace(/\\([*_`~[\]\\])/g, (_m, c) => `&#${c.charCodeAt(0)};`);
+    return s
       .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-      .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>")
+      // Emphasis only at word boundaries: opener after start/space/paren, closer
+      // before end/space/punct. Stops a stray "*" (e.g. "Cheerful*Days") from
+      // italicizing the rest of the line.
+      .replace(
+        /(^|[\s(>])\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*(?=[\s).,!?;:'"]|$)/g,
+        "$1<strong>$2</strong>"
+      )
+      .replace(
+        /(^|[\s(>])\*(?=\S)([^*\n]+?)(?<=\S)\*(?=[\s).,!?;:'"]|$)/g,
+        "$1<em>$2</em>"
+      )
       // clickable numbered citations: [1] / [2][3]  (also inside `code`/brackets)
       .replace(/\[(\d+)\]/g, '<a href="#" class="cite" data-ref="$1">[$1]</a>');
+  };
   const out = [];
   let list = false;
   for (const raw of (src || "").split("\n")) {

@@ -121,6 +121,7 @@ def summaries() -> list[dict]:
             "ended_at": e.get("ended_at", 0),
             "focus_character_id": e.get("focus_character_id", 0),
             "song_title": e.get("song_title", ""),
+            "jacket_url": e.get("jacket_url", ""),
             "is_key_story": e.get("is_key_story", False),
             "logo_url": e.get("logo_url", ""),
             "summary": text,
