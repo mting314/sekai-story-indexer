@@ -88,11 +88,14 @@ def generate_answer(
         )
         client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
         model = model or os.getenv("SEKAI_CHAT_MODEL") or "gemini-flash-latest"
+        # Gemini-3 flash models spend output tokens on internal "thinking", so a
+        # small max_output_tokens truncates the visible answer mid-sentence. Give
+        # ample budget so thinking + answer both fit.
         resp = client.models.generate_content(
             model=model,
             contents=user,
             config=types.GenerateContentConfig(
-                system_instruction=system, temperature=0.2, max_output_tokens=700
+                system_instruction=system, temperature=0.2, max_output_tokens=4096
             ),
         )
         text = (resp.text or "").strip()
