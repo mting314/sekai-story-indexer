@@ -132,11 +132,11 @@ function renderAssistant(container, res) {
   const quotes = parts.filter((p) => p.type === "quote");
   const texts = parts.filter((p) => p.type !== "quote");
 
-  // Natural-language answer (or extractive lead-in) as prose.
+  // Natural-language answer (or extractive lead-in) — rendered as markdown.
   for (const p of texts) {
     const t = document.createElement("div");
     t.className = "answer-text";
-    t.textContent = p.text;
+    t.innerHTML = renderMarkdown(p.text);
     container.appendChild(t);
   }
 
@@ -180,6 +180,34 @@ function renderAssistant(container, res) {
     }
     container.appendChild(sources);
   }
+}
+
+// Minimal, safe markdown -> HTML (escape first, then a limited subset).
+function renderMarkdown(src) {
+  const esc = (s) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inline = (s) =>
+    esc(s)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
+  const out = [];
+  let list = false;
+  for (const raw of (src || "").split("\n")) {
+    const line = raw.trimEnd();
+    const h = line.match(/^(#{1,4})\s+(.*)$/);
+    const li = line.match(/^\s*[-*]\s+(.*)$/);
+    if (li) {
+      if (!list) { out.push("<ul>"); list = true; }
+      out.push(`<li>${inline(li[1])}</li>`);
+      continue;
+    }
+    if (list) { out.push("</ul>"); list = false; }
+    if (h) out.push(`<h4>${inline(h[2])}</h4>`);
+    else if (line.trim()) out.push(`<p>${inline(line)}</p>`);
+  }
+  if (list) out.push("</ul>");
+  return out.join("");
 }
 
 function openExcerpt(cite) {
