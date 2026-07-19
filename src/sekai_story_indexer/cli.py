@@ -675,6 +675,12 @@ def ingest(
     cache_file: str = typer.Option("summaries_cache.json", help="Path to the summaries cache file"),
     manifest_file: str = typer.Option("ingestion_manifest.json", help="Path to the ingestion manifest"),
     prune: bool = typer.Option(True, "--prune/--no-prune", help="Delete indexed records not emitted by this run"),
+    skip_summaries: bool = typer.Option(
+        False,
+        "--skip-summaries",
+        help="Embed raw scenes only; skip the (expensive) tier-summary LLM pass. "
+        "Sufficient for the default raw-retrieval query mode.",
+    ),
 ):
     """Walks the story directory, generates hierarchical summaries, and indexes them into ChromaDB."""
     initialize_ingest_settings()
@@ -731,27 +737,39 @@ def ingest(
         embedding_model=embedding_model,
         summary_cache_schema_version=SUMMARY_CACHE_SCHEMA_VERSION,
     )
-    summarizer = HierarchicalSummarizer(
-        glossary=glossary,
-        story_order=story_order,
-        cache_context=cache_context,
-    )
-    summary_nodes = summarizer.summarize_hierarchy(raw_nodes, cache_file=cache_file)
-    
-    console.print(f"Generated {len(summary_nodes)} hierarchical summaries. Upserting to Vector DB...")
+    if skip_summaries:
+        summary_nodes = []
+        console.print(
+            "[yellow]--skip-summaries: skipping the tier-summary LLM pass; "
+            "embedding raw scenes only.[/yellow]"
+        )
+    else:
+        summarizer = HierarchicalSummarizer(
+            glossary=glossary,
+            story_order=story_order,
+            cache_context=cache_context,
+        )
+        summary_nodes = summarizer.summarize_hierarchy(raw_nodes, cache_file=cache_file)
+        console.print(f"Generated {len(summary_nodes)} hierarchical summaries.")
+
+    console.print("Upserting to Vector DB...")
     lexical_index = LexicalIndex(get_lexical_db_path())
-    
+
     raw_ids = _upsert_story_nodes(
         retrieval_chunks,
         progress_label="[green]Embedding raw retrieval chunks...",
         glossary=glossary,
         lexical_index=lexical_index,
     )
-    summary_ids = _upsert_story_nodes(
-        summary_nodes,
-        progress_label="[green]Embedding summaries...",
-        glossary=glossary,
-        lexical_index=lexical_index,
+    summary_ids = (
+        _upsert_story_nodes(
+            summary_nodes,
+            progress_label="[green]Embedding summaries...",
+            glossary=glossary,
+            lexical_index=lexical_index,
+        )
+        if summary_nodes
+        else set()
     )
 
     emitted_ids = {*raw_ids, *summary_ids}
