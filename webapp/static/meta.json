@@ -1,0 +1,218 @@
+{
+ "characters": {
+  "1": {
+   "jp": "星乃一歌",
+   "en": "Ichika Hoshino",
+   "color": "#33aaee",
+   "unit": "leo_need",
+   "icon": "/static/chara/1.png"
+  },
+  "2": {
+   "jp": "天馬咲希",
+   "en": "Saki Tenma",
+   "color": "#ffdd44",
+   "unit": "leo_need",
+   "icon": "/static/chara/2.png"
+  },
+  "3": {
+   "jp": "望月穂波",
+   "en": "Honami Mochizuki",
+   "color": "#ee6666",
+   "unit": "leo_need",
+   "icon": "/static/chara/3.png"
+  },
+  "4": {
+   "jp": "日野森志歩",
+   "en": "Shiho Hinomori",
+   "color": "#bbdd22",
+   "unit": "leo_need",
+   "icon": "/static/chara/4.png"
+  },
+  "5": {
+   "jp": "花里みのり",
+   "en": "Minori Hanasato",
+   "color": "#ffccaa",
+   "unit": "more_more_jump",
+   "icon": "/static/chara/5.png"
+  },
+  "6": {
+   "jp": "桐谷遥",
+   "en": "Haruka Kiritani",
+   "color": "#99ccff",
+   "unit": "more_more_jump",
+   "icon": "/static/chara/6.png"
+  },
+  "7": {
+   "jp": "桃井愛莉",
+   "en": "Airi Momoi",
+   "color": "#ffaacc",
+   "unit": "more_more_jump",
+   "icon": "/static/chara/7.png"
+  },
+  "8": {
+   "jp": "日野森雫",
+   "en": "Shizuku Hinomori",
+   "color": "#99eedd",
+   "unit": "more_more_jump",
+   "icon": "/static/chara/8.png"
+  },
+  "9": {
+   "jp": "小豆沢こはね",
+   "en": "Kohane Azusawa",
+   "color": "#ff6699",
+   "unit": "vivid_bad_squad",
+   "icon": "/static/chara/9.png"
+  },
+  "10": {
+   "jp": "白石杏",
+   "en": "An Shiraishi",
+   "color": "#00bbdd",
+   "unit": "vivid_bad_squad",
+   "icon": "/static/chara/10.png"
+  },
+  "11": {
+   "jp": "東雲彰人",
+   "en": "Akito Shinonome",
+   "color": "#ff7722",
+   "unit": "vivid_bad_squad",
+   "icon": "/static/chara/11.png"
+  },
+  "12": {
+   "jp": "青柳冬弥",
+   "en": "Toya Aoyagi",
+   "color": "#0077dd",
+   "unit": "vivid_bad_squad",
+   "icon": "/static/chara/12.png"
+  },
+  "13": {
+   "jp": "天馬司",
+   "en": "Tsukasa Tenma",
+   "color": "#ffbb00",
+   "unit": "wonderlands_showtime",
+   "icon": "/static/chara/13.png"
+  },
+  "14": {
+   "jp": "鳳えむ",
+   "en": "Emu Otori",
+   "color": "#ff66bb",
+   "unit": "wonderlands_showtime",
+   "icon": "/static/chara/14.png"
+  },
+  "15": {
+   "jp": "草薙寧々",
+   "en": "Nene Kusanagi",
+   "color": "#33dd99",
+   "unit": "wonderlands_showtime",
+   "icon": "/static/chara/15.png"
+  },
+  "16": {
+   "jp": "神代類",
+   "en": "Rui Kamishiro",
+   "color": "#bb88ee",
+   "unit": "wonderlands_showtime",
+   "icon": "/static/chara/16.png"
+  },
+  "17": {
+   "jp": "宵崎奏",
+   "en": "Kanade Yoisaki",
+   "color": "#bb6688",
+   "unit": "nightcord",
+   "icon": "/static/chara/17.png"
+  },
+  "18": {
+   "jp": "朝比奈まふゆ",
+   "en": "Mafuyu Asahina",
+   "color": "#8888cc",
+   "unit": "nightcord",
+   "icon": "/static/chara/18.png"
+  },
+  "19": {
+   "jp": "東雲絵名",
+   "en": "Ena Shinonome",
+   "color": "#ccaa88",
+   "unit": "nightcord",
+   "icon": "/static/chara/19.png"
+  },
+  "20": {
+   "jp": "暁山瑞希",
+   "en": "Mizuki Akiyama",
+   "color": "#ddaacc",
+   "unit": "nightcord",
+   "icon": "/static/chara/20.png"
+  },
+  "21": {
+   "jp": "初音ミク",
+   "en": "Hatsune Miku",
+   "color": "#33ccbb",
+   "unit": "virtual_singer",
+   "icon": "/static/chara/21.png"
+  },
+  "22": {
+   "jp": "鏡音リン",
+   "en": "Kagamine Rin",
+   "color": "#ffcc11",
+   "unit": "virtual_singer",
+   "icon": "/static/chara/22.png"
+  },
+  "23": {
+   "jp": "鏡音レン",
+   "en": "Kagamine Len",
+   "color": "#ffee11",
+   "unit": "virtual_singer",
+   "icon": "/static/chara/23.png"
+  },
+  "24": {
+   "jp": "巡音ルカ",
+   "en": "Megurine Luka",
+   "color": "#ffbbcc",
+   "unit": "virtual_singer",
+   "icon": "/static/chara/24.png"
+  },
+  "25": {
+   "jp": "MEIKO",
+   "en": "MEIKO",
+   "color": "#dd4444",
+   "unit": "virtual_singer",
+   "icon": "/static/chara/25.png"
+  },
+  "26": {
+   "jp": "KAITO",
+   "en": "KAITO",
+   "color": "#3366cc",
+   "unit": "virtual_singer",
+   "icon": "/static/chara/26.png"
+  }
+ },
+ "units": {
+  "leo_need": {
+   "name": "Leo/need",
+   "color": "#33aaee",
+   "symbol": "/static/units/leo_need.png"
+  },
+  "more_more_jump": {
+   "name": "MORE MORE JUMP!",
+   "color": "#ffccaa",
+   "symbol": "/static/units/more_more_jump.png"
+  },
+  "vivid_bad_squad": {
+   "name": "Vivid BAD SQUAD",
+   "color": "#ff6699",
+   "symbol": "/static/units/vivid_bad_squad.png"
+  },
+  "wonderlands_showtime": {
+   "name": "Wonderlands x Showtime",
+   "color": "#ffbb00",
+   "symbol": "/static/units/wonderlands_showtime.png"
+  },
+  "nightcord": {
+   "name": "Nightcord at 25:00",
+   "color": "#bb6688",
+   "symbol": "/static/units/nightcord.png"
+  },
+  "virtual_singer": {
+   "name": "Virtual Singer",
+   "color": "#33ccbb",
+   "symbol": "/static/units/virtual_singer.png"
+  }
+ }
+}
