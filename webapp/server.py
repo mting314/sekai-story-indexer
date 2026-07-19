@@ -98,6 +98,7 @@ class QueryRequest(BaseModel):
     question: str
     unit: str | None = None
     event_id: int | None = None
+    history: list[dict] = []  # prior turns: [{role, text}, ...] for follow-ups
 
 
 # Backend selection: "local" (default) = dependency-light lexical engine that
@@ -132,27 +133,33 @@ GENERATE = os.environ.get("SEKAI_GENERATE", "1") != "0"
 
 
 def _query_local(req: QueryRequest) -> dict:
+    from sekai_story_indexer.query.condense import condense
     from sekai_story_indexer.query.intent import classify
 
     engine = _get_local_engine()
-    intent = classify(req.question)
+    # Conversation memory: rewrite a follow-up into a standalone question using
+    # recent history, then route/retrieve on that.
+    q = condense(req.question, req.history) if req.history else req.question
+    intent = classify(q)
 
     # Deterministic paths for common shapes (mirrors the original's routing).
     if intent == "count":
-        result = engine.count_dialogue(req.question, unit=req.unit, event_id=req.event_id)
+        result = engine.count_dialogue(q, unit=req.unit, event_id=req.event_id)
         result["error"] = None
+        result["resolved_question"] = q
         return result  # exact count — never LLM-generated
     if intent == "summarize":
-        result = engine.summarize(req.question, unit=req.unit, event_id=req.event_id)
+        result = engine.summarize(q, unit=req.unit, event_id=req.event_id)
     else:
-        result = engine.query(req.question, unit=req.unit, event_id=req.event_id)
+        result = engine.query(q, unit=req.unit, event_id=req.event_id)
     result.setdefault("intent", intent)
+    result["resolved_question"] = q
     result["error"] = None
 
     if GENERATE and result.get("citations"):
         from sekai_story_indexer.query.generate import generate_answer
 
-        nl = generate_answer(req.question, result["citations"])
+        nl = generate_answer(q, result["citations"])
         if nl:
             # Natural-language answer up top; keep quotes as supporting evidence.
             result["answer"] = nl

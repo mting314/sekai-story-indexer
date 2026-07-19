@@ -21,13 +21,24 @@ from pathlib import Path
 
 from ..indexer.processor import StoryProcessor
 from ..models.story import StoryNode
-from ..source.constants import UNIT_NAMES
+from ..source.constants import CHARACTER_ID_TO_JP, CHARACTER_ID_TO_UNIT, UNIT_NAMES
 from ..source.relevance import weight_factor
 from .scoping import ScopeIndex
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 _CJK_RE = re.compile(r"[぀-ヿ㐀-鿿]")
 _H1_RE = re.compile(r"^#\s*(.+)$")
+
+# Unit references in questions (substring, lowercased) -> unit slug.
+_UNIT_KEYWORDS = {
+    "leo/need": "leo_need", "leoneed": "leo_need", "leo need": "leo_need",
+    "more more jump": "more_more_jump", "moremorejump": "more_more_jump",
+    "mmj": "more_more_jump", "momojan": "more_more_jump",
+    "vivid bad squad": "vivid_bad_squad", "vbs": "vivid_bad_squad", "vivid": "vivid_bad_squad",
+    "wonderlands": "wonderlands_showtime", "wxs": "wonderlands_showtime", "wonder show": "wonderlands_showtime",
+    "nightcord": "nightcord", "25-ji": "nightcord", "niigo": "nightcord", "n25": "nightcord",
+    "virtual singer": "virtual_singer", "vocaloid": "virtual_singer",
+}
 
 
 def tokenize(text: str) -> list[str]:
@@ -83,8 +94,12 @@ class LocalQueryEngine:
         #   ("bad" in "Vivid BAD SQUAD").
         self._expansions: list[tuple[frozenset[str], list[str]]] = []
         glossary = glossary or {}
-        # character list (jp full name, en) for deterministic count targeting
+        # character list (jp full name, en) + id->(jp,en) for count targeting
         self._characters: list[tuple[str, str]] = list((glossary.get("characters") or {}).items())
+        _jp_to_en = dict(self._characters)
+        self._char_by_id: dict[int, tuple[str, str]] = {
+            cid: (jp, _jp_to_en.get(jp, jp)) for cid, jp in CHARACTER_ID_TO_JP.items()
+        }
         for jp, en in (glossary.get("characters") or {}).items():
             jp_toks, en_toks = tokenize(jp), tokenize(en)
             for et in en_toks:
@@ -349,55 +364,80 @@ class LocalQueryEngine:
             "intent": "summarize",
         }
 
-    def _resolve_count_target(self, question: str) -> tuple[str, str] | None:
-        """Return (jp_full_name, en_name) of the character the count is about.
-        Matches a JP name-fragment (users type the given name, e.g. 'まふゆ') or an
-        EN name token from the question."""
+    def _named_chars(self, question: str) -> list[tuple[str, str]]:
+        """All characters explicitly named in the question (JP fragment or EN token)."""
         q_tokens = set(tokenize(question))
         jp_runs = _CJK_RE.findall(question)
         jp_bigrams = {"".join(pair) for pair in zip(jp_runs, jp_runs[1:])}
+        out = []
         for jp, en in self._characters:
-            if jp in question or any(bg in jp for bg in jp_bigrams):
-                return jp, en
-            if any(len(t) >= 3 and t in q_tokens for t in tokenize(en)):
-                return jp, en
-        return None
+            if (jp in question or any(bg in jp for bg in jp_bigrams)
+                    or any(len(t) >= 3 and t in q_tokens for t in tokenize(en))):
+                out.append((jp, en))
+        return out
+
+    def _units_in_question(self, question: str) -> set[str]:
+        ql = question.lower()
+        return {slug for kw, slug in _UNIT_KEYWORDS.items() if kw in ql}
+
+    def _resolve_count_targets(self, question, scope) -> list[tuple[str, str]]:
+        """Characters to count: an 'each/all <unit>' phrase expands to that unit's
+        members; otherwise any explicitly named character(s)."""
+        ql = question.lower()
+        wants_all = any(w in ql for w in ("each ", "every ", "all ", "per "))
+        units = self._units_in_question(question) or ({scope.unit} if scope.unit else set())
+        if wants_all and units:
+            return [
+                self._char_by_id[cid]
+                for cid, u in CHARACTER_ID_TO_UNIT.items()
+                if u in units and cid in self._char_by_id
+            ]
+        return self._named_chars(question)
 
     def count_dialogue(
         self, question: str, *, unit: str | None = None, event_id: int | None = None
     ) -> dict:
-        """Exact dialogue-line count for a character in scope — deterministic,
-        never an LLM estimate (mirrors the original's count_dialogue tool)."""
+        """Exact dialogue-line count for one or more characters in scope —
+        deterministic, never an LLM estimate."""
         scope = self._scope_index.resolve(question, unit=unit, event_id=event_id)
-        target = self._resolve_count_target(question)
-        if not target:
-            msg = "Tell me which character to count lines for."
+        targets = self._resolve_count_targets(question, scope)
+        if not targets:
+            msg = "Tell me which character (or unit) to count lines for."
             return {"answer": msg, "answer_parts": [{"type": "text", "text": msg}],
                     "citations": [], "scope": scope.as_dict(), "backend": "local",
                     "intent": "count"}
-        jp, en = target
-        en_tokens = {t for t in en.lower().split() if len(t) >= 2}
         idxs = self._candidate_indices(scope.unit, scope.arc_id, scope.arc_ids)
-        n = sum(
-            1
-            for i in idxs
-            for turn in self.nodes[i].dialogue_turns
-            if _speaker_is(turn.speaker, jp, en_tokens)
-        )
+        counts = []
+        for jp, en in targets:
+            en_tokens = {t for t in en.lower().split() if len(t) >= 2}
+            n = sum(
+                1
+                for i in idxs
+                for turn in self.nodes[i].dialogue_turns
+                if _speaker_is(turn.speaker, jp, en_tokens)
+            )
+            counts.append((en, n))
+
         where = ""
         if scope.label:
             where = f" in {scope.label}"
         elif scope.arc_id:
-            row = self._meta_by_arc.get(scope.arc_id, {})
-            where = f" in {row.get('name', scope.arc_id)}"
+            where = f" in {self._meta_by_arc.get(scope.arc_id, {}).get('name', scope.arc_id)}"
         elif scope.unit:
             where = f" in {UNIT_NAMES.get(scope.unit, scope.unit)}"
-        answer = f"{en} has {n} dialogue line{'s' if n != 1 else ''}{where}."
+
+        if len(counts) == 1:
+            en, n = counts[0]
+            answer = f"{en} has {n} dialogue line{'s' if n != 1 else ''}{where}."
+        else:
+            counts.sort(key=lambda c: -c[1])
+            answer = f"Dialogue lines{where}:\n" + "\n".join(f"- {en}: {n}" for en, n in counts)
         return {
             "answer": answer,
             "answer_parts": [{"type": "text", "text": answer}],
-            "citations": [], "count": n, "scope": scope.as_dict(),
-            "backend": "local", "intent": "count",
+            "citations": [], "counts": dict(counts),
+            "count": counts[0][1] if len(counts) == 1 else None,  # single-target convenience
+            "scope": scope.as_dict(), "backend": "local", "intent": "count",
         }
 
 

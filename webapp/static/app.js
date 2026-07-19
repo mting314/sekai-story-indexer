@@ -1,7 +1,7 @@
 // Sekai Story Indexer — minimal vanilla-JS front end.
 // Timeline reads /api/events; chat posts /api/query. No build step.
 
-const state = { events: [], units: [], activeUnit: "all", scopeEventId: null };
+const state = { events: [], units: [], activeUnit: "all", scopeEventId: null, history: [] };
 
 async function boot() {
   const [units, events] = await Promise.all([
@@ -263,12 +263,15 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
         question: q,
         unit: state.activeUnit === "all" ? null : state.activeUnit,
         event_id: state.scopeEventId,
+        history: state.history.slice(-6), // conversation memory
       }),
     }).then((r) => r.json());
     if (res.error && !res.answer) {
       pending.textContent = `⚠ ${res.error}`;
     } else {
       renderAssistant(pending, res);
+      state.history.push({ role: "user", text: q });
+      state.history.push({ role: "assistant", text: res.answer || "" });
     }
   } catch (err) {
     pending.textContent = `⚠ ${err}`;
