@@ -41,3 +41,26 @@ def test_fetch_unit_stories_writes_tree(tmp_path, monkeypatch):
     assert n == 2
     ep1 = tmp_path / "leo_need" / "unit" / "01-chapter" / "01_a.md"
     assert ep1.exists() and "一歌: はじめまして" in ep1.read_text(encoding="utf-8")
+
+
+def test_summarize_events_one_per_event(monkeypatch):
+    from sekai_story_indexer.indexer.event_summarizer import summarize_events
+    from sekai_story_indexer.indexer.processor import StoryProcessor
+    from pathlib import Path
+    import tempfile
+    d = Path(tempfile.mkdtemp()) / "story" / "leo_need" / "event" / "0001" 
+    d.mkdir(parents=True)
+    (d / "01.md").write_text("# 1\n\n一歌: A\n", encoding="utf-8")
+    (d / "02.md").write_text("# 2\n\n咲希: B\n", encoding="utf-8")
+    nodes = []
+    for p in sorted(d.glob("*.md")):
+        nodes.extend(StoryProcessor.process_file(p))
+    calls = []
+    def fake(name, unit, body, model):
+        calls.append((name, unit)); return f"summary of {name}"
+    out = summarize_events(nodes, summarize=fake, log=lambda m: None)
+    assert len(out) == 1                       # one summary for the whole event
+    assert out[0].summary_level == 2
+    assert out[0].metadata.arc_id == "0001"
+    assert "0001" in out[0].text
+    assert len(calls) == 1                      # exactly one LLM call for the event

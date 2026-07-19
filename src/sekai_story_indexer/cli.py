@@ -676,13 +676,17 @@ def ingest(
     manifest_file: str = typer.Option("ingestion_manifest.json", help="Path to the ingestion manifest"),
     prune: bool = typer.Option(True, "--prune/--no-prune", help="Delete indexed records not emitted by this run"),
     skip_summaries: bool = typer.Option(
-        False,
-        "--skip-summaries",
-        help="Embed raw scenes only; skip the (expensive) tier-summary LLM pass. "
-        "Sufficient for the default raw-retrieval query mode.",
+        False, "--skip-summaries", help="Deprecated alias for --summaries none.",
+    ),
+    summaries: str = typer.Option(
+        "event",
+        "--summaries",
+        help="Summary strategy: 'event' (one per event story, recommended), "
+        "'hierarchical' (per-part/episode/year — expensive, mostly redundant here), "
+        "or 'none' (embed raw scenes only).",
     ),
 ):
-    """Walks the story directory, generates hierarchical summaries, and indexes them into ChromaDB."""
+    """Walks the story directory, summarizes, and indexes into ChromaDB."""
     initialize_ingest_settings()
     
     story_path = Path(story_dir)
@@ -737,13 +741,20 @@ def ingest(
         embedding_model=embedding_model,
         summary_cache_schema_version=SUMMARY_CACHE_SCHEMA_VERSION,
     )
-    if skip_summaries:
+    mode = "none" if skip_summaries else summaries
+    if mode == "none":
         summary_nodes = []
-        console.print(
-            "[yellow]--skip-summaries: skipping the tier-summary LLM pass; "
-            "embedding raw scenes only.[/yellow]"
+        console.print("[yellow]--summaries none: embedding raw scenes only.[/yellow]")
+    elif mode == "event":
+        from .indexer.event_summarizer import summarize_events
+
+        console.print("Generating one summary per event story (--summaries event)...")
+        summary_nodes = summarize_events(
+            raw_nodes, story_order=story_order,
+            log=lambda m: console.print(f"[dim]{m}[/dim]"),
         )
-    else:
+        console.print(f"Generated {len(summary_nodes)} event summaries.")
+    else:  # hierarchical
         summarizer = HierarchicalSummarizer(
             glossary=glossary,
             story_order=story_order,
