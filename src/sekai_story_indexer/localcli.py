@@ -50,6 +50,22 @@ def fetch_unit_stories_command(story_root: Path = typer.Option(Path("story"))):
     typer.echo(f"Wrote {n} unit-story episodes into {story_root}")
 
 
+@app.command("backfill-slugs")
+def backfill_slugs_command(
+    story_root: Path = typer.Option(Path("story")),
+    events_index: Path = typer.Option(Path("events_index.json")),
+    story_order: Path = typer.Option(Path("story_order.yaml")),
+):
+    """Backfill existing story tree directories and files with Romanized slugs."""
+    from .source.backfill_slugs import backfill_story_tree
+
+    stats = backfill_story_tree(story_root, events_index, story_order)
+    typer.echo(
+        f"Backfill complete: {stats['events_updated']} event slugs updated in index, "
+        f"{stats['dirs_renamed']} directories renamed, {stats['files_renamed']} files renamed."
+    )
+
+
 @app.command()
 def ask(
     question: str,

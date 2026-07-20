@@ -20,12 +20,29 @@ import unicodedata
 
 from .constants import CHARACTER_ID_TO_UNIT, DB_UNIT_TO_SLUG
 
+_KAKASI = None
 _SLUG_STRIP_RE = re.compile(r"[^a-z0-9]+")
 
 
+def _get_kakasi():
+    global _KAKASI
+    if _KAKASI is None:
+        import pykakasi
+
+        _KAKASI = pykakasi.kakasi()
+    return _KAKASI
+
+
 def slugify(value: str, *, max_len: int = 60) -> str:
-    """ASCII slug for filesystem paths. Non-ASCII (e.g. Japanese) is dropped;
-    if nothing survives, returns an empty string (callers fall back to an id)."""
+    """ASCII slug for filesystem paths. Japanese (Kana/Kanji) is romanized into
+    Hepburn Romaji; remaining non-ASCII characters are stripped."""
+    if any(ord(c) > 127 for c in value):
+        try:
+            k = _get_kakasi()
+            converted = k.convert(value)
+            value = " ".join(item.get("hepburn", "") for item in converted)
+        except Exception:
+            pass
     normalized = unicodedata.normalize("NFKD", value)
     ascii_only = normalized.encode("ascii", "ignore").decode("ascii").lower()
     slug = _SLUG_STRIP_RE.sub("-", ascii_only).strip("-")
@@ -93,19 +110,26 @@ def resolve_unit_from_story_units(story_units: list[dict]) -> str:
     ``mixed``. Each row: ``{unit, eventStoryUnitRelation}``.
     """
     main = {
-        DB_UNIT_TO_SLUG.get((r.get("unit") or "").lower())
+        u
         for r in story_units
         if r.get("eventStoryUnitRelation") == "main"
+        if (u := DB_UNIT_TO_SLUG.get((r.get("unit") or "").lower())) is not None
     }
-    main.discard(None)
     if len(main) == 1:
-        return next(iter(main))
+        val = next(iter(main))
+        if val is not None:
+            return val
     if len(main) > 1:
         return "mixed"
-    other = {DB_UNIT_TO_SLUG.get((r.get("unit") or "").lower()) for r in story_units}
-    other.discard(None)
+    other = {
+        u
+        for r in story_units
+        if (u := DB_UNIT_TO_SLUG.get((r.get("unit") or "").lower())) is not None
+    }
     if len(other) == 1:
-        return next(iter(other))
+        val = next(iter(other))
+        if val is not None:
+            return val
     return "mixed"
 
 
