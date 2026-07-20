@@ -141,7 +141,7 @@ def test_processor_reads_sekai_tree_and_populates_unit(tmp_path: Path):
     assert meta.unit == "vivid_bad_squad"
     assert meta.content_type == "event"
     assert meta.arc_id == "0151-grow-glorious"
-    assert meta.story_type == "Side"
+    assert meta.story_type == "Event"
     assert meta.episode_number == 1
     assert meta.parent_year_id == "vivid_bad_squad|0151-grow-glorious"
 

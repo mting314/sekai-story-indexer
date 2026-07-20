@@ -62,7 +62,11 @@ class StoryMetadata(BaseModel):
     event_id: int = Field(0, description="Sekai master-DB event id, 0 if not an event story")
     started_at: int = Field(0, description="Event release timestamp (ms epoch), for chronological order")
     arc_id: str = Field(..., description="Volume id: event slug, 'main', or unit-story id")
-    story_type: str = Field(..., description="'Main' or 'Side' (retained for tier machinery)")
+    story_type: str = Field(
+        ...,
+        description="Content bucket on the tier axis: 'Event' (event story), 'Main', "
+        "'Unit', 'Card', 'Area' (or legacy 'Side'/'Other').",
+    )
     episode_name: str = Field(..., description="Episode or sub-series name")
     part_name: str = Field(..., description="Part or file name")
     file_path: str = Field(..., description="Path to the original markdown file")
@@ -103,6 +107,6 @@ class StoryMetadata(BaseModel):
 class StoryNode(BaseModel):
     text: str = Field(..., description="The actual text content of the scene or summary")
     metadata: StoryMetadata
-    summary_level: int = Field(4, description="1: Year, 2: Episode, 3: Part, 4: Scene (Raw)")
+    summary_level: int = Field(4, description="1: Event, 2: Episode, 3: Part, 4: Scene (Raw)")
     dialogue_turns: list[DialogueTurn] = Field(default_factory=list)
     narrative_beats: list[NarrativeBeat] = Field(default_factory=list)

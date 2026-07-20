@@ -55,7 +55,7 @@ def _meta(**kw) -> StoryMetadata:
         episode_name="",
         part_name="",
         file_path="",
-        story_type="Side",
+        story_type="Event",  # local summaries are all derived from event stories
         is_prose=True,
         scene_start=0,
         scene_end=0,

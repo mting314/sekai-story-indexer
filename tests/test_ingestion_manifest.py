@@ -26,9 +26,9 @@ from sekai_story_indexer.indexer.parser import PARSER_VERSION
 from sekai_story_indexer.indexer.processor import StoryProcessor
 from sekai_story_indexer.indexer.summarizer import (
     EPISODE_SUMMARY_SECTIONS,
+    EVENT_SUMMARY_SECTIONS,
     PART_SUMMARY_SECTIONS,
     SUMMARIZATION_PROMPT_VERSION,
-    YEAR_SUMMARY_SECTIONS,
     HierarchicalSummarizer,
     extract_summary_sections,
     trim_previous_summary_context,
@@ -211,7 +211,7 @@ def test_summarizer_uses_configured_generation_agent(monkeypatch: pytest.MonkeyP
     [
         ("Part", PART_SUMMARY_SECTIONS),
         ("Episode", EPISODE_SUMMARY_SECTIONS),
-        ("Year", YEAR_SUMMARY_SECTIONS),
+        ("Event", EVENT_SUMMARY_SECTIONS),
     ],
 )
 def test_summary_prompt_includes_required_tier_sections(
@@ -264,7 +264,7 @@ def test_episode_prompt_requires_part_index_with_stable_labels() -> None:
 def test_year_prompt_requires_stable_episode_index_labels() -> None:
     _, prompt = HierarchicalSummarizer()._build_summary_prompt(
         "episode summaries",
-        level_name="Year",
+        level_name="Event",
     )
 
     assert "- Episode 1:" in prompt
@@ -282,7 +282,7 @@ def test_year_prompt_requires_stable_episode_index_labels() -> None:
     ("level_name", "input_phrase"),
     [
         ("Episode", "The current Episode input is multiple structured Part summaries."),
-        ("Year", "The current Year input is multiple structured Episode summaries."),
+        ("Event", "The current Event input is multiple structured Episode summaries."),
     ],
 )
 def test_aggregate_summary_prompts_describe_structured_child_inputs(

@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 
 from ..models.story import StoryMetadata, StoryNode
+from ..source.transform import story_type_for
 from .parser import StoryParser
 
 
@@ -24,10 +25,6 @@ def episode_number_from_names(episode_name: str, part_name: str) -> int:
         if match:
             return int(match.group(1))
     return 0
-
-
-def _story_type_for(content_type: str) -> str:
-    return "Main" if content_type == "main" or content_type.startswith("第") else "Side"
 
 
 class StoryProcessor:
@@ -61,7 +58,7 @@ class StoryProcessor:
             else:
                 raise IndexError("unsupported path depth under story")
 
-            story_type = _story_type_for(content_type)
+            story_type = story_type_for(content_type)
 
             parent_year_id, parent_episode_id, parent_part_id = _parent_ids(
                 unit, arc_id, story_type, ep_name, part_name

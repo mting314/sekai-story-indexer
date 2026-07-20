@@ -177,8 +177,7 @@ def _extract_semantic_boundary(
 
 
 def _extract_story_type(question_lower: str) -> str | None:
-    if "side story" in question_lower or "side stories" in question_lower:
-        return "Side"
+    # Sekai has no "side story" (a linkura concept); only "main story" scopes a tier.
     if "main story" in question_lower or "main stories" in question_lower:
         return "Main"
     return None

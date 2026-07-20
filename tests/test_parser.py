@@ -82,10 +82,10 @@ def test_hierarchy_extraction():
     assert meta_main.episode_name == "第1話『花咲きたい！』"
     assert meta_main.part_name == "1"
 
-    # Side story test
+    # Non-main, non-Sekai-bucket folder falls back to the neutral "Other".
     path_side = Path("story/103/～Shades of Stars～/第1話.md")
     meta_side = StoryProcessor.extract_hierarchy(path_side)
     assert meta_side.arc_id == "103"
-    assert meta_side.story_type == "Side"
+    assert meta_side.story_type == "Other"
     assert meta_side.episode_name == "～Shades of Stars～"
     assert meta_side.part_name == "第1話"

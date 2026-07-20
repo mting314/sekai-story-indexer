@@ -295,7 +295,7 @@ def test_canonical_story_order_uses_chronological_manifest_order(tmp_path: Path)
         for node in raw_nodes
     }
 
-    assert order_by_label["102|Side"] < order_by_label["103|Side"]
-    assert order_by_label["103|Side"] < order_by_label["103|Main"]
+    assert order_by_label["102|Other"] < order_by_label["103|Other"]
+    assert order_by_label["103|Other"] < order_by_label["103|Main"]
     assert order_by_label["103|Main"] < order_by_label["104|Main"]
     assert order_by_label["104|Main"] < order_by_label["105|Main"]

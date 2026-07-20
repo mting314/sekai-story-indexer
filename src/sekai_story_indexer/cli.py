@@ -734,7 +734,7 @@ def ingest(
         "hierarchical",
         "--summaries",
         help="Summary strategy: 'hierarchical' (the inherited linkura Refine "
-        "summarizer — per-part/episode/year via the API; the default), 'local' "
+        "summarizer — per-part/episode/event via the API; the default), 'local' "
         "(embed the FREE locally-generated episode/event/unit summaries — no "
         "generation cost), or 'none' (embed raw scenes only).",
     ),

@@ -32,7 +32,7 @@ EPISODE_SUMMARY_SECTIONS = (
     "Continuity Facts",
     "Important Terms",
 )
-YEAR_SUMMARY_SECTIONS = (
+EVENT_SUMMARY_SECTIONS = (
     "Overview",
     "Episode Index",
     "Character Trajectories",
@@ -43,10 +43,10 @@ YEAR_SUMMARY_SECTIONS = (
 SUMMARY_SECTIONS_BY_LEVEL = {
     "Part": PART_SUMMARY_SECTIONS,
     "Episode": EPISODE_SUMMARY_SECTIONS,
-    "Year": YEAR_SUMMARY_SECTIONS,
+    "Event": EVENT_SUMMARY_SECTIONS,
 }
 KNOWN_SUMMARY_SECTIONS = frozenset(
-    PART_SUMMARY_SECTIONS + EPISODE_SUMMARY_SECTIONS + YEAR_SUMMARY_SECTIONS
+    PART_SUMMARY_SECTIONS + EPISODE_SUMMARY_SECTIONS + EVENT_SUMMARY_SECTIONS
 )
 
 
@@ -91,8 +91,8 @@ def _summary_input_label(level_name: str) -> str:
         return "CURRENT PART TEXT (RAW PARSED STORY TEXT)"
     if level_name == "Episode":
         return "CURRENT EPISODE INPUT (STRUCTURED PART SUMMARIES)"
-    if level_name == "Year":
-        return "CURRENT YEAR INPUT (STRUCTURED EPISODE SUMMARIES)"
+    if level_name == "Event":
+        return "CURRENT EVENT INPUT (STRUCTURED EPISODE SUMMARIES)"
     return f"CURRENT {level_name.upper()} INPUT"
 
 
@@ -108,10 +108,10 @@ def _summary_input_instructions(level_name: str) -> str:
             "the child Part summaries into one episode-level summary. Do not concatenate, copy, "
             "or preserve child section structures verbatim."
         )
-    if level_name == "Year":
+    if level_name == "Event":
         return (
-            "The current Year input is multiple structured Episode summaries. Synthesize across "
-            "the child Episode summaries into a year-level episode routing index and status "
+            "The current Event input is multiple structured Episode summaries. Synthesize across "
+            "the child Episode summaries into an event-level episode routing index and status "
             "summary. Do not concatenate, copy, or preserve child section structures verbatim."
         )
     return f"The current input is a {level_name}."
@@ -189,30 +189,30 @@ Episode Part Index label rules:
 - Use stable English labels for non-numbered parts or interludes, such as `Interlude:` or `Ending:`.
 - Do not use raw Japanese part titles as Part Index bullet labels when a generic label is available."""
 
-    if level_name == "Year":
-        return """Required Year summary format:
+    if level_name == "Event":
+        return """Required Event summary format:
 
 Overview:
-[A detailed prose summary of the year's overall narrative movement, club status changes, competitions, graduations/transitions, and recurring themes. Keep episode boundaries clear; do not force unrelated episodes into larger arcs.]
+[A detailed prose summary of the event's overall narrative movement, club status changes, competitions, graduations/transitions, and recurring themes. Keep episode boundaries clear; do not force unrelated episodes into larger arcs.]
 
 Episode Index:
 - Episode 1: central conflict and outcome in one line, about 20-30 words.
 - Episode 2: central conflict and outcome in one line, about 20-30 words.
 
 Character Trajectories:
-- Character Name: year-long growth, setbacks, role changes, relationships, goals.
-- Character Name: year-long growth, setbacks, role changes, relationships, goals.
+- Character Name: growth across the event, setbacks, role changes, relationships, goals.
+- Character Name: growth across the event, setbacks, role changes, relationships, goals.
 
 Unit / Club State:
 - Unit or club: membership, creative direction, conflicts, achievements, public status.
 
 Continuity Facts:
-- Year-level or cross-episode facts only: final states, competition results, graduations/transitions, promises, unresolved threads, and rare genuine multi-episode arcs.
+- Event-level or cross-episode facts only: final states, competition results, graduations/transitions, promises, unresolved threads, and rare genuine multi-episode arcs.
 
 Important Terms:
-- Up to 15 major recurring or year-routing terms.
+- Up to 15 major recurring or event-routing terms.
 
-Year Episode Index label rules:
+Event Episode Index label rules:
 - Use `Episode N:` for numbered main episodes.
 - Use stable English labels for non-numbered special entries, such as `Interlude:` or `Special:`.
 - Do not use raw Japanese episode titles as Episode Index bullet labels.
@@ -418,7 +418,7 @@ class HierarchicalSummarizer:
     def summarize_hierarchy(self, raw_nodes: list[StoryNode], cache_file: str = "summaries_cache.json") -> list[StoryNode]:
         """
         Builds the full Tier 1-3 hierarchy.
-        Returns a flat list of all generated Summary Nodes (Part, Episode, and Year levels)
+        Returns a flat list of all generated Summary Nodes (Part, Episode, and Event levels)
         so they can all be embedded into the Vector DB.
         """
         all_summaries = []
@@ -433,8 +433,8 @@ class HierarchicalSummarizer:
         episode_summaries = self.summarize_episodes(part_summaries, cache_file)
         all_summaries.extend(episode_summaries)
 
-        # 3. Generate Tier 1 (Year) Summaries
-        safe_print("\n--- Generating Tier 1 (Year) Summaries ---")
+        # 3. Generate Tier 1 (Event) Summaries
+        safe_print("\n--- Generating Tier 1 (Event) Summaries ---")
         year_summaries = self.summarize_years(episode_summaries, cache_file)
         all_summaries.extend(year_summaries)
 
@@ -612,10 +612,10 @@ class HierarchicalSummarizer:
         return summary_nodes
 
     def summarize_years(self, episode_nodes: list[StoryNode], cache_file: str = "summaries_cache.json") -> list[StoryNode]:
-        """Aggregates Tier 2 Episode Summaries into Tier 1 Year Summaries."""
+        """Aggregates Tier 2 Episode Summaries into Tier 1 Event Summaries."""
         cache = _load_cache(cache_file)
 
-        # Group by arc_id (Year)
+        # Group by arc_id (Event)
         years: dict[str, list[StoryNode]] = defaultdict(list)
         for node in episode_nodes:
             years[node.metadata.arc_id].append(node)
@@ -636,7 +636,7 @@ class HierarchicalSummarizer:
         
         prev_summary = None
         for arc_id in sorted_years:
-            cache_key = f"YEAR|{arc_id}"
+            cache_key = f"EVENT|{arc_id}"
             episodes = years[arc_id]
             
             # Sort episodes inside the year
@@ -656,7 +656,7 @@ class HierarchicalSummarizer:
             combined_text = "\n\n---\n\n".join([f"Episode: {n.metadata.episode_name}\n{n.text}" for n in episodes])
             prev_context = trim_previous_summary_context(prev_summary)
             cache_inputs = self._aggregate_cache_inputs(
-                level="year",
+                level="event",
                 child_nodes=episodes,
                 combined_text=combined_text,
                 prev_summary=prev_context,
@@ -665,15 +665,15 @@ class HierarchicalSummarizer:
             cached = _cached_summary(cache, cache_key, fingerprint)
 
             if cached is not None:
-                safe_print(f"Loading cached year summary for {cache_key}...")
+                safe_print(f"Loading cached event summary for {cache_key}...")
                 current_summary = cached
             else:
-                safe_print(f"Summarizing Year: {cache_key}...")
+                safe_print(f"Summarizing Event: {cache_key}...")
                 
                 current_summary = self._generate_rolling_summary(
                     current_text=combined_text, 
                     prev_summary=prev_context,
-                    level_name="Year"
+                    level_name="Event"
                 )
                 
                 _store_cached_summary(

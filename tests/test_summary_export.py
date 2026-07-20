@@ -11,7 +11,7 @@ from sekai_story_indexer.summary_export import (
 
 def _summary(*, label: str = "Part", include_part_index: bool = True) -> str:
     list_label = "Key Events" if label == "Part" else "Episode Arc"
-    if label == "Year":
+    if label == "Event":
         list_label = "Episode Index"
     part_index = ""
     if label == "Episode" and include_part_index:
@@ -79,26 +79,26 @@ def test_build_summary_reader_data_parses_sections_and_orders_tree(tmp_path: Pat
             "summary": _summary(label="Episode"),
             "inputs": {"level": "episode"},
         },
-        "YEAR|103": {
+        "EVENT|103": {
             "schema_version": "1",
             "fingerprint": "year-103",
-            "summary": _summary(label="Year"),
-            "inputs": {"level": "year"},
+            "summary": _summary(label="Event"),
+            "inputs": {"level": "event"},
         },
-        "YEAR|104": {
+        "EVENT|104": {
             "schema_version": "1",
             "fingerprint": "year-104",
-            "summary": _summary(label="Year"),
-            "inputs": {"level": "year"},
+            "summary": _summary(label="Event"),
+            "inputs": {"level": "event"},
         },
     }
 
     data = build_summary_reader_data(cache, story_order=story_order)
 
     assert data["schemaVersion"] == "2"
-    assert data["counts"] == {"years": 2, "episodes": 1, "parts": 2}
+    assert data["counts"] == {"events": 2, "episodes": 1, "parts": 2}
     assert [data["nodes"][node_id]["label"] for node_id in data["roots"]] == ["Arc 104", "Arc 103"]
-    episode_id = data["nodes"]["year:103"]["children"][0]
+    episode_id = data["nodes"]["event:103"]["children"][0]
     episode = data["nodes"][episode_id]
     assert [data["nodes"][part_id]["label"] for part_id in episode["children"]] == [
         "Part B",
@@ -154,11 +154,11 @@ def test_export_summary_reader_writes_static_site(tmp_path: Path) -> None:
     cache_file.write_text(
         json.dumps(
             {
-                "YEAR|103": {
+                "EVENT|103": {
                     "schema_version": "1",
                     "fingerprint": "year",
-                    "summary": _summary(label="Year"),
-                    "inputs": {"level": "year"},
+                    "summary": _summary(label="Event"),
+                    "inputs": {"level": "event"},
                 }
             }
         ),
@@ -176,9 +176,9 @@ def test_export_summary_reader_writes_static_site(tmp_path: Path) -> None:
 
     assert (output_dir / "index.html").read_text(encoding="utf-8").startswith("<!doctype html>")
     data = json.loads((output_dir / "data" / "summaries.json").read_text(encoding="utf-8"))
-    assert data["counts"]["years"] == 1
-    assert data["roots"] == ["year:103"]
-    assert "YEAR|103" in data["summaries"]
+    assert data["counts"]["events"] == 1
+    assert data["roots"] == ["event:103"]
+    assert "EVENT|103" in data["summaries"]
 
 
 def test_export_production_summary_reader_writes_zip_page_site(tmp_path: Path) -> None:
@@ -187,11 +187,11 @@ def test_export_production_summary_reader_writes_zip_page_site(tmp_path: Path) -
     cache_file.write_text(
         json.dumps(
             {
-                "YEAR|103": {
+                "EVENT|103": {
                     "schema_version": "1",
                     "fingerprint": "year",
-                    "summary": _summary(label="Year"),
-                    "inputs": {"level": "year"},
+                    "summary": _summary(label="Event"),
+                    "inputs": {"level": "event"},
                 }
             }
         ),
@@ -215,4 +215,4 @@ def test_export_production_summary_reader_writes_zip_page_site(tmp_path: Path) -
     assert not (output_dir / "data" / "summaries_cache.json").exists()
     data = json.loads((output_dir / "data" / "summaries.json").read_text(encoding="utf-8"))
     assert data["schemaVersion"] == "2"
-    assert "YEAR|103" in data["summaries"]
+    assert "EVENT|103" in data["summaries"]

@@ -34,7 +34,7 @@ def test_valid_fixture_supports_distinct_chronological_and_summary_order(
         tmp_path,
         """
 chronological_order:
-  - story_type: Side
+  - story_type: Other
     arcs: ["102", "103"]
   - story_type: Main
     arcs: ["103"]
@@ -47,7 +47,7 @@ summary_order:
     arcs: ["103"]
   - story_type: Main
     arcs: ["104"]
-  - story_type: Side
+  - story_type: Other
     arcs: ["102", "103"]
   - story_type: Main
     arcs: ["105"]
@@ -56,11 +56,11 @@ summary_order:
 
     story_order = load_story_order(config_path, story_root=story_root)
 
-    assert story_order.chronological_episode_key("103", "Side", "～Shades of Stars～") < (
+    assert story_order.chronological_episode_key("103", "Other", "～Shades of Stars～") < (
         story_order.chronological_episode_key("103", "Main", "第1話『花咲きたい！』")
     )
     assert story_order.summary_episode_key("104", "Main", "第1話『未来への歌』") < (
-        story_order.summary_episode_key("103", "Side", "～Shades of Stars～")
+        story_order.summary_episode_key("103", "Other", "～Shades of Stars～")
     )
 
 
@@ -131,10 +131,10 @@ def test_story_root_with_uncovered_story_pair_raises_clear_error(tmp_path: Path)
         tmp_path,
         """
 chronological_order:
-  - story_type: Side
+  - story_type: Event
     arcs: ["103"]
 summary_order:
-  - story_type: Side
+  - story_type: Event
     arcs: ["103"]
 """,
     )
@@ -267,7 +267,7 @@ part_order_overrides:
         self: HierarchicalSummarizer,
         current_text: str,
         prev_summary: str | None = None,
-        level_name: str = "Year",
+        level_name: str = "Event",
     ) -> str:
         return f"{level_name} summary"
 
@@ -276,5 +276,5 @@ part_order_overrides:
     year_summaries = summarizer.summarize_years([episode_summary], cache_file=str(tmp_path / "cache.json"))
 
     assert len(year_summaries) == 1
-    assert year_summaries[0].text == "Year summary"
+    assert year_summaries[0].text == "Event summary"
     assert year_summaries[0].metadata.episode_name == "ALL_EPISODES"

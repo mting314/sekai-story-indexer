@@ -28,13 +28,9 @@ from .transform import (
     scenario_to_lines,
     slugify,
     song_info,
+    story_type_for,
     tree_relpath,
 )
-
-
-def story_type_for(content_type: str) -> str:
-    """Map a Sekai content bucket onto the tier machinery's {Main, Side, Other}."""
-    return "Main" if content_type == "main" else "Side"
 
 
 @dataclass
