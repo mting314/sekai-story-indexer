@@ -116,6 +116,19 @@ def backfill_story_tree(
                             log(f"Renamed dir: {old_dir_name} -> {target_dir_name}")
                             final_arc_dir = new_dir
                         else:
+                            # Target already exists (e.g. an interrupted re-run). Merge
+                            # the old dir's episodes in rather than stranding them, then
+                            # drop the now-empty old dir. Never overwrite existing files.
+                            for f in list(arc_dir.iterdir()):
+                                dest = new_dir / f.name
+                                if not dest.exists():
+                                    f.rename(dest)
+                            if not any(arc_dir.iterdir()):
+                                arc_dir.rmdir()
+                                log(f"Merged stranded dir {old_dir_name} into {target_dir_name}")
+                            else:
+                                log(f"WARNING: {old_dir_name} could not be fully merged into "
+                                    f"{target_dir_name} (name clashes remain)")
                             final_arc_dir = new_dir
 
                     # Rename episode .md files inside final_arc_dir

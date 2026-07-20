@@ -238,7 +238,7 @@ Deployment notes for self-hosting and GitHub Pages are in
 `docs\summary-reader-deploy.md`.
 
 The original production page from `Linkura Summaries.zip` is also preserved
-under `web\summary-reader-production`. Export that variant with:
+under `webapp\templates\summary-reader-production`. Export that variant with:
 
 ```powershell
 .\scripts\export-production-summary-reader.ps1
