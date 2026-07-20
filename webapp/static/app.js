@@ -466,10 +466,17 @@ function setScope(e) {
     return;
   }
   state.scopeEventId = e.event_id;
+  const u = (state.meta.units || {})[e.unit] || {};
+  const color = u.color || "var(--accent)";
   const hint = document.getElementById("scope-hint");
   hint.classList.remove("hidden");
-  hint.innerHTML = `Scoped to <b>${e.name}</b>${e.nickname ? ` (${e.nickname})` : ""} ·
-    <a href="#" id="clear-scope">clear</a>`;
+  hint.style.setProperty("--scope-color", color);
+  const sub = [e.nickname, u.name].filter(Boolean).join(" · ") || "asking about this event";
+  hint.innerHTML =
+    `<div class="reply-body">` +
+    `<div class="reply-title" style="color:${color}">${escapeHtml(e.name)}</div>` +
+    `<div class="reply-sub">${escapeHtml(sub)}</div></div>` +
+    `<button class="reply-close" id="clear-scope" title="Clear" aria-label="Clear scope">×</button>`;
   document.getElementById("clear-scope").onclick = (ev) => {
     ev.preventDefault();
     state.scopeEventId = null;
