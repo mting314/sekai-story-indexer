@@ -538,47 +538,67 @@ function enableInertialScroll(el) {
     return best == null ? pos : clamp(best);
   }
 
-  let target = el.scrollTop;
+  // Physics: each wheel/trackpad tick or drag-release is an impulse into
+  // `velocity` (px/frame); a rAF loop integrates it and decays it by friction,
+  // so scrolling keeps gliding after the fingers/wheel stop — the actual inertia.
+  // When it dies down, a light spring pulls to the nearest banner (snap).
+  const FRICTION = 0.92; // per-frame velocity decay (higher = longer glide)
+  const WHEEL_GAIN = 0.16; // how much of a wheel delta becomes velocity
+  const MAX_V = 60; // cap so a hard flick can't teleport
+  const SNAP_STIFF = 0.16; // spring toward the snap point once inertia settles
+
+  let velocity = 0;
+  let snapPos = null; // active snap target once we're settling; null while flinging
   let raf = 0;
 
-  function animate() {
-    const diff = target - el.scrollTop;
-    if (Math.abs(diff) < 0.5) {
-      el.scrollTop = target;
-      raf = 0;
-      return;
+  function frame() {
+    if (snapPos == null) {
+      // inertial phase: coast and decay
+      velocity *= FRICTION;
+      const next = clamp(el.scrollTop + velocity);
+      if (next === el.scrollTop) velocity = 0; // hit an edge
+      el.scrollTop = next;
+      if (Math.abs(velocity) <= 0.5) {
+        velocity = 0;
+        snapPos = nearestCardTop(el.scrollTop); // begin settle
+      }
+    } else {
+      // settle phase: spring to the nearest banner
+      const diff = snapPos - el.scrollTop;
+      if (Math.abs(diff) < 0.5) {
+        el.scrollTop = snapPos;
+        snapPos = null;
+        raf = 0;
+        return;
+      }
+      el.scrollTop += diff * SNAP_STIFF;
     }
-    el.scrollTop += diff * 0.2; // ease toward target (~5 frames to settle)
-    raf = requestAnimationFrame(animate);
+    raf = requestAnimationFrame(frame);
   }
-  function startAnim() {
-    if (!raf) raf = requestAnimationFrame(animate);
+  function startFrame() {
+    if (!raf) raf = requestAnimationFrame(frame);
   }
-  function stopAnim() {
+  function stopFrame() {
     if (raf) {
       cancelAnimationFrame(raf);
       raf = 0;
     }
+    velocity = 0;
+    snapPos = null;
   }
 
-  // ---- mouse wheel: momentum glide + snap-on-settle ----
-  let wheelTimer = 0;
+  // ---- wheel + trackpad: impulse into velocity → inertial glide ----
   el.addEventListener(
     "wheel",
     (e) => {
       if (e.ctrlKey) return; // let pinch-zoom through
       e.preventDefault();
-      if (!raf) target = el.scrollTop; // resync when starting from rest
       let d = e.deltaY;
       if (e.deltaMode === 1) d *= 16; // lines → px
       else if (e.deltaMode === 2) d *= el.clientHeight; // pages → px
-      target = clamp(target + d);
-      startAnim();
-      clearTimeout(wheelTimer);
-      wheelTimer = setTimeout(() => {
-        target = nearestCardTop(target);
-        startAnim();
-      }, 110);
+      snapPos = null; // a new tick means we're flinging again, not settling
+      velocity = Math.max(-MAX_V, Math.min(MAX_V, velocity + d * WHEEL_GAIN));
+      startFrame();
     },
     { passive: false }
   );
@@ -592,8 +612,7 @@ function enableInertialScroll(el) {
 
   el.addEventListener("pointerdown", (e) => {
     if (e.pointerType !== "mouse" || e.button !== 0) return; // touch keeps native
-    stopAnim();
-    clearTimeout(wheelTimer);
+    stopFrame();
     dragging = true;
     moved = false;
     startY = e.clientY;
@@ -618,8 +637,7 @@ function enableInertialScroll(el) {
     dragging = false;
     el.classList.remove("dragging");
     try { el.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
-    // Release velocity from the last ~90ms of movement (px/frame @ ~16ms), then
-    // project momentum forward and snap to the nearest banner.
+    // Release velocity from the last ~90ms of movement (px/frame @ ~16ms).
     const end = samples[samples.length - 1];
     let first = samples[0];
     for (const s of samples) {
@@ -627,9 +645,10 @@ function enableInertialScroll(el) {
     }
     const dt = end.t - first.t;
     const resting = e.timeStamp - end.t > 90;
-    const vpf = dt > 0 && !resting ? (-(end.y - first.y) / dt) * 16 : 0;
-    target = nearestCardTop(clamp(el.scrollTop + vpf * 12));
-    startAnim();
+    velocity = dt > 0 && !resting ? (-(end.y - first.y) / dt) * 16 : 0;
+    velocity = Math.max(-MAX_V, Math.min(MAX_V, velocity));
+    snapPos = Math.abs(velocity) > 0.5 ? null : nearestCardTop(el.scrollTop);
+    startFrame();
   }
   el.addEventListener("pointerup", endDrag);
   el.addEventListener("pointercancel", endDrag);

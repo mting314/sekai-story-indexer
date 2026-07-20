@@ -91,7 +91,7 @@ main {
 /* banner-forward tile: art fills the card, text rides on a left-to-right scrim */
 .event-card {
   position: relative; display: block; min-height: 88px; flex-shrink: 0;
-  width: 100%; max-width: 340px; align-self: center;
+  width: 100%; max-width: 260px; align-self: center;
   background: var(--card); border-radius: 14px; overflow: hidden; cursor: pointer;
   border: 1px solid #ffffff10; scroll-snap-align: start; user-select: none;
   transition: transform .15s ease, box-shadow .15s ease;
