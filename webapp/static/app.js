@@ -67,21 +67,44 @@ async function renderSummaries() {
   const el = document.getElementById("summaries");
   if (state.summaries === null) {
     el.innerHTML = '<p class="empty">Loading…</p>';
-    state.summaries = await fetch("/api/summaries").then((r) => r.json());
+    [state.summaries, state.unitSummaries] = await Promise.all([
+      fetch("/api/summaries").then((r) => r.json()),
+      fetch("/api/unit-summaries").then((r) => r.json()).catch(() => ({})),
+    ]);
   }
   const rows = state.summaries.filter(
     (s) => state.activeUnit === "all" || s.unit === state.activeUnit
   );
   if (!rows.length) {
     el.innerHTML =
-      '<p class="empty">No event summaries yet — run <code>indexer ingest --summaries event</code>.</p>';
+      '<p class="empty">No event summaries yet — run the summarizer (see README).</p>';
     return;
   }
   el.innerHTML = "";
   const list = document.createElement("div");
   list.className = "sum-list";
+  // Tier-3 unit overview at the top when a single unit is selected.
+  const us = (state.unitSummaries || {})[state.activeUnit];
+  if (state.activeUnit !== "all" && us && us.summary) list.appendChild(unitOverviewCard(us));
   for (const s of rows) list.appendChild(summaryCard(s));
   el.appendChild(list);
+}
+
+function unitOverviewCard(us) {
+  const u = state.meta.units[state.activeUnit] || {};
+  const card = document.createElement("div");
+  card.className = "unit-overview";
+  card.style.setProperty("--unit-color", u.color || "#888");
+  const sym = u.symbol
+    ? `<img class="usym" src="${u.symbol}" alt="" onerror="this.style.display='none'">`
+    : "";
+  const head = `<div class="uo-head">${sym}<span style="color:${u.color}">${escapeHtml(u.name || "")}</span> — story so far</div>`;
+  const body = document.createElement("div");
+  body.className = "answer-text";
+  body.innerHTML = renderMarkdown(us.summary);
+  card.innerHTML = head;
+  card.appendChild(body);
+  return card;
 }
 
 // Collapsed event card: unit symbol + accent color, date, nickname, name.
@@ -198,6 +221,43 @@ function summaryBody(s) {
   text.innerHTML = renderMarkdown(s.summary);
   decorateNames(text, new Set(s.characters || []));
   frag.appendChild(text);
+
+  // Tier-1: lazy-loaded per-episode summaries.
+  if (s.episode_count > 0) {
+    const wrap = document.createElement("div");
+    wrap.className = "episodes";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ep-toggle";
+    btn.textContent = `▸ Episode breakdown (${s.episode_count})`;
+    const list = document.createElement("div");
+    list.className = "ep-list hidden";
+    btn.addEventListener("click", async () => {
+      const nowHidden = list.classList.toggle("hidden");
+      btn.textContent = `${nowHidden ? "▸" : "▾"} Episode breakdown (${s.episode_count})`;
+      if (!list.dataset.filled) {
+        list.dataset.filled = "1";
+        list.innerHTML = '<p class="empty">Loading…</p>';
+        const eps = await fetch(`/api/episodes?arc=${encodeURIComponent(s.arc_id)}`)
+          .then((r) => r.json())
+          .catch(() => []);
+        list.innerHTML = "";
+        for (const ep of eps) {
+          const d = document.createElement("div");
+          d.className = "ep-item";
+          const md = document.createElement("div");
+          md.className = "answer-text";
+          md.innerHTML = renderMarkdown(ep.summary);
+          d.innerHTML = `<div class="ep-key">Episode ${escapeHtml(ep.episode)}</div>`;
+          d.appendChild(md);
+          list.appendChild(d);
+        }
+      }
+    });
+    wrap.appendChild(btn);
+    wrap.appendChild(list);
+    frag.appendChild(wrap);
+  }
   return frag;
 }
 
@@ -496,6 +556,16 @@ function renderAssistant(container, res) {
 }
 
 // Minimal, safe markdown -> HTML (escape first, then a limited subset).
+// Inline character tag Name{char_id=N} -> colored name + chibi icon.
+function tagSpan(name, id) {
+  const c = (state.meta.characters || {})[String(id)];
+  if (!c) return name;
+  const icon = c.icon
+    ? `<img class="ent-ic" src="${c.icon}" alt="" onerror="this.style.display='none'">`
+    : "";
+  return `<span class="ent char" style="color:${c.color}">${icon}${name}</span>`;
+}
+
 function renderMarkdown(src) {
   const esc = (s) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -522,6 +592,13 @@ function renderMarkdown(src) {
         /(?<![\w*])\*(?=\S)([^*\n]+?)(?<=\S)\*(?=[^\w*]|$)/g,
         "<em>$1</em>"
       )
+      // inline character tags from the summarizer: Name{char_id=N} -> colored name
+      // + chibi icon (deterministic, exact span). Orphan tags are stripped.
+      .replace(
+        /([A-Z][A-Za-z'’.\-/]*(?:\s+[A-Z][A-Za-z'’.\-/]*){0,3})\s*\{char_id=(\d+)\}/g,
+        (_m, name, id) => tagSpan(name, id)
+      )
+      .replace(/\{char_id=\d+\}/g, "")
       // clickable numbered citations: [1] / [2][3]  (also inside `code`/brackets)
       .replace(/\[(\d+)\]/g, '<a href="#" class="cite" data-ref="$1">[$1]</a>');
   };
@@ -537,7 +614,10 @@ function renderMarkdown(src) {
       continue;
     }
     if (list) { out.push("</ul>"); list = false; }
-    if (h) out.push(`<h4>${inline(h[2])}</h4>`);
+    if (h) {
+      const lvl = Math.min(Math.max(h[1].length, 2), 4); // ## -> h2, kept 2..4
+      out.push(`<h${lvl}>${inline(h[2])}</h${lvl}>`);
+    }
     else if (line.trim()) out.push(`<p>${inline(line)}</p>`);
   }
   if (list) out.push("</ul>");

@@ -535,9 +535,13 @@ def _load_event_summaries(story_root: Path) -> dict[str, str]:
             except Exception:
                 return {}
             # Values may be bare strings (old cache) or {summary, characters}
-            # (local/Ollama structured format) — normalize to text for retrieval.
-            return {
-                arc: (v if isinstance(v, str) else (v or {}).get("summary", ""))
-                for arc, v in raw.items()
-            }
+            # (local/Ollama structured format) — normalize to text for retrieval,
+            # stripping inline {char_id=N} tags so they don't pollute search.
+            import re
+
+            def _text(v):
+                s = v if isinstance(v, str) else (v or {}).get("summary", "")
+                return re.sub(r"\{char_id=\d+\}", "", s)
+
+            return {arc: _text(v) for arc, v in raw.items()}
     return {}

@@ -136,6 +136,21 @@ a.cite:hover { text-decoration: underline; }
 .region-row .rlabel { color: var(--muted); font-weight: 600; width: 26px; flex-shrink: 0; }
 .region-row .rperiod { color: var(--text); font-variant-numeric: tabular-nums; }
 @media (max-width: 560px) { .sum-art { width: 84px; height: 84px; } }
+/* tier-1 episode breakdown */
+.episodes { margin-top: 10px; border-top: 1px solid #2b2f3a; padding-top: 8px; }
+.ep-toggle { background: transparent; border: 0; color: var(--accent); cursor: pointer; font-size: 12.5px; font-weight: 600; padding: 2px 0; }
+.ep-toggle:hover { text-decoration: underline; }
+.ep-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.ep-item { background: #0c0e14; border-radius: 8px; padding: 8px 10px; border-left: 2px solid var(--unit-color, #2b2f3a); }
+.ep-key { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 3px; }
+.ep-item .answer-text { font-size: 12.5px; }
+/* tier-3 unit overview */
+.unit-overview { background: linear-gradient(180deg, #1b1f2b, var(--card)); border-radius: 10px; border-left: 4px solid var(--unit-color, #888); padding: 12px 14px; margin-bottom: 4px; }
+.unit-overview .uo-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+.unit-overview .uo-head .usym { width: 24px; height: 24px; object-fit: contain; }
+.unit-overview .answer-text { font-size: 13px; }
+/* markdown ## / ### section headings inside summaries */
+.answer-text h2, .answer-text h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 10px 0 3px; }
 .sum-body .answer-text { font-size: 13.5px; line-height: 1.55; }
 /* inline color-coded entity mentions (fandom-wiki style) */
 .ent { font-weight: 600; white-space: nowrap; }
