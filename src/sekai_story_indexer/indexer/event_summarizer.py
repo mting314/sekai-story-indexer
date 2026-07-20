@@ -23,6 +23,10 @@ _PROMPT = (
     "Summarize this Project Sekai event story in 1-2 short paragraphs. Focus on "
     "plot progression and character development; name the characters involved. "
     "Do not invent anything not in the text.\n\n"
+    "Output ONLY the finished summary as plain prose. Do NOT include headings, "
+    "numbered steps, bullet points, outlines, draft notes, or labels such as "
+    "'Paragraph 1', 'Refine and Polish', or 'Draft'. Do NOT describe your process "
+    "— write the summary directly.\n\n"
     "Event: {name}  (unit: {unit})\n\nStory:\n{body}\n\nSummary:"
 )
 
@@ -33,10 +37,19 @@ def _summarize_text(name: str, unit: str, body: str, model: str) -> str:
 
     client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
     prompt = _PROMPT.format(name=name, unit=UNIT_NAMES.get(unit, unit), body=body[:200_000])
+    # Disable "thinking" so the whole output budget goes to the visible answer.
+    # Gemini-3/2.5 flash otherwise spends tokens on internal planning and either
+    # leaks scaffolding ("Paragraph 1:", "Refine and Polish") into the text or
+    # truncates the summary mid-sentence. thinking_budget=0 fixes both.
+    kwargs: dict = {"temperature": 0.2, "max_output_tokens": 2048}
+    try:
+        kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
+    except Exception:  # older google-genai without ThinkingConfig
+        pass
     resp = client.models.generate_content(
         model=model,
         contents=prompt,
-        config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=2048),
+        config=types.GenerateContentConfig(**kwargs),
     )
     return (resp.text or "").strip()
 
