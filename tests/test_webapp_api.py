@@ -265,3 +265,16 @@ def test_hierarchical_summaries_empty_when_cache_absent(client, tmp_path, monkey
     data = client.get("/api/hierarchical-summaries").json()
     assert data["roots"] == []
     assert data["counts"] == {"events": 0, "episodes": 0, "parts": 0}
+
+
+def test_episode_raw_endpoint(client):
+    """Raw transcript endpoint returns the H1 title + full text from the story tree."""
+    data = client.get("/api/episode-raw?arc=0002-marionette&episode=01_disappearance").json()
+    assert data["title"] == "1. The Captive Marionette"
+    assert "Kanade" in data["text"]
+    assert "# 1. The Captive Marionette" not in data["text"]  # H1 pulled into title, not duplicated
+
+
+def test_episode_raw_rejects_path_traversal(client):
+    data = client.get("/api/episode-raw?arc=../../etc&episode=passwd").json()
+    assert data["text"] == ""
