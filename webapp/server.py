@@ -334,12 +334,63 @@ def _can_generate_over(result: dict) -> bool:
     )
 
 
+def _best_supporting_line(excerpt: str, answer: str) -> str:
+    """The line in a cited scene most relevant to the answer — pins WHERE a claim
+    came from (the UI highlights it in the excerpt), instead of the whole episode."""
+    from sekai_story_indexer.query.local import tokenize
+
+    atoks = set(tokenize(answer))
+    best, best_overlap = "", 0
+    for ln in (excerpt or "").splitlines():
+        s = ln.strip()
+        if not s or s.startswith("#"):
+            continue
+        overlap = len(atoks & set(tokenize(s)))
+        if overlap > best_overlap:
+            best, best_overlap = s, overlap
+    return best
+
+
+def _finalize_citations(nl: str, citations: list[dict]) -> tuple[str, list[dict]]:
+    """Keep only the citations the answer actually references, in first-cited order,
+    renumber them contiguously, rewrite the answer's [n], and pin each kept citation
+    to its most-relevant supporting line. Leaves things unchanged if the model cited
+    nothing resolvable (so we never blank the sources)."""
+    refs: list[int] = []
+    for m in re.findall(r"\[(\d+)\]", nl):
+        r = int(m)
+        if r not in refs:
+            refs.append(r)
+    by_ref = {c.get("ref"): c for c in citations}
+    remap: dict[int, int] = {}
+    kept: list[dict] = []
+    for old in refs:
+        c = by_ref.get(old)
+        if c is None:
+            continue
+        remap[old] = len(kept) + 1
+        c = {**c, "ref": remap[old]}
+        pinned = _best_supporting_line(c.get("excerpt", ""), nl)
+        if pinned:
+            c["quote"] = pinned
+        kept.append(c)
+    if not kept:
+        return nl, citations  # model didn't cite resolvably -> don't strip sources
+    nl2 = re.sub(r"\[(\d+)\]", lambda m: f"[{remap[int(m.group(1))]}]"
+                 if int(m.group(1)) in remap else "", nl)
+    return nl2, kept
+
+
 def _apply_generated_answer(result: dict, nl: str) -> None:
+    nl, kept = _finalize_citations(nl, result.get("citations") or [])
     result["answer"] = nl
-    result["answer_parts"] = (
-        [{"type": "text", "text": nl}]
-        + [p for p in result.get("answer_parts", []) if p.get("type") == "quote"]
-    )
+    result["citations"] = kept
+    # prose + a supporting-quote block per cited source (the exact line, [ref]).
+    parts: list[dict] = [{"type": "text", "text": nl}]
+    for c in kept:
+        if c.get("quote"):
+            parts.append({"type": "quote", "ref": c["ref"], "text": c["quote"]})
+    result["answer_parts"] = parts
     result["generated"] = True
 
 
@@ -579,9 +630,16 @@ def _summarize_intercept(question: str) -> dict | None:
 
 
 def _with_focus(result: dict, focus: Focus | None) -> dict:
-    """Attach the current focus to a response so the UI chip reflects it."""
+    """Attach the current focus to a response so the UI chip reflects it, enriched
+    with the focus event's unit + nickname (for the chip's icon/label)."""
     if focus and (focus.arcs or focus.character_id):
-        result = {**result, "focus": focus.as_dict()}
+        fd = focus.as_dict()
+        if focus.arcs:
+            ev = next((e for e in load_events() if e.get("arc_slug") == focus.arcs[0]), None)
+            if ev:
+                fd["unit"] = ev.get("unit")
+                fd["nickname"] = ev.get("nickname")
+        result = {**result, "focus": fd}
     return result
 
 

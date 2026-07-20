@@ -186,3 +186,26 @@ def test_session_focus_resets_on_topic_switch(client, monkeypatch):
     r = client.post("/api/query", json={"question": "What happens in mafu1?", "session_id": "t-switch"})
     assert r.json()["scope"]["arc_id"] == "0002-marionette"
     assert r.json().get("focus", {}).get("arcs") == ["0002-marionette"]
+
+
+def test_finalize_citations_keeps_only_referenced_and_renumbers():
+    from webapp import server
+    cits = [
+        {"ref": i, "arc_id": "0188-x", "excerpt": f"# ep{i}\n\nline about topic {i}\n"}
+        for i in range(1, 9)
+    ]
+    nl = "She reaches out to them [8]. Earlier she hesitated [3]."
+    nl2, kept = server._finalize_citations(nl, cits)
+    assert [c["ref"] for c in kept] == [1, 2]  # renumbered in first-cited order
+    assert kept[0]["arc_id"] == "0188-x"
+    assert "[1]" in nl2 and "[2]" in nl2 and "[8]" not in nl2 and "[3]" not in nl2
+    # each kept citation pins a supporting line from its own excerpt
+    assert kept[0]["quote"].startswith("line about topic 8")
+
+
+def test_finalize_citations_noop_when_nothing_cited():
+    from webapp import server
+    cits = [{"ref": 1, "arc_id": "a", "excerpt": "x"}]
+    nl = "An answer with no citations."
+    nl2, kept = server._finalize_citations(nl, cits)
+    assert nl2 == nl and kept == cits  # don't blank sources when model didn't cite

@@ -695,10 +695,30 @@ function showFocusChip(focus) {
   if (!hint) return;
   const label = focus && focus.label;
   if (!label) return;
-  hint.style.removeProperty("--scope-color");
+
+  const u = (state.meta.units || {})[focus.unit] || {};
+  const ch = (state.meta.characters || {})[focus.character_id];
+  const color = u.color || (ch && ch.color) || "";
+  const icoStyle =
+    "width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:6px;object-fit:cover";
+  // unit symbol normally; a mixed event (or a unit with no symbol) shows the
+  // focus character's icon instead.
+  let icon = "";
+  if (focus.unit && focus.unit !== "mixed" && u.symbol) {
+    icon = `<img src="${u.symbol}" alt="" style="${icoStyle}" onerror="this.style.display='none'">`;
+  } else if (ch && ch.icon) {
+    icon = `<img src="${ch.icon}" alt="" style="${icoStyle}" onerror="this.style.display='none'">`;
+  }
+  const nick = focus.nickname
+    ? ` <span style="opacity:.7">[${escapeHtml(focus.nickname)}]</span>`
+    : "";
+  const sub = (u.name ? escapeHtml(u.name) + " · " : "") + escapeHtml(label);
+  if (color) hint.style.setProperty("--scope-color", color);
+  else hint.style.removeProperty("--scope-color");
   hint.innerHTML =
-    `<div class="reply-body"><div class="reply-title">In focus</div>` +
-    `<div class="reply-sub">${escapeHtml(label)}</div></div>` +
+    `<div class="reply-body"><div class="reply-title"${color ? ` style="color:${color}"` : ""}>` +
+    `${icon}In focus${nick}</div>` +
+    `<div class="reply-sub">${sub}</div></div>` +
     `<button class="reply-close" id="clear-focus" title="Clear focus" aria-label="Clear focus">×</button>`;
   hint.classList.remove("hidden");
   const btn = document.getElementById("clear-focus");

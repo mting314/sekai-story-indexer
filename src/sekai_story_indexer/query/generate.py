@@ -36,7 +36,12 @@ _STYLE = (
     "prose over headings and bullet lists for short answers.\n"
     "Cite every claim with the bracketed source NUMBER(S) shown in the evidence "
     "(e.g. [1], or [2][3]). Use only those numbers — never invent a citation or "
-    "cite an episode title."
+    "cite an episode title. Cite only the sources you actually draw from — do not "
+    "list sources you didn't use.\n"
+    "When you state something a character said, felt, or decided, ground it with a "
+    "SHORT direct quote copied verbatim from that evidence block, in double quotes, "
+    "immediately followed by its citation — e.g. she resolves to keep singing "
+    '("<exact line from the source>") [3]. Keep quotes brief (one line).'
 )
 
 
