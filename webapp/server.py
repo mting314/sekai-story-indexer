@@ -321,6 +321,29 @@ def hierarchical_summaries() -> dict:
     return data
 
 
+_SLUG_RE = re.compile(r"[A-Za-z0-9_-]+")
+
+
+@app.get("/api/episode-raw")
+def episode_raw(arc: str, episode: str) -> dict:
+    """Raw episode transcript (H1 title + scene text) for the sidebar, read from the
+    story tree. ``arc``/``episode`` are slugs; anything else is rejected (no path
+    traversal). Returns {title, text}; empty text when the file isn't found."""
+    if not (_SLUG_RE.fullmatch(arc) and _SLUG_RE.fullmatch(episode)):
+        return {"title": episode, "text": ""}
+    root = Path(os.environ.get("SEKAI_STORY_ROOT", "story"))
+    matches = list(root.glob(f"*/*/{arc}/{episode}.md"))
+    if not matches:
+        return {"title": episode, "text": ""}
+    raw = matches[0].read_text(encoding="utf-8")
+    title = episode
+    for line in raw.splitlines():
+        if line.startswith("# "):
+            title = line[2:].strip()
+            break
+    return {"title": title, "text": raw}
+
+
 class QueryRequest(BaseModel):
     question: str
     unit: str | None = None

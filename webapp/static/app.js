@@ -5,7 +5,7 @@ const state = {
   events: [], units: [], activeUnit: "all", scopeEventId: null, history: [],
   view: "timeline", summaries: null, meta: { characters: {}, units: {} }, entityRe: null,
   sessionId: null,
-  summaryMode: "event", hier: null, // "event" (per-event) | "hierarchical" (tiered tree)
+  hier: null, // cached /api/hierarchical-summaries tree
 };
 
 // Route external (sekai.best) art through the server image proxy so it loads even
@@ -84,124 +84,162 @@ function renderCurrentView() {
   else renderTimeline();
 }
 
-// The Summaries tab has two modes: per-event summaries (the local set) and the
-// hierarchical event -> episode -> part tree (from the full-engine cache).
+// Summaries tab: the hierarchical event -> episode tree (from the full-engine
+// cache). The redundant per-episode "part" tier is collapsed; each event carries
+// the rich album header, each episode links to its raw transcript.
 async function renderSummaries() {
-  const el = document.getElementById("summaries");
-  el.innerHTML = "";
-  el.appendChild(summaryModeToggle());
-  const body = document.createElement("div");
-  body.id = "sum-content";
-  el.appendChild(body);
-  if (state.summaryMode === "hierarchical") await renderHierarchical(body);
-  else await renderEventSummaries(body);
+  await renderHierarchical(document.getElementById("summaries"));
 }
 
-function summaryModeToggle() {
-  const bar = document.createElement("div");
-  bar.className = "sum-modes";
-  for (const [mode, label] of [["event", "Event"], ["hierarchical", "Hierarchical"]]) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "sum-mode" + (state.summaryMode === mode ? " active" : "");
-    b.textContent = label;
-    b.onclick = () => {
-      if (state.summaryMode === mode) return;
-      state.summaryMode = mode;
-      renderSummaries();
-    };
-    bar.appendChild(b);
-  }
-  return bar;
+function eventsByArc() {
+  const m = {};
+  for (const e of state.events || []) if (e.arc_slug) m[e.arc_slug] = e;
+  return m;
 }
 
-async function renderEventSummaries(el) {
-  if (state.summaries === null) {
-    el.innerHTML = '<p class="empty">Loading…</p>';
-    [state.summaries, state.unitSummaries] = await Promise.all([
-      fetch("/api/summaries").then((r) => r.json()),
-      fetch("/api/unit-summaries").then((r) => r.json()).catch(() => ({})),
-    ]);
-  }
-  const rows = state.summaries.filter(
-    (s) => state.activeUnit === "all" || s.unit === state.activeUnit
-  );
-  if (!rows.length) {
-    el.innerHTML =
-      '<p class="empty">No event summaries yet — run the summarizer (see README).</p>';
-    return;
-  }
-  el.innerHTML = "";
-  const list = document.createElement("div");
-  list.className = "sum-list";
-  // Tier-3 unit overview at the top when a single unit is selected.
-  const us = (state.unitSummaries || {})[state.activeUnit];
-  if (state.activeUnit !== "all" && us && us.summary) list.appendChild(unitOverviewCard(us));
-  for (const s of rows) list.appendChild(summaryCard(s));
-  el.appendChild(list);
-}
+const arcOfEvent = (nodeId) => String(nodeId).replace(/^event:/, "");
+const episodeNumber = (slug) => {
+  const m = /^(\d+)/.exec(String(slug || ""));
+  return m ? String(parseInt(m[1], 10)) : String(slug || "");
+};
 
-// Hierarchical tree: event -> episode -> part, each node expandable; nodes with a
-// summary render their sections inline on expand. Data from /api/hierarchical-summaries.
 async function renderHierarchical(el) {
   if (state.hier === null) {
     el.innerHTML = '<p class="empty">Loading…</p>';
     state.hier = await fetch("/api/hierarchical-summaries").then((r) => r.json()).catch(() => null);
   }
   const data = state.hier;
-  if (!data || !data.roots || !data.roots.length) {
+  const roots = (data && data.roots) || [];
+  const evByArc = eventsByArc();
+  const visible = roots.filter((rid) => {
+    if (state.activeUnit === "all") return true;
+    const ev = evByArc[arcOfEvent(rid)];
+    return ev && ev.unit === state.activeUnit;
+  });
+  if (!visible.length) {
     el.innerHTML =
-      '<p class="empty">No hierarchical summaries yet — run <code>indexer ingest ' +
-      "--summaries hierarchical</code> (or the sample generator) to populate " +
+      '<p class="empty">No hierarchical summaries yet — run ' +
+      "<code>indexer ingest --summaries hierarchical</code> to populate " +
       "<code>summaries_cache.json</code>.</p>";
     return;
   }
   el.innerHTML = "";
-  const c = data.counts || {};
-  const head = document.createElement("div");
-  head.className = "hier-counts";
-  head.textContent = `${c.events || 0} events · ${c.episodes || 0} episodes · ${c.parts || 0} parts`;
-  el.appendChild(head);
-  const tree = document.createElement("div");
-  tree.className = "hier-tree";
-  for (const rootId of data.roots) tree.appendChild(hierNode(rootId, data, 0));
-  el.appendChild(tree);
+  const list = document.createElement("div");
+  list.className = "sum-list";
+  for (const rid of visible) list.appendChild(hierEventCard(rid, data, evByArc));
+  el.appendChild(list);
 }
 
-function hierNode(nodeId, data, depth) {
+// One event = a collapsible album card (rich header) -> event summary + episodes.
+function hierEventCard(nodeId, data, evByArc) {
   const node = data.nodes[nodeId];
-  const wrap = document.createElement("div");
-  wrap.className = `hier-node hier-${node.kind}`;
-  const childIds = node.children || [];
-  const summary = node.summaryId ? data.summaries[node.summaryId] : null;
-  const hasBody = Boolean(childIds.length || summary);
+  const arc = arcOfEvent(nodeId);
+  const ev = evByArc[arc] || { name: node.title, unit: "mixed" };
+  const u = state.meta.units[ev.unit] || {};
+  const card = document.createElement("div");
+  card.className = "sum-card";
+  card.style.setProperty("--unit-color", u.color || "#888");
 
+  const sym = u.symbol
+    ? `<img class="usym" src="${u.symbol}" alt="" onerror="this.style.display='none'">`
+    : "";
+  const nick = ev.nickname ? `<span class="nick">${escapeHtml(ev.nickname)}</span>` : "";
+  const key = ev.is_key_story ? '<span class="keytag" title="Key story">★</span>' : "";
   const head = document.createElement("button");
   head.type = "button";
-  head.className = "hier-head";
-  head.style.paddingLeft = `${8 + depth * 16}px`;
+  head.className = "sum-head";
   head.innerHTML =
-    `<span class="hier-chev">${hasBody ? "▸" : "·"}</span>` +
-    `<span class="hier-kind">${node.kind}</span>` +
-    `<span class="hier-label">${escapeHtml(node.label || node.title || nodeId)}</span>`;
+    `${sym}<span class="sum-date">${fmtDate(ev.started_at)}</span>${nick}` +
+    `<span class="sum-name">${escapeHtml(ev.name || node.title)}</span>${key}` +
+    `<span class="chev">▸</span>`;
+
+  const body = document.createElement("div");
+  body.className = "sum-body";
+  const inner = document.createElement("div");
+  inner.className = "sum-inner";
+  body.appendChild(inner);
+
+  head.addEventListener("click", () => {
+    const open = card.classList.toggle("open");
+    head.setAttribute("aria-expanded", String(open));
+    if (open && !inner.dataset.filled) {
+      inner.dataset.filled = "1";
+      inner.appendChild(eventHero(ev, node));
+      const summary = node.summaryId ? data.summaries[node.summaryId] : null;
+      if (summary) inner.appendChild(hierSummary(summary));
+      const eps = (node.children || [])
+        .map((id) => data.nodes[id])
+        .filter((n) => n && n.kind === "episode");
+      if (eps.length) {
+        const wrap = document.createElement("div");
+        wrap.className = "hier-episodes";
+        for (const ep of eps) wrap.appendChild(hierEpisode(ep, data, arc));
+        inner.appendChild(wrap);
+      }
+    }
+  });
+  card.appendChild(head);
+  card.appendChild(body);
+  return card;
+}
+
+// One episode: "Episode N" (collapsible summary) + a link to its raw transcript.
+// The redundant single "part" child is collapsed into the episode summary.
+function hierEpisode(node, data, arc) {
+  const num = episodeNumber(node.episodeName);
+  const wrap = document.createElement("div");
+  wrap.className = "hier-ep";
+
+  const head = document.createElement("div");
+  head.className = "hier-ep-head";
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "hier-ep-toggle";
+  toggle.innerHTML = `<span class="hier-chev">▸</span>Episode ${escapeHtml(num)}`;
+  const link = document.createElement("a");
+  link.href = "#";
+  link.className = "hier-ep-transcript";
+  link.textContent = "📄 transcript";
+  link.onclick = (e) => {
+    e.preventDefault();
+    openTranscript(arc, node.episodeName, num);
+  };
+  head.appendChild(toggle);
+  head.appendChild(link);
   wrap.appendChild(head);
 
   const body = document.createElement("div");
-  body.className = "hier-body hidden";
+  body.className = "hier-ep-body hidden";
   wrap.appendChild(body);
 
-  head.onclick = () => {
-    const nowHidden = body.classList.toggle("hidden"); // toggle() -> true when 'hidden' is now set
-    head.querySelector(".hier-chev").textContent = hasBody ? (nowHidden ? "▸" : "▾") : "·";
-    if (!body.dataset.filled && hasBody) {
-      if (summary) body.appendChild(hierSummary(summary));
-      for (const cid of childIds) body.appendChild(hierNode(cid, data, depth + 1));
+  // episode-tier summary, or the single part's summary (collapse the redundant tier)
+  let summary = node.summaryId ? data.summaries[node.summaryId] : null;
+  if (!summary) {
+    const part = (node.children || [])
+      .map((id) => data.nodes[id])
+      .find((n) => n && n.kind === "part" && n.summaryId);
+    if (part) summary = data.summaries[part.summaryId];
+  }
+  toggle.addEventListener("click", () => {
+    const nowHidden = body.classList.toggle("hidden");
+    toggle.querySelector(".hier-chev").textContent = nowHidden ? "▸" : "▾";
+    if (!body.dataset.filled) {
       body.dataset.filled = "1";
+      body.appendChild(summary ? hierSummary(summary) : emptyNote("No episode summary."));
     }
-  };
+  });
   return wrap;
 }
 
+function emptyNote(text) {
+  const p = document.createElement("p");
+  p.className = "empty";
+  p.textContent = text;
+  return p;
+}
+
+// Summary sections: markdown + character coloring/icons (decorateNames), since the
+// hierarchical summaries carry no inline {char_id} tags.
 function hierSummary(summary) {
   const box = document.createElement("div");
   box.className = "hier-summary";
@@ -213,71 +251,72 @@ function hierSummary(summary) {
     const c = document.createElement("div");
     c.className = "answer-text";
     c.innerHTML = renderMarkdown(summary.sections[label] || "");
+    decorateNames(c, new Set());
     box.appendChild(c);
   }
   return box;
 }
 
-function unitOverviewCard(us) {
-  const u = state.meta.units[state.activeUnit] || {};
-  const card = document.createElement("div");
-  card.className = "unit-overview";
-  card.style.setProperty("--unit-color", u.color || "#888");
-  const sym = u.symbol
-    ? `<img class="usym" src="${u.symbol}" alt="" onerror="this.style.display='none'">`
+// Album-hero header (art + unit + focus char + song), salvaged from the former
+// event-summary card so the hierarchical view keeps the rich context.
+function eventHero(ev, node) {
+  const u = state.meta.units[ev.unit] || {};
+  const fc = state.meta.characters[ev.focus_character_id];
+  const hero = document.createElement("div");
+  hero.className = "sum-hero";
+  const artSources = [ev.jacket_url, ev.logo_url, u.symbol].filter(Boolean).map(proxied);
+  const artHtml = artSources.length
+    ? `<img class="sum-art" src="${artSources[0]}" alt="" ` +
+      `data-fallbacks="${escapeHtml(artSources.slice(1).join("|"))}" ` +
+      `onerror="var f=(this.dataset.fallbacks||'').split('|').filter(Boolean);` +
+      `if(f.length){this.src=f.shift();this.dataset.fallbacks=f.join('|');}` +
+      `else{this.closest('.sum-hero').classList.add('no-art');}">`
     : "";
-  const head = `<div class="uo-head">${sym}<span style="color:${u.color}">${escapeHtml(u.name || "")}</span> — story so far</div>`;
-  const body = document.createElement("div");
-  body.className = "answer-text";
-  body.innerHTML = renderMarkdown(us.summary);
-  card.innerHTML = head;
-  card.appendChild(body);
-  return card;
+  const rows = [`<div class="hero-title">${escapeHtml(ev.name || (node && node.title) || "")}</div>`];
+  const badges = [];
+  if (u.name) {
+    badges.push(
+      `<span class="hero-unit" style="color:${u.color}">` +
+        (u.symbol ? `<img src="${u.symbol}" alt="" onerror="this.style.display='none'">` : "") +
+        `${escapeHtml(u.name)}</span>`
+    );
+  }
+  if (ev.is_key_story) badges.push('<span class="hero-key">★ key story</span>');
+  if (badges.length) rows.push(`<div class="hero-row">${badges.join("")}</div>`);
+  if (fc) {
+    rows.push(
+      `<div class="hero-row"><span class="hero-focus"><img src="${fc.icon}" alt="" ` +
+        `onerror="this.style.display='none'"><b style="color:${fc.color}">${escapeHtml(fc.en)}</b>` +
+        `</span><span class="hero-label">focus</span></div>`
+    );
+  }
+  const songHtml = ev.song_title ? `<div class="sum-song">🎵 ${escapeHtml(ev.song_title)}</div>` : "";
+  const artCol = artHtml || songHtml ? `<div class="sum-artcol">${artHtml}${songHtml}</div>` : "";
+  hero.innerHTML = artCol + `<div class="sum-info">${rows.join("")}${regionPeriods(ev.regions)}</div>`;
+  return hero;
 }
 
-// Collapsed event card: unit symbol + accent color, date, nickname, name.
-// Click to expand -> focus character, duration, focus song, decorated summary.
-function summaryCard(s) {
-  const u = state.meta.units[s.unit] || {};
-  const card = document.createElement("div");
-  card.className = "sum-card";
-  card.style.setProperty("--unit-color", u.color || "#888");
-
-  const sym = u.symbol
-    ? `<img class="usym" src="${u.symbol}" alt="" onerror="this.style.display='none'">`
-    : "";
-  const nick = s.nickname ? `<span class="nick">${escapeHtml(s.nickname)}</span>` : "";
-  const key = s.is_key_story ? '<span class="keytag" title="Key story">★</span>' : "";
-
-  const head = document.createElement("button");
-  head.type = "button";
-  head.className = "sum-head";
-  head.innerHTML =
-    `${sym}<span class="sum-date">${fmtDate(s.started_at)}</span>${nick}` +
-    `<span class="sum-name">${escapeHtml(s.name)}</span>${key}` +
-    `<span class="chev">▸</span>`;
-
-  // Animated expand/collapse: the body is a grid that transitions 0fr -> 1fr;
-  // the inner wrapper clips overflow so height animates smoothly.
-  const body = document.createElement("div");
-  body.className = "sum-body";
-  const inner = document.createElement("div");
-  inner.className = "sum-inner";
-  body.appendChild(inner);
-
-  head.addEventListener("click", () => {
-    const open = card.classList.toggle("open");
-    head.setAttribute("aria-expanded", String(open));
-    if (open && !inner.dataset.filled) {
-      inner.appendChild(summaryBody(s));
-      inner.dataset.filled = "1";
-    }
-  });
-
-  card.appendChild(head);
-  card.appendChild(body);
-  return card;
+// Open the right sidebar with an episode's raw transcript (fetched on demand).
+async function openTranscript(arc, episodeSlug, num) {
+  const sb = document.getElementById("sidebar");
+  document.getElementById("sb-title").textContent = `Episode ${num}`;
+  document.getElementById("sb-sub").textContent = "raw transcript";
+  const el = document.getElementById("sb-body");
+  el.innerHTML = '<p class="empty">Loading…</p>';
+  sb.classList.remove("hidden");
+  const data = await fetch(
+    `/api/episode-raw?arc=${encodeURIComponent(arc)}&episode=${encodeURIComponent(episodeSlug)}`
+  ).then((r) => r.json()).catch(() => null);
+  if (!data || !data.text) {
+    el.innerHTML = '<p class="empty">Transcript unavailable.</p>';
+    return;
+  }
+  document.getElementById("sb-title").textContent = data.title || `Episode ${num}`;
+  el.innerHTML = renderMarkdown(data.text);
+  decorateNames(el, new Set());
+  el.scrollTop = 0;
 }
+
 
 // Per-server release windows, in display order, with region flag + label.
 const _REGIONS = [
@@ -303,102 +342,6 @@ function regionPeriods(regions) {
   return `<div class="region-block"><div class="region-head">Event period</div>${rows.join("")}</div>`;
 }
 
-// Album-hero header: large art on the left, topline info + per-region periods on
-// the right; the decorated summary prose below.
-function summaryBody(s) {
-  const frag = document.createDocumentFragment();
-  const u = state.meta.units[s.unit] || {};
-  const fc = state.meta.characters[s.focus_character_id];
-
-  const hero = document.createElement("div");
-  hero.className = "sum-hero";
-
-  // Album art with a graceful fallback chain: song jacket -> event logo -> unit
-  // symbol. If the jacket fails to load (network/proxy hiccup), swap to the next
-  // source instead of blanking the art. `data-fallbacks` is a "|"-joined queue the
-  // onerror handler pops from; only after all fail do we mark the hero no-art.
-  const artSources = [s.jacket_url, s.logo_url, u.symbol].filter(Boolean).map(proxied);
-  const artHtml = artSources.length
-    ? `<img class="sum-art" src="${artSources[0]}" alt="" ` +
-      `data-fallbacks="${escapeHtml(artSources.slice(1).join("|"))}" ` +
-      `onerror="var f=(this.dataset.fallbacks||'').split('|').filter(Boolean);` +
-      `if(f.length){this.src=f.shift();this.dataset.fallbacks=f.join('|');}` +
-      `else{this.closest('.sum-hero').classList.add('no-art');}">`
-    : "";
-
-  const rows = [`<div class="hero-title">${escapeHtml(s.name)}</div>`];
-  const badges = [];
-  if (u.name) {
-    badges.push(
-      `<span class="hero-unit" style="color:${u.color}">` +
-        (u.symbol ? `<img src="${u.symbol}" alt="" onerror="this.style.display='none'">` : "") +
-        `${escapeHtml(u.name)}</span>`
-    );
-  }
-  if (s.is_key_story) badges.push('<span class="hero-key">★ key story</span>');
-  if (badges.length) rows.push(`<div class="hero-row">${badges.join("")}</div>`);
-  if (fc) {
-    rows.push(
-      `<div class="hero-row"><span class="hero-focus"><img src="${fc.icon}" alt="" ` +
-        `onerror="this.style.display='none'"><b style="color:${fc.color}">${escapeHtml(fc.en)}</b>` +
-        `</span><span class="hero-label">focus</span></div>`
-    );
-  }
-
-  // Album art + song title stacked together on the left.
-  const songHtml = s.song_title
-    ? `<div class="sum-song">🎵 ${escapeHtml(s.song_title)}</div>`
-    : "";
-  const artCol = artHtml || songHtml ? `<div class="sum-artcol">${artHtml}${songHtml}</div>` : "";
-
-  hero.innerHTML =
-    artCol + `<div class="sum-info">${rows.join("")}${regionPeriods(s.regions)}</div>`;
-  frag.appendChild(hero);
-
-  const text = document.createElement("div");
-  text.className = "answer-text";
-  text.innerHTML = renderMarkdown(s.summary);
-  decorateNames(text, new Set(s.characters || []));
-  frag.appendChild(text);
-
-  // Tier-1: lazy-loaded per-episode summaries.
-  if (s.episode_count > 0) {
-    const wrap = document.createElement("div");
-    wrap.className = "episodes";
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "ep-toggle";
-    btn.textContent = `▸ Episode breakdown (${s.episode_count})`;
-    const list = document.createElement("div");
-    list.className = "ep-list hidden";
-    btn.addEventListener("click", async () => {
-      const nowHidden = list.classList.toggle("hidden");
-      btn.textContent = `${nowHidden ? "▸" : "▾"} Episode breakdown (${s.episode_count})`;
-      if (!list.dataset.filled) {
-        list.dataset.filled = "1";
-        list.innerHTML = '<p class="empty">Loading…</p>';
-        const eps = await fetch(`/api/episodes?arc=${encodeURIComponent(s.arc_id)}`)
-          .then((r) => r.json())
-          .catch(() => []);
-        list.innerHTML = "";
-        for (const ep of eps) {
-          const d = document.createElement("div");
-          d.className = "ep-item";
-          const md = document.createElement("div");
-          md.className = "answer-text";
-          md.innerHTML = renderMarkdown(ep.summary);
-          d.innerHTML = `<div class="ep-key">Episode ${escapeHtml(ep.episode)}</div>`;
-          d.appendChild(md);
-          list.appendChild(d);
-        }
-      }
-    });
-    wrap.appendChild(btn);
-    wrap.appendChild(list);
-    frag.appendChild(wrap);
-  }
-  return frag;
-}
 
 function fmtDateLong(ms) {
   if (!ms) return "?";
