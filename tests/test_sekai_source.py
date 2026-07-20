@@ -25,7 +25,8 @@ from sekai_story_indexer.source.transform import (
 
 def test_slugify_ascii_and_japanese():
     assert slugify("Grow, Glorious!") == "grow-glorious"
-    assert slugify("咲きたい！") == ""  # non-ascii dropped
+    assert slugify("咲きたい！") == "saki-tai"
+    assert slugify("雨上がりのステップ") == "ameagari-no-suteppu"
     assert slugify("VBS Live 2024") == "vbs-live-2024"
 
 
@@ -33,7 +34,7 @@ def test_arc_and_episode_naming_is_zero_padded():
     assert arc_slug(151, "Grow Glorious") == "0151-grow-glorious"
     assert arc_slug(7, "") == "0007"
     assert episode_filename(5, "The Title") == "05_the-title.md"
-    assert episode_filename(12, "咲") == "12.md"
+    assert episode_filename(12, "咲") == "12_saki.md"
 
 
 def test_resolve_unit_by_db_field_and_characters():
@@ -290,3 +291,28 @@ def test_cross_unit_collab_is_not_a_focus_event():
     r = cat[0]
     assert r["is_focus_event"] is False
     assert r["nickname"] is None and r["focus_character"] == ""
+
+
+def test_backfill_story_tree(tmp_path: Path):
+    import json
+
+    from sekai_story_indexer.source.backfill_slugs import backfill_story_tree
+
+    story_root = tmp_path / "story"
+    ep_dir = story_root / "leo_need" / "event" / "0001"
+    ep_dir.mkdir(parents=True)
+    ep_file = ep_dir / "01.md"
+    ep_file.write_text("# 1. 雨上がりのステップ\n\n咲希: こんにちは", encoding="utf-8")
+
+    index_file = tmp_path / "events_index.json"
+    index_file.write_text(
+        json.dumps([{"event_id": 1, "name": "雨上がりのステップ", "arc_slug": "0001"}], ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    stats = backfill_story_tree(story_root, index_file, tmp_path / "story_order.yaml")
+    assert stats["dirs_renamed"] == 1
+    assert stats["files_renamed"] == 1
+    assert (
+        story_root / "leo_need" / "event" / "0001-ameagari-no-suteppu" / "01_ameagari-no-suteppu.md"
+    ).exists()
