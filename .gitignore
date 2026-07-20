@@ -236,3 +236,4 @@ web/summary-reader-production/data/
 /story/
 /events_index.json
 /story_order.yaml
+chat_log.jsonl
