@@ -126,8 +126,15 @@ def build_catalog(
             music=music_by_event.get(event["id"]),
         )
         units = _focus_units(event["id"], event_card_ids, cards_by_id)
+        # A solo focus event: a marathon/CC with exactly one featured unit, whose
+        # banner character actually belongs to that unit. The unit-membership check
+        # excludes Virtual Singers (who headline some events, e.g. New Year, but
+        # never get a solo focus event) and guards against banner/unit mismatches.
+        focus_unit = next(iter(units)) if len(units) == 1 else None
         rec["is_focus_event"] = (
-            rec["event_type"] in ("marathon", "cheerful_carnival") and len(units) == 1
+            rec["event_type"] in ("marathon", "cheerful_carnival")
+            and focus_unit is not None
+            and CHARACTER_ID_TO_UNIT.get(rec["focus_character_id"]) == focus_unit
         )
         if not rec["is_focus_event"]:  # not a solo focus -> no focus attribution
             rec["focus_character_id"] = 0

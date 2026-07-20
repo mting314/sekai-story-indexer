@@ -353,3 +353,25 @@ def test_cheerful_carnival_single_unit_is_a_focus_event():
     r = cat[0]
     assert r["is_focus_event"] is True
     assert r["focus_character_id"] == 2 and r["nickname"] == "saki1"
+
+
+def test_virtual_singer_banner_is_not_a_focus_event():
+    # VS headline some events (e.g. New Year) but never get a solo focus event;
+    # the banner char must belong to the single focus unit. Regression for miku1.
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    events = [{"id": 40, "name": "New Year", "startAt": 1000, "eventType": "marathon"}]
+    stories = {40: {"id": 140, "eventId": 40, "assetbundleName": "ab", "eventStoryEpisodes": []}}
+    su = {140: [{"unit": "leo_need", "eventStoryUnitRelation": "main"}]}
+    banner = {40: 21}  # Miku (Virtual Singer) on the banner
+    event_card_ids = {40: [1, 2]}
+    cards_by_id = {
+        1: {"id": 1, "characterId": 21, "cardRarityType": "rarity_4"},  # Miku / VS (excluded)
+        2: {"id": 2, "characterId": 2, "cardRarityType": "rarity_4"},   # Saki / Leo/need
+    }
+    cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
+                        music_by_event={}, banner_char_by_event=banner,
+                        event_card_ids=event_card_ids, cards_by_id=cards_by_id)
+    r = cat[0]
+    assert r["is_focus_event"] is False
+    assert r["focus_character_id"] == 0 and r["nickname"] is None
