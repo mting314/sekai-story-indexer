@@ -19,7 +19,7 @@ candidate signals genuinely disagree:
 
 | Signal | What it really is | Fails on |
 |---|---|---|
-| `eventStories.bannerGameCharacterUnitId` | the banner **artwork** character | "Light Up the Fire" → Kohane art, but An's story |
+| `eventStories.bannerGameCharacterUnitId` | the master DB's tagged banner character | "Light Up the Fire" → tagged Kohane, but An got the new 4★ card and the story |
 | first `eventCards` entry / gacha pickups | featured **cards** (often several) | "アイドル・花里みのり" → first card is Toya, story is Minori's |
 | `eventDeckBonuses`, card `bonusRate` | the whole participating roster | flat across all featured characters |
 
@@ -53,14 +53,15 @@ Passing marathons/CCs are numbered per character in release order.
 ## Curated overrides — `focus_overrides.json`
 
 The song rule handles mixed/collab exclusion on its own. The remaining thing the
-master DB can't express is when the banner **artwork** character differs from the
-story **protagonist** — for those, a curated file maps `event_id → focus character
-id` (or `0` to force-exclude). Applied on top of the rule, so it survives
-re-fetches. Current entries:
+master DB can't express is when its tagged banner character
+(`bannerGameCharacterUnitId`) differs from the story **protagonist** (the character
+who debuts the event's new 4★ card) — for those, a curated file maps
+`event_id → focus character id` (or `0` to force-exclude). Applied on top of the
+rule, so it survives re-fetches. Current entries:
 
 | event | override | why |
 |---|---|---|
-| `97` Light Up the Fire | → An (10) | banner artwork is Kohane, but the story is An's |
+| `97` Light Up the Fire | → An (10) | `bannerGameCharacterUnitId` is tagged Kohane, but An debuts the event's new 4★ card and is the story protagonist |
 
 To fix a future mistake: add one line to `focus_overrides.json` and re-run
 `indexer fetch` (or regenerate `events_index.json`).
