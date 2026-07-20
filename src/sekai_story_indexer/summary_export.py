@@ -471,15 +471,10 @@ def _safe_episode_key(
     story_type: str,
     episode_name: str,
 ) -> tuple[Any, ...]:
-    try:
-        res = story_order.summary_episode_key(
-            arc_id,
-            story_type,
-            episode_name,
-        )
-        return (res[:2], res[2:])
-    except StoryOrderConfigError:
-        return ((9999, 9999), (0 if story_type == "Side" else 1, natural_sort_key(arc_id), natural_sort_key(episode_name)))
+    # summary_episode_key falls back to an end-of-list rank for unknown arcs and
+    # never raises, so no StoryOrderConfigError guard is needed here.
+    res = story_order.summary_episode_key(arc_id, story_type, episode_name)
+    return (res[:2], res[2:])
 
 
 def _safe_part_key(
