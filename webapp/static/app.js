@@ -458,6 +458,13 @@ function renderTimeline() {
     `&nbsp;·&nbsp; <span class="dot pending"></span> on timeline, indexing pending (${rows.length - nIndexed})`;
   el.appendChild(legend);
 
+  // Cards live in an inner wrapper so the rubber-band overscroll (see
+  // enableWheelInertia) can translate them past the edges without moving the
+  // sticky legend.
+  const inner = document.createElement("div");
+  inner.className = "tl-inner";
+  el.appendChild(inner);
+
   for (const e of rows) {
     const card = document.createElement("div");
     card.className =
@@ -494,43 +501,86 @@ function renderTimeline() {
         </div>
       </div>`;
     card.onclick = () => setScope(e);
-    el.appendChild(card);
+    inner.appendChild(card);
   }
   if (!rows.length) el.innerHTML = '<p class="empty">No events for this filter.</p>';
   enableWheelInertia(el);
+  if (el._resetOverscroll) el._resetOverscroll();
 }
 
 // Extra momentum for wheel + trackpad scrolling (more inertia / less friction
-// than the browser's native scroll). Wheel-only on purpose — no pointer capture,
-// so card clicks are untouched. Each tick is an impulse into `velocity` (px per
-// frame); a rAF loop integrates it and decays it by FRICTION, so the list keeps
-// gliding after input stops. CSS scroll-snap still settles it on a banner.
-// Tuning knobs: FRICTION (↑ = longer glide), WHEEL_GAIN (↑ = stronger push).
+// than the browser's native scroll) plus iOS-style rubber-band overscroll at the
+// top/bottom. Wheel-only on purpose — no pointer capture — so card clicks are
+// untouched.
+//
+// Two states, both driven by one rAF loop:
+//   • in-bounds: each wheel tick is an impulse into `velocity` (px/frame) that a
+//     loop integrates and decays by FRICTION, so the list keeps gliding after
+//     input stops.
+//   • past an edge: momentum/push spills into `over` (px past the edge) with
+//     diminishing resistance, and the `.tl-inner` wrapper is translated by it so
+//     you see the content pull past the edge. A spring pulls `over` back to 0
+//     with a force proportional to the distance pushed — the snap-back.
+//
+// Tuning knobs: FRICTION (↑ = longer glide), WHEEL_GAIN (↑ = stronger push),
+// RUBBER (↑ = looser/further overscroll), SPRING (↑ = snappier snap-back).
 function enableWheelInertia(el) {
   if (el._wheelInertia) return;
   el._wheelInertia = true;
 
   const reduce =
     window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reduce) return; // let native scroll handle it
+  if (reduce) {
+    el._resetOverscroll = () => {};
+    return; // let native scroll handle it
+  }
 
   const FRICTION = 0.96; // per-frame velocity decay — higher = more inertia
   const WHEEL_GAIN = 0.14; // fraction of a wheel delta added to velocity
   const MAX_V = 90; // cap so a hard flick can't teleport
+  const RUBBER = 0.35; // resistance converting motion into overscroll
+  const SPRING = 0.16; // per-frame spring-back of the overscroll offset
+  const MAX_OVER = 140; // hard cap on how far you can push past an edge
   const maxScroll = () => Math.max(0, el.scrollHeight - el.clientHeight);
-  const clamp = (v) => Math.max(0, Math.min(maxScroll(), v));
 
   let velocity = 0;
+  let over = 0; // signed px past an edge: >0 past bottom, <0 past top
+  let inner = null;
   let raf = 0;
 
+  function applyTransform() {
+    if (inner) inner.style.transform = over ? `translateY(${(-over).toFixed(2)}px)` : "";
+  }
+
   function frame() {
+    if (over !== 0) {
+      // Overscrolled: spring `over` back toward 0 (restoring force ∝ distance)
+      // and let any leftover momentum bleed off.
+      over *= 1 - SPRING;
+      if (Math.abs(over) < 0.3) over = 0;
+      velocity *= 0.8;
+      applyTransform();
+      raf = over !== 0 ? requestAnimationFrame(frame) : 0;
+      return;
+    }
     velocity *= FRICTION;
-    const next = clamp(el.scrollTop + velocity);
-    if (next === el.scrollTop) velocity = 0; // hit an edge
-    el.scrollTop = next;
-    if (Math.abs(velocity) > 0.4) {
-      raf = requestAnimationFrame(frame);
+    const next = el.scrollTop + velocity;
+    const max = maxScroll();
+    if (next < 0) {
+      over = Math.max(-MAX_OVER, over + next * RUBBER); // spill past the top
+      el.scrollTop = 0;
+      velocity = 0;
+      applyTransform();
+    } else if (next > max) {
+      over = Math.min(MAX_OVER, over + (next - max) * RUBBER); // spill past bottom
+      el.scrollTop = max;
+      velocity = 0;
+      applyTransform();
     } else {
+      el.scrollTop = next;
+    }
+    if (Math.abs(velocity) > 0.4 || over !== 0) raf = requestAnimationFrame(frame);
+    else {
       velocity = 0;
       raf = 0;
     }
@@ -544,11 +594,38 @@ function enableWheelInertia(el) {
       let d = e.deltaY;
       if (e.deltaMode === 1) d *= 16; // lines → px
       else if (e.deltaMode === 2) d *= el.clientHeight; // pages → px
-      velocity = Math.max(-MAX_V, Math.min(MAX_V, velocity + d * WHEEL_GAIN));
+      const max = maxScroll();
+      const atTop = el.scrollTop <= 0;
+      const atBottom = el.scrollTop >= max - 1;
+      if (over !== 0 || (atTop && d < 0) || (atBottom && d > 0)) {
+        // Push directly into overscroll, with resistance that stiffens the
+        // further you go, so it feels harder to push the more you push.
+        const resist = RUBBER / (1 + Math.abs(over) / 80);
+        over = Math.max(-MAX_OVER, Math.min(MAX_OVER, over + d * resist));
+        velocity = 0;
+        applyTransform();
+      } else {
+        velocity = Math.max(-MAX_V, Math.min(MAX_V, velocity + d * WHEEL_GAIN));
+      }
       if (!raf) raf = requestAnimationFrame(frame);
     },
     { passive: false }
   );
+
+  // Called after each render: re-capture the fresh inner wrapper and clear state
+  // (innerHTML was rebuilt, so any prior transform/offset is gone).
+  function reset() {
+    velocity = 0;
+    over = 0;
+    if (raf) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
+    inner = el.querySelector(".tl-inner");
+    if (inner) inner.style.transform = "";
+  }
+  el._resetOverscroll = reset;
+  reset();
 }
 
 function setScope(e) {
