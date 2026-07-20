@@ -369,6 +369,9 @@ def _structure_full_answer(answer: str) -> dict:
         return f"[{refs[arc]}]"
 
     text = _CIT_RE.sub(_repl, answer or "").strip()
+    # The engine wraps bits of prose/citations in backticks; strip them so the UI
+    # doesn't render them as blue code spans (these answers never contain code).
+    text = text.replace("`", "")
 
     citations = []
     for arc in order:
@@ -434,22 +437,40 @@ def _metadata_intercept(question: str) -> dict | None:
         return None
 
 
-def _resolve_focus_scope(req: QueryRequest) -> None:
+def _resolve_focus_scope(req: QueryRequest) -> dict | None:
     """If the question refers to an event by focus name/nickname, append the event's
-    real name to the question (so retrieval finds it) and scope to its event_id."""
+    real name to the question (so retrieval finds it) and scope to its event_id.
+    Returns the resolved event (for logging) or None."""
     try:
         from sekai_story_indexer.query.metadata import resolve_focus_reference
 
         ev = resolve_focus_reference(req.question, load_events(), _characters_meta())
         if not ev:
-            return
+            return None
         name, nick = ev.get("name"), ev.get("nickname")
         tag = f'"{name}"' + (f" [{nick}]" if nick else "")
         req.question = f"{req.question}\n\n(Note: this question refers to the event {tag}.)"
         if not req.event_id and ev.get("event_id"):
             req.event_id = ev["event_id"]
+        return ev
     except Exception:
-        return
+        return None
+
+
+# Chat log: one JSON line per turn (raw + condensed question, route taken, backend,
+# citation count) so we can see what was asked and which path answered it.
+_CHATLOG = Path(os.environ.get("SEKAI_CHAT_LOG", "chat_log.jsonl"))
+
+
+def _log_turn(rec: dict) -> None:
+    try:
+        import datetime
+
+        rec = {"ts": datetime.datetime.now(datetime.UTC).isoformat(), **rec}
+        with _CHATLOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
 
 
 _SUMMARIZE_RE = re.compile(r"\b(summar(?:y|ize|ise)|recap|overview|tl;?dr|synops)", re.IGNORECASE)
@@ -490,6 +511,9 @@ def _summarize_intercept(question: str) -> dict | None:
 def query(req: QueryRequest) -> dict:
     """Answer a question. Uses the local lexical engine by default (runs anywhere);
     set SEKAI_QUERY_BACKEND=full for the Google/Chroma RAG stack."""
+    raw = req.question
+    log: dict = {"question": raw, "history_len": len(req.history or [])}
+
     # Resolve follow-ups into a standalone question up front, so BOTH backends and
     # the intercepts see the full context (the full engine has no history of its own).
     if req.history:
@@ -499,25 +523,37 @@ def query(req: QueryRequest) -> dict:
             req.question = condense(req.question, req.history)
         except Exception:
             pass
+        if req.question != raw:
+            log["condensed"] = req.question
         req.history = []  # consumed -> no double-condense in _query_local
 
     # Pure identity/count/list focus-event questions -> deterministic answer.
     md = _metadata_intercept(req.question)
     if md is not None:
+        _log_turn({**log, "route": "metadata", "backend": md.get("backend"), "citations": len(md.get("citations") or [])})
         return md
     # "Summarize <event>" -> serve the pre-computed summary, not a raw-scene RAG dump.
     sm = _summarize_intercept(req.question)
     if sm is not None:
+        _log_turn({**log, "route": "summarize", "citations": len(sm.get("citations") or [])})
         return sm
     # Other content questions that REFER to an event by focus name/nickname -> resolve
     # to the event and point the RAG at it, then answer normally.
-    _resolve_focus_scope(req)
+    ev = _resolve_focus_scope(req)
+    if ev:
+        log["resolved_event"] = ev.get("arc_slug")
     if QUERY_BACKEND == "full":
-        return _query_full(req)
-    try:
-        return _query_local(req)
-    except Exception as exc:  # pragma: no cover - defensive
-        return {"answer": None, "error": f"local query failed: {exc}", "backend": "local"}
+        result = _query_full(req)
+    else:
+        try:
+            result = _query_local(req)
+        except Exception as exc:  # pragma: no cover - defensive
+            result = {"answer": None, "error": f"local query failed: {exc}", "backend": "local"}
+    _log_turn({
+        **log, "route": "rag", "backend": result.get("backend"),
+        "citations": len(result.get("citations") or []), "error": result.get("error"),
+    })
+    return result
 
 
 @app.get("/api/health")

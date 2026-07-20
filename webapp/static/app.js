@@ -439,7 +439,9 @@ function renderTimeline() {
       : "";
     const nick = e.nickname ? `<span class="nick">${e.nickname}</span>` : "";
     const song = e.song_title ? `<div class="song">🎵 ${e.song_title}</div>` : "";
-    const focus = e.focus_character ? `<div class="focus">★ ${e.focus_character}</div>` : "";
+    const fcInfo = state.meta.characters[e.focus_character_id];
+    const focusName = (fcInfo && fcInfo.en) || e.focus_character;
+    const focus = focusName ? `<div class="focus">★ ${focusName}</div>` : "";
     const status = e.indexed
       ? '<span class="status-dot indexed" title="Queryable in chat now"></span>'
       : '<span class="status-dot pending" title="On the timeline; chat-answerable after the next ingest"></span>';
