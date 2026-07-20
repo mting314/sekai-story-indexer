@@ -10,7 +10,7 @@ def _parent_ids(
 ) -> tuple[str, str, str]:
     # Tier-1 id is unit-qualified so the same event slug never collides across
     # units and so unit-scoped rollups have a stable key.
-    year_id = f"{unit}|{arc_id}"
+    year_id = f"{unit}|{arc_id}" if unit and unit != arc_id else arc_id
     episode_id = f"{year_id}|{story_type}|{episode_name}"
     part_id = f"{episode_id}|{part_name}"
     return year_id, episode_id, part_id
@@ -27,7 +27,7 @@ def episode_number_from_names(episode_name: str, part_name: str) -> int:
 
 
 def _story_type_for(content_type: str) -> str:
-    return "Main" if content_type == "main" else "Side"
+    return "Main" if content_type == "main" or content_type.startswith("第") else "Side"
 
 
 class StoryProcessor:
@@ -45,11 +45,22 @@ class StoryProcessor:
         parts = file_path.parts
         try:
             story_idx = parts.index("story")
-            unit = parts[story_idx + 1]
-            content_type = parts[story_idx + 2]
-            arc_id = parts[story_idx + 3]  # event slug / "main" — the Volume
-            ep_name = file_path.stem       # e.g. "05_the-title"
-            part_name = ep_name            # one file per episode; scenes split within
+            depth = len(parts) - 1 - story_idx
+            if depth >= 4:
+                unit = parts[story_idx + 1]
+                content_type = parts[story_idx + 2]
+                arc_id = parts[story_idx + 3]  # event slug / "main" — the Volume
+                ep_name = file_path.stem       # e.g. "05_the-title"
+                part_name = ep_name            # one file per episode; scenes split within
+            elif depth == 3:
+                unit = parts[story_idx + 1]
+                arc_id = parts[story_idx + 1]
+                content_type = parts[story_idx + 2]
+                ep_name = parts[story_idx + 2]
+                part_name = file_path.stem
+            else:
+                raise IndexError("unsupported path depth under story")
+
             story_type = _story_type_for(content_type)
 
             parent_year_id, parent_episode_id, parent_part_id = _parent_ids(

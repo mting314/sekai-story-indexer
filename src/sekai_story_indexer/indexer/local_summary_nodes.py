@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 from ..models.story import StoryMetadata, StoryNode
 
@@ -49,7 +50,16 @@ def _arc_units(story_root: Path) -> dict[str, str]:
 
 
 def _meta(**kw) -> StoryMetadata:
-    base = dict(story_type="Side", is_prose=True, scene_start=0, scene_end=0)
+    base = dict(
+        arc_id="",
+        episode_name="",
+        part_name="",
+        file_path="",
+        story_type="Side",
+        is_prose=True,
+        scene_start=0,
+        scene_end=0,
+    )
     base.update(kw)
     return StoryMetadata(**base)
 
@@ -59,7 +69,11 @@ def load_local_summary_nodes(story_root: Path) -> list[StoryNode]:
     events = _load("event_summaries.json", story_root)
     units = _load("unit_summaries.json", story_root)
     raw_index = _load("events_index.json", story_root)
-    index = {r.get("arc_slug"): r for r in raw_index} if isinstance(raw_index, list) else {}
+    index: dict[str, Any] = (
+        {r.get("arc_slug"): r for r in raw_index if isinstance(r, dict)}
+        if isinstance(raw_index, list)
+        else {}
+    )
     arc_unit = _arc_units(story_root)
 
     # chronological rank per arc (for story_order) when the index is available
@@ -70,7 +84,12 @@ def load_local_summary_nodes(story_root: Path) -> list[StoryNode]:
     }
 
     def unit_of(arc: str) -> str:
-        return index.get(arc, {}).get("unit") or arc_unit.get(arc, "mixed")
+        entry = index.get(arc)
+        if isinstance(entry, dict):
+            unit_val = entry.get("unit")
+            if unit_val:
+                return str(unit_val)
+        return str(arc_unit.get(arc, "mixed"))
 
     nodes: list[StoryNode] = []
 

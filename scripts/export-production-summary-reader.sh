@@ -4,7 +4,7 @@ set -euo pipefail
 cache_file="summaries_cache.json"
 output_dir="site/summary-reader-production"
 story_order_file="story_order.yaml"
-source_dir="web/summary-reader-production"
+source_dir="webapp/templates/summary-reader-production"
 port="8011"
 serve=0
 

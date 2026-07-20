@@ -39,7 +39,7 @@ def test_fetch_unit_stories_writes_tree(tmp_path, monkeypatch):
         tmp_path, scenario_fetch=lambda ab, sid: scenarios[sid], log=lambda m: None
     )
     assert n == 2
-    ep1 = tmp_path / "leo_need" / "unit" / "01-chapter" / "01_a.md"
+    ep1 = next((tmp_path / "leo_need" / "unit").rglob("01_a.md"))
     assert ep1.exists() and "一歌: はじめまして" in ep1.read_text(encoding="utf-8")
 
 

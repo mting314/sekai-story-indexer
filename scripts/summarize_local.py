@@ -108,8 +108,8 @@ def main() -> int:
         todo = todo[: args.limit]
 
     print(f"loading {MODEL_ID} ...", flush=True)
-    from mlx_lm import generate, load
-    from mlx_lm.sample_utils import make_sampler
+    from mlx_lm import generate, load  # pyrefly: ignore[missing-import]
+    from mlx_lm.sample_utils import make_sampler  # pyrefly: ignore[missing-import]
 
     model, tok = load(MODEL_ID)
     sampler = make_sampler(temp=0.3)
