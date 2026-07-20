@@ -500,79 +500,105 @@ function renderTimeline() {
   enableInertialScroll(el);
 }
 
-// Game-style scroll for the event list: grab-and-flick momentum (mouse) with a
-// snap-to-card settle, layered over the browser's native scroll + CSS snap
-// (which already handle wheel, trackpad, touch, and keyboard). Bound once per
-// container; re-running renderTimeline only swaps innerHTML, so the guard holds.
+// Game-style scroll for the event list (Project Sekai in-game feel): the mouse
+// wheel glides with momentum instead of jumping in discrete steps, a flick with
+// the mouse button carries inertia, and both settle by snapping the nearest
+// banner to the top. One eased animation loop drives everything toward a moving
+// `target` scroll offset; wheel/drag just push that target. Touch keeps its
+// native momentum (we don't hijack it). Bound once per container — re-running
+// renderTimeline only swaps innerHTML, so the guard holds.
 function enableInertialScroll(el) {
   if (el._inertiaBound) return;
   el._inertiaBound = true;
 
   const reduce =
     window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const SNAP_PAD = 34; // matches scroll-padding-top (clears the sticky legend)
+  if (reduce) return; // native scroll + CSS proximity snap only; no custom motion
 
-  // Snap the card whose top is nearest the scroll offset to the top of the view.
-  function snapToNearest() {
+  const SNAP_PAD = 34; // matches scroll-padding-top (clears the sticky legend)
+  const maxScroll = () => Math.max(0, el.scrollHeight - el.clientHeight);
+  const clamp = (v) => Math.max(0, Math.min(maxScroll(), v));
+
+  // Content-absolute top of the card nearest to scroll offset `pos` (minus the
+  // legend pad), so snapping lands a banner just below the sticky legend.
+  function nearestCardTop(pos) {
     const cards = el.querySelectorAll(".event-card");
-    if (!cards.length) return;
-    const contTop = el.getBoundingClientRect().top;
-    const ref = SNAP_PAD; // viewport-relative target line
+    if (!cards.length) return pos;
+    const base = el.scrollTop - el.getBoundingClientRect().top;
     let best = null;
     let bestDist = Infinity;
     for (const c of cards) {
-      const top = c.getBoundingClientRect().top - contTop;
-      const d = Math.abs(top - ref);
+      const top = c.getBoundingClientRect().top + base - SNAP_PAD;
+      const d = Math.abs(top - pos);
       if (d < bestDist) {
         bestDist = d;
-        best = c;
+        best = top;
       }
     }
-    if (!best) return;
-    const target = best.getBoundingClientRect().top - contTop + el.scrollTop - SNAP_PAD;
-    el.scrollTo({ top: Math.max(0, target), behavior: reduce ? "auto" : "smooth" });
+    return best == null ? pos : clamp(best);
   }
 
-  if (reduce) return; // native scroll + CSS proximity snap only; no flick inertia
-
-  let dragging = false;
-  let moved = false;
-  let startY = 0;
-  let startScroll = 0;
-  let lastY = 0;
-  let lastT = 0;
-  let vel = 0; // px per frame
+  let target = el.scrollTop;
   let raf = 0;
 
-  function stopInertia() {
+  function animate() {
+    const diff = target - el.scrollTop;
+    if (Math.abs(diff) < 0.5) {
+      el.scrollTop = target;
+      raf = 0;
+      return;
+    }
+    el.scrollTop += diff * 0.2; // ease toward target (~5 frames to settle)
+    raf = requestAnimationFrame(animate);
+  }
+  function startAnim() {
+    if (!raf) raf = requestAnimationFrame(animate);
+  }
+  function stopAnim() {
     if (raf) {
       cancelAnimationFrame(raf);
       raf = 0;
     }
   }
 
-  function inertia() {
-    vel *= 0.94; // friction
-    el.scrollTop += vel;
-    const atEdge = el.scrollTop <= 0 || el.scrollTop >= el.scrollHeight - el.clientHeight - 1;
-    if (Math.abs(vel) > 0.4 && !atEdge) {
-      raf = requestAnimationFrame(inertia);
-    } else {
-      raf = 0;
-      snapToNearest();
-    }
-  }
+  // ---- mouse wheel: momentum glide + snap-on-settle ----
+  let wheelTimer = 0;
+  el.addEventListener(
+    "wheel",
+    (e) => {
+      if (e.ctrlKey) return; // let pinch-zoom through
+      e.preventDefault();
+      if (!raf) target = el.scrollTop; // resync when starting from rest
+      let d = e.deltaY;
+      if (e.deltaMode === 1) d *= 16; // lines → px
+      else if (e.deltaMode === 2) d *= el.clientHeight; // pages → px
+      target = clamp(target + d);
+      startAnim();
+      clearTimeout(wheelTimer);
+      wheelTimer = setTimeout(() => {
+        target = nearestCardTop(target);
+        startAnim();
+      }, 110);
+    },
+    { passive: false }
+  );
+
+  // ---- mouse drag flick ----
+  let dragging = false;
+  let moved = false;
+  let startY = 0;
+  let startScroll = 0;
+  let samples = []; // recent {t, y} for release-velocity estimation
 
   el.addEventListener("pointerdown", (e) => {
-    // Only hijack mouse drags; touch/trackpad keep their native momentum.
-    if (e.pointerType !== "mouse" || e.button !== 0) return;
-    stopInertia();
+    if (e.pointerType !== "mouse" || e.button !== 0) return; // touch keeps native
+    stopAnim();
+    clearTimeout(wheelTimer);
     dragging = true;
     moved = false;
-    startY = lastY = e.clientY;
+    startY = e.clientY;
     startScroll = el.scrollTop;
-    lastT = e.timeStamp;
-    vel = 0;
+    samples = [{ t: e.timeStamp, y: e.clientY }];
     el.classList.add("dragging");
     try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
   });
@@ -580,11 +606,11 @@ function enableInertialScroll(el) {
   el.addEventListener("pointermove", (e) => {
     if (!dragging) return;
     if (Math.abs(e.clientY - startY) > 4) moved = true;
-    el.scrollTop = startScroll - (e.clientY - startY);
-    const dt = e.timeStamp - lastT || 16;
-    vel = (-(e.clientY - lastY) / dt) * 16; // normalize to ~per-frame px
-    lastY = e.clientY;
-    lastT = e.timeStamp;
+    el.scrollTop = clamp(startScroll - (e.clientY - startY));
+    // Trailing window so a quick flick still reads as a flick even if the pointer
+    // pauses for a frame before release.
+    samples.push({ t: e.timeStamp, y: e.clientY });
+    while (samples.length > 6) samples.shift();
   });
 
   function endDrag(e) {
@@ -592,8 +618,18 @@ function enableInertialScroll(el) {
     dragging = false;
     el.classList.remove("dragging");
     try { el.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
-    if (Math.abs(vel) > 0.6) inertia();
-    else snapToNearest();
+    // Release velocity from the last ~90ms of movement (px/frame @ ~16ms), then
+    // project momentum forward and snap to the nearest banner.
+    const end = samples[samples.length - 1];
+    let first = samples[0];
+    for (const s of samples) {
+      if (end.t - s.t <= 90) { first = s; break; }
+    }
+    const dt = end.t - first.t;
+    const resting = e.timeStamp - end.t > 90;
+    const vpf = dt > 0 && !resting ? (-(end.y - first.y) / dt) * 16 : 0;
+    target = nearestCardTop(clamp(el.scrollTop + vpf * 12));
+    startAnim();
   }
   el.addEventListener("pointerup", endDrag);
   el.addEventListener("pointercancel", endDrag);
