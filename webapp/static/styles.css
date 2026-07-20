@@ -72,16 +72,16 @@ main {
 .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .chip { padding: 5px 11px; border-radius: 999px; border: 1px solid #2b2f3a; background: transparent; color: var(--muted); cursor: pointer; font-size: 12.5px; }
 .chip.active { background: var(--accent); color: #04222b; border-color: var(--accent); font-weight: 600; }
-/* Game-style event list: a vertically-scrolling stack of banner tiles with
-   snap-to-card. Modeled on Project Sekai's in-game event list, where the banner
-   art is the visual anchor of each row. Scrolling is native — the browser/OS
-   momentum is the inertia (same approach as the SEKAI-Stories reference) — with
-   CSS scroll-snap giving the settle-on-a-card feel. */
+/* Game-style event list: a vertically-scrolling stack of banner tiles, with the
+   banner art as the visual anchor of each row (Project Sekai in-game style).
+   Extra scroll momentum/inertia is added in app.js (enableWheelInertia). CSS
+   scroll-snap is intentionally NOT used — with scroll-padding + snap-align:start
+   the browser reserves phantom scroll space past the last card (you could scroll
+   into blank space below the bottom), so we let scrolling end exactly at the
+   last card. */
 .timeline {
   display: flex; flex-direction: column; gap: 12px;
   max-height: 72vh; overflow-y: auto;
-  scroll-snap-type: y proximity;   /* settle on a card without trapping momentum */
-  scroll-padding-top: 34px;        /* clear the sticky legend when snapping */
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
@@ -95,7 +95,7 @@ main {
   position: relative; display: block; min-height: 88px; flex-shrink: 0;
   width: 100%; max-width: 340px; align-self: center;
   background: var(--card); border-radius: 14px; overflow: hidden; cursor: pointer;
-  border: 1px solid #ffffff10; scroll-snap-align: start;
+  border: 1px solid #ffffff10;
   transition: transform .15s ease, box-shadow .15s ease;
 }
 .event-card:hover { transform: translateY(-1px); box-shadow: 0 8px 22px #0007; }

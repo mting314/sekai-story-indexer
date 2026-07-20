@@ -497,6 +497,58 @@ function renderTimeline() {
     el.appendChild(card);
   }
   if (!rows.length) el.innerHTML = '<p class="empty">No events for this filter.</p>';
+  enableWheelInertia(el);
+}
+
+// Extra momentum for wheel + trackpad scrolling (more inertia / less friction
+// than the browser's native scroll). Wheel-only on purpose — no pointer capture,
+// so card clicks are untouched. Each tick is an impulse into `velocity` (px per
+// frame); a rAF loop integrates it and decays it by FRICTION, so the list keeps
+// gliding after input stops. CSS scroll-snap still settles it on a banner.
+// Tuning knobs: FRICTION (↑ = longer glide), WHEEL_GAIN (↑ = stronger push).
+function enableWheelInertia(el) {
+  if (el._wheelInertia) return;
+  el._wheelInertia = true;
+
+  const reduce =
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce) return; // let native scroll handle it
+
+  const FRICTION = 0.96; // per-frame velocity decay — higher = more inertia
+  const WHEEL_GAIN = 0.14; // fraction of a wheel delta added to velocity
+  const MAX_V = 90; // cap so a hard flick can't teleport
+  const maxScroll = () => Math.max(0, el.scrollHeight - el.clientHeight);
+  const clamp = (v) => Math.max(0, Math.min(maxScroll(), v));
+
+  let velocity = 0;
+  let raf = 0;
+
+  function frame() {
+    velocity *= FRICTION;
+    const next = clamp(el.scrollTop + velocity);
+    if (next === el.scrollTop) velocity = 0; // hit an edge
+    el.scrollTop = next;
+    if (Math.abs(velocity) > 0.4) {
+      raf = requestAnimationFrame(frame);
+    } else {
+      velocity = 0;
+      raf = 0;
+    }
+  }
+
+  el.addEventListener(
+    "wheel",
+    (e) => {
+      if (e.ctrlKey) return; // let pinch-zoom through
+      e.preventDefault();
+      let d = e.deltaY;
+      if (e.deltaMode === 1) d *= 16; // lines → px
+      else if (e.deltaMode === 2) d *= el.clientHeight; // pages → px
+      velocity = Math.max(-MAX_V, Math.min(MAX_V, velocity + d * WHEEL_GAIN));
+      if (!raf) raf = requestAnimationFrame(frame);
+    },
+    { passive: false }
+  );
 }
 
 function setScope(e) {
