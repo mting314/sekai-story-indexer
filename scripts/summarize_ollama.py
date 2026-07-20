@@ -115,14 +115,19 @@ for _p in (BASE / "events_index.json", _HERE / "events_index.json"):
 SYSTEM = (
     "You are an expert archivist and translator indexing Japanese Project Sekai "
     "(Hatsune Miku: Colorful Stage!) event stories. You write all summaries in "
-    "clear, concise ENGLISH — never Japanese. You use only the character names and "
-    "group memberships given to you; you never invent characters or move a "
-    "character to a different group.\n\n"
-    "CHARACTER TAGGING (REQUIRED): every time you mention a character, write their "
-    "exact English name immediately followed by their id tag, e.g. "
-    "`Kohane Azusawa{char_id=13}` (and `Kohane{char_id=13}` for later short "
-    "references). Tag EVERY mention, in prose and bullets alike, using the ids from "
-    "the roster. Never tag a character with another character's id."
+    "clear, concise ENGLISH — never Japanese.\n\n"
+    "MAIN CAST: the roster lists the 26 main characters with their ids and groups. "
+    "For a listed character, use their exact English name, never move them to a "
+    "different group, and tag each mention with their id, e.g. "
+    "`Kohane Azusawa{char_id=13}` (and `Kohane{char_id=13}` later). Never tag a "
+    "character with another character's id.\n"
+    "SIDE CHARACTERS: minor, guest, and one-off characters who are NOT on the "
+    "roster also appear — refer to them faithfully by the name the story uses "
+    "(romanized), do NOT add a {char_id} tag to them (they have no id), and NEVER "
+    "substitute a main character for a side character. If the story's focus is a "
+    "side character (e.g. someone who is ill, a mentor, a rival), name that side "
+    "character — do not misattribute their role to a roster member.\n"
+    "Do not fabricate events or people that are not in the text."
 )
 if GLOSSARY_TEXT:
     SYSTEM += (
@@ -136,7 +141,8 @@ _GLOBAL_RULES = (
     "- Write in clear, concise English.\n"
     "- Use exactly the required `## ` section headings for the tier, and emit every one.\n"
     "- If a bullet-list section has no entries, write exactly `- None`.\n"
-    "- Tag every character mention as Name{char_id=ID}.\n"
+    "- Tag each mention of a ROSTER character as Name{char_id=ID}; name side "
+    "characters plainly (no tag).\n"
     "- Do not add extra sections, tables, or bold text."
 )
 _FORMATS = {
@@ -189,7 +195,9 @@ def build_context(unit: str, focus_id=None, song=None) -> str:
 
 def build_prompt(tier, unit, current_text, *, prev_summary=None, focus_id=None, song=None) -> str:
     parts = [
-        "Character groups (ground truth — use these EXACT names and ids; do NOT reassign anyone):",
+        "MAIN CAST (use these EXACT names + ids; never reassign anyone to another "
+        "group). Side/guest characters not listed here may also appear — name them "
+        "faithfully from the text, without an id tag:",
         ROSTER_TEXT,
         build_context(unit, focus_id, song),
     ]
