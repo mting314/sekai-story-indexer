@@ -61,7 +61,7 @@ rule, so it survives re-fetches. Current entries:
 
 | event | override | why |
 |---|---|---|
-| `97` Light Up the Fire | → An (10) | `bannerGameCharacterUnitId` is tagged Kohane, but An debuts the event's new 4★ card and is the story protagonist |
+| `97` Light Up the Fire | → An (10) | source-data error: `bannerGameCharacterUnitId` is tagged Kohane, but the actual banner art shows An (confirmed) and An debuts the event's new 4★ card / is the story protagonist |
 
 To fix a future mistake: add one line to `focus_overrides.json` and re-run
 `indexer fetch` (or regenerate `events_index.json`).
