@@ -34,9 +34,32 @@ _PROMPT = (
 )
 
 
+def window_history(
+    history: list[dict] | None, *, max_turns: int = 6, max_chars: int = 4000
+) -> list[dict]:
+    """Cap conversation history to the most recent turns within a char budget.
+
+    Keeps context clean and bounded: at most ``max_turns`` recent turns, and drops
+    older ones once the running character budget is exceeded (server-side focus
+    state carries the durable entity memory, so raw history can stay short)."""
+    if not history:
+        return []
+    windowed: list[dict] = []
+    used = 0
+    for turn in reversed(history[-max_turns:]):
+        text = str(turn.get("text", ""))
+        if windowed and used + len(text) > max_chars:
+            break
+        windowed.append(turn)
+        used += len(text)
+    windowed.reverse()
+    return windowed
+
+
 def condense(question: str, history: list[dict] | None, *, model: str | None = None) -> str:
     """Return a standalone version of ``question`` given prior turns, or the
     question unchanged if there's no history / no API key / on error."""
+    history = window_history(history)
     if not history or not os.getenv("GOOGLE_API_KEY"):
         return question
     try:
@@ -44,7 +67,7 @@ def condense(question: str, history: list[dict] | None, *, model: str | None = N
         from google.genai import types
 
         convo = "\n".join(
-            f"{h.get('role', 'user')}: {h.get('text', '')}" for h in history[-6:]
+            f"{h.get('role', 'user')}: {h.get('text', '')}" for h in history
         )
         client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
         model = model or os.getenv("SEKAI_CHAT_MODEL") or "gemini-flash-latest"

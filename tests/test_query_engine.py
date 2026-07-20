@@ -1344,3 +1344,42 @@ def test_summary_citation_labels_include_summary_scope_without_scene():
     assert "Scene" not in year_label
     assert "Scene" not in episode_label
     assert "Scene" not in part_label
+
+
+def _prepare_capturing_analysis(scope_arc_ids: tuple[str, ...]):
+    """Run _prepare_query in the default routing_mode='off' path with retrieval
+    stubbed, capturing the analysis handed to retrieval. Proves caller scope is
+    threaded into the arc_ids machinery even when the analyzer never runs."""
+    engine = make_engine()
+    engine.retrieval_config = RetrievalConfig()  # routing_mode='off' -> analysis is None
+    captured: dict[str, Any] = {}
+    engine._expanded_question = lambda q: q  # type: ignore[method-assign]
+    engine._query_embedding = lambda q: [0.0]  # type: ignore[method-assign]
+
+    def fake_raw_only(question, *, query_embedding=None, analysis=None):
+        captured["analysis"] = analysis
+        return []
+
+    engine._raw_only_retrieve = fake_raw_only  # type: ignore[method-assign]
+    prepared = engine._prepare_query("what happens at the climax of airi1?",
+                                     scope_arc_ids=scope_arc_ids)
+    return captured.get("analysis"), prepared
+
+
+def test_scope_arc_ids_thread_into_retrieval_analysis():
+    analysis, prepared = _prepare_capturing_analysis(("0005-kokokara-re-start",))
+    assert analysis is not None
+    assert analysis.arc_ids == ("0005-kokokara-re-start",)
+    # no nodes survive the stub -> insufficient context, but scope was applied
+    assert prepared.immediate_answer == INSUFFICIENT_SOURCE_CONTEXT
+
+
+def test_no_scope_leaves_analysis_none_in_off_mode():
+    analysis, _ = _prepare_capturing_analysis(())
+    assert analysis is None  # unchanged behavior when caller passes no scope
+
+
+def test_scope_multiple_arc_ids_thread_as_union():
+    analysis, _ = _prepare_capturing_analysis(("0006-lyric", "0002-marionette"))
+    assert analysis is not None
+    assert analysis.arc_ids == ("0006-lyric", "0002-marionette")

@@ -4,7 +4,21 @@
 const state = {
   events: [], units: [], activeUnit: "all", scopeEventId: null, history: [],
   view: "timeline", summaries: null, meta: { characters: {}, units: {} }, entityRe: null,
+  sessionId: null,
 };
+
+// Stable per-chat session id so the server can keep conversation focus state.
+function ensureSessionId() {
+  if (state.sessionId) return state.sessionId;
+  let sid = null;
+  try { sid = localStorage.getItem("sekai_session_id"); } catch (e) { /* ignore */ }
+  if (!sid) {
+    sid = "s-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { localStorage.setItem("sekai_session_id", sid); } catch (e) { /* ignore */ }
+  }
+  state.sessionId = sid;
+  return sid;
+}
 
 async function boot() {
   const [units, events, meta] = await Promise.all([
@@ -665,6 +679,77 @@ function closeExcerpt() {
   document.getElementById("sidebar").classList.add("hidden");
 }
 
+// Show what the conversation is currently "about" (server-inferred focus), unless
+// the user has a manually-clicked timeline scope. Lets the user clear it.
+function showFocusChip(focus) {
+  if (state.scopeEventId) return; // manual scope chip takes precedence
+  const hint = document.getElementById("scope-hint");
+  if (!hint) return;
+  const label = focus && focus.label;
+  if (!label) return;
+  hint.style.removeProperty("--scope-color");
+  hint.innerHTML =
+    `<div class="reply-body"><div class="reply-title">In focus</div>` +
+    `<div class="reply-sub">${escapeHtml(label)}</div></div>` +
+    `<button class="reply-close" id="clear-focus" title="Clear focus" aria-label="Clear focus">×</button>`;
+  hint.classList.remove("hidden");
+  const btn = document.getElementById("clear-focus");
+  if (btn) btn.onclick = () => {
+    // abandon server-side focus by rotating the session id, and hide the chip
+    try { localStorage.removeItem("sekai_session_id"); } catch (e) { /* ignore */ }
+    state.sessionId = null;
+    ensureSessionId();
+    hint.classList.add("hidden");
+    hint.innerHTML = "";
+  };
+}
+
+// Consume the SSE stream: append `delta` text as it arrives, finalize on `done`.
+async function streamAnswer(q, pending) {
+  const resp = await fetch("/api/query/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      question: q,
+      unit: state.activeUnit === "all" ? null : state.activeUnit,
+      event_id: state.scopeEventId,
+      history: state.history.slice(-6),
+      session_id: ensureSessionId(),
+    }),
+  });
+  if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let text = "";
+  let done = null;
+  pending.textContent = "";
+  for (;;) {
+    const { value, done: streamDone } = await reader.read();
+    if (streamDone) break;
+    buf += decoder.decode(value, { stream: true });
+    const frames = buf.split("\n\n");
+    buf = frames.pop() || ""; // keep the incomplete tail
+    for (const frame of frames) {
+      const line = frame.split("\n").find((l) => l.startsWith("data: "));
+      if (!line) continue;
+      let evt;
+      try { evt = JSON.parse(line.slice(6)); } catch (e) { continue; }
+      if (evt.type === "delta") {
+        text += evt.text || "";
+        pending.textContent = text; // progressive plain-text render
+        document.getElementById("messages").scrollTop = 1e9;
+      } else if (evt.type === "meta") {
+        if (evt.focus) showFocusChip(evt.focus);
+      } else if (evt.type === "done") {
+        done = evt;
+      }
+    }
+  }
+  return done || { answer: text };
+}
+
 document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const input = document.getElementById("question");
@@ -674,20 +759,12 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   addMessage("user", q);
   const pending = addMessage("assistant", "…");
   try {
-    const res = await fetch("/api/query", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question: q,
-        unit: state.activeUnit === "all" ? null : state.activeUnit,
-        event_id: state.scopeEventId,
-        history: state.history.slice(-6), // conversation memory
-      }),
-    }).then((r) => r.json());
+    const res = await streamAnswer(q, pending);
     if (res.error && !res.answer) {
       pending.textContent = `⚠ ${res.error}`;
     } else {
-      renderAssistant(pending, res);
+      renderAssistant(pending, res); // swap progressive text for the rich view
+      if (res.focus) showFocusChip(res.focus);
       state.history.push({ role: "user", text: q });
       state.history.push({ role: "assistant", text: res.answer || "" });
     }

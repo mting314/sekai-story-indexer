@@ -16,6 +16,8 @@ REPO = Path(__file__).resolve().parent.parent
 
 @pytest.fixture(scope="module")
 def client():
+    import json
+
     os.environ["SEKAI_QUERY_BACKEND"] = "local"
     os.environ["SEKAI_STORY_ROOT"] = str(REPO / "sample" / "story")
     os.environ["SEKAI_EVENTS_INDEX"] = str(REPO / "sample" / "events_index.json")
@@ -25,6 +27,11 @@ def client():
     from webapp import server as server_module
 
     importlib.reload(server_module)
+    # Pin the timeline/events source to the sample so tests are deterministic and
+    # offline (load_events() otherwise hits the live master DB, whose arc slugs
+    # differ from the sample the engine indexes). In prod both are the same source.
+    sample_events = json.loads((REPO / "sample" / "events_index.json").read_text())
+    server_module.load_events = lambda: sample_events
     return TestClient(server_module.app)
 
 
@@ -74,3 +81,105 @@ def test_query_returns_quotes_and_excerpts(client):
 def test_query_not_indexed_event(client):
     r = client.post("/api/query", json={"question": "Tell me about akito1"})
     assert "not indexed" in r.json()["answer"].lower()
+
+
+def test_clarify_gate_does_not_misfire_on_sample(client):
+    # existing sample questions are unambiguous -> must never return a clarify turn
+    for q in ["How does Kohane feel about singing?", "What happens in koha1?",
+              "Why has Mafuyu disappeared?"]:
+        assert client.post("/api/query", json={"question": q}).json()["backend"] != "clarify"
+
+
+def test_clarify_gate_fires_on_ambiguous_reference(client, monkeypatch):
+    # inject a colliding fixture (title event + character with a multi-event arc),
+    # since the 3-event sample can't collide naturally.
+    from webapp import server as server_module
+
+    events = [
+        {"event_id": 30, "arc_slug": "0030-rise", "name": "Rise as One",
+         "nickname": "hona2", "focus_character_id": 20, "indexed": True},
+        {"event_id": 12, "arc_slug": "0012-warm", "name": "A Warm Welcome",
+         "nickname": "hona1", "focus_character_id": 20, "indexed": True},
+    ]
+    monkeypatch.setattr(server_module, "load_events", lambda: events)
+    monkeypatch.setattr(server_module, "_characters_meta", lambda: {"20": {"en": "Honami"}})
+
+    # Honami has two focus events -> "Honami's story" is ambiguous.
+    body = client.post("/api/query", json={"question": "summarize Honami's story"}).json()
+    assert body["backend"] == "clarify"
+    assert body["options"], "clarify turn should carry structured options"
+
+
+def test_referenced_arcs_unions_multiple_nicknames():
+    # a comparison must scope to BOTH stories, not lock to the first nickname
+    from webapp import server
+    events = [{"nickname": "koha1", "arc_slug": "0006-lyric"},
+              {"nickname": "mafu1", "arc_slug": "0002-marionette"}]
+    assert server._referenced_arcs("compare koha1 and mafu1", events) == \
+        ["0006-lyric", "0002-marionette"]
+
+
+def test_referenced_arcs_empty_on_topic_switch():
+    # a genuine topic switch (no nickname) resolves no scope -> not locked to prior arc
+    from webapp import server
+    events = [{"nickname": "koha1", "arc_slug": "0006-lyric"}]
+    assert server._referenced_arcs("what about Mafuyu's disappearance?", events) == []
+
+
+def _parse_sse(raw: str) -> list[dict]:
+    import json
+    return [json.loads(line[len("data: "):]) for line in raw.splitlines()
+            if line.startswith("data: ")]
+
+
+def test_query_stream_emits_meta_deltas_and_done(client):
+    with client.stream("POST", "/api/query/stream",
+                       json={"question": "How does Kohane feel about singing?"}) as r:
+        assert r.status_code == 200
+        assert "text/event-stream" in r.headers["content-type"]
+        events = _parse_sse(b"".join(r.iter_bytes()).decode())
+    types = [e["type"] for e in events]
+    assert types[0] == "meta" and types[-1] == "done"
+    assert "delta" in types  # progressive text
+    done = events[-1]
+    assert done["citations"][0]["arc_id"] == "0006-lyric"
+    # streamed deltas reconstruct the answer
+    streamed = "".join(e["text"] for e in events if e["type"] == "delta")
+    assert streamed.strip()
+
+
+def _pin_sample_events(monkeypatch):
+    """In tests load_events() hits the live master DB (slugs differ from the sample
+    the engine uses); pin it to the sample so focus + engine agree, as in prod."""
+    import json as _json
+
+    from webapp import server
+    events = _json.loads((REPO / "sample" / "events_index.json").read_text())
+    monkeypatch.setattr(server, "load_events", lambda: events)
+
+
+def test_session_focus_carries_scope_on_followup(client, monkeypatch):
+    # Turn 1 scopes to koha1; turn 2 is a pronoun follow-up naming no entity — the
+    # session focus must carry the scope so it stays on 0006-lyric.
+    from webapp import server
+    _pin_sample_events(monkeypatch)
+    server._SESSIONS.clear("t-focus")
+    r1 = client.post("/api/query", json={"question": "What happens in koha1?", "session_id": "t-focus"})
+    assert r1.json()["scope"]["arc_id"] == "0006-lyric"
+    r2 = client.post("/api/query", json={
+        "question": "what happens at the climax of that story?", "session_id": "t-focus",
+    })
+    body = r2.json()
+    assert body.get("scope", {}).get("arc_id") == "0006-lyric"  # carried, not global
+    assert body.get("focus", {}).get("arcs") == ["0006-lyric"]
+
+
+def test_session_focus_resets_on_topic_switch(client, monkeypatch):
+    from webapp import server
+    _pin_sample_events(monkeypatch)
+    server._SESSIONS.clear("t-switch")
+    client.post("/api/query", json={"question": "What happens in koha1?", "session_id": "t-switch"})
+    # switch to a different explicit event -> focus follows the new topic
+    r = client.post("/api/query", json={"question": "What happens in mafu1?", "session_id": "t-switch"})
+    assert r.json()["scope"]["arc_id"] == "0002-marionette"
+    assert r.json().get("focus", {}).get("arcs") == ["0002-marionette"]

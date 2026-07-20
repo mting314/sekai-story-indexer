@@ -136,13 +136,23 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   `answer_parts` (text + clickable quote blocks) and `citations[].excerpt`; the
   web app renders quotes inline and opens a side panel with the full scene on
   click. (Full engine gains the same structure in Phase 4.)
-- [~] **Phase 4 — Full-engine scoping.** Shared resolver `query/scoping.py`
-  (`ScopeIndex` + `chroma_where`) DONE and wired into the local engine + per-unit
-  golden cases; `unit`/`arc_id` already flow into Chroma metadata (via
-  `model_dump`), so `chroma_where` filters are ready. Injecting the filter into
-  `engine.py`'s query call + a keyed golden run against `--backend full` is
-  raised (untestable here). `ALLOWED_STORY_TYPES` is fine — content_type maps to
-  Main/Side.
+- [x] **Phase 4 — Full-engine scoping.** Shared resolver `query/scoping.py`
+  (`ScopeIndex` + `chroma_where`) wired into the local engine + per-unit golden
+  cases. **Full-engine scope now wired + verified live:** `engine.query(question,
+  arc_ids=…)` threads a caller-resolved scope into the arc-filter machinery
+  (works even in `routing_mode="off"`), and `webapp/server.py` passes the resolved
+  event's arc(s) (union, so comparisons aren't locked to one). Fixed the
+  scope-drop that switched a follow-up to a different arc (airi1→airi2).
+- [x] **Phase 7 — Natural-chat conversation layer.** Server-side per-session focus
+  state (`webapp/sessions.py`: carry the current event/character across pronoun
+  follow-ups, reset on topic switch); clarify-instead-of-guess gate
+  (`query/disambiguation.py`); deterministic contextual-retrieval prefixes
+  (`query/context.py`: nickname / "character X's Nth focus event" / unit / song) —
+  **live now for the local TF-IDF (free, no re-embed)** and **teed up for the full
+  engine** (prepended to the Chroma embedding + lexical text; takes effect on the
+  next `indexer ingest` re-embed); history windowing (`condense.window_history`);
+  and SSE streaming (`/api/query/stream` + `generate_answer_stream`). See
+  `docs/contextual_embeddings_plan.md`.
 - [~] **Phase 5 — Content beyond events.** **Unit stories DONE** (real fetch:
   `sekai fetch-unit-stories` → `story/<unit>/unit/…`, tested); non-event content
   is always-queryable. Card side-stories + Area conversations: modeled/scaffolded,

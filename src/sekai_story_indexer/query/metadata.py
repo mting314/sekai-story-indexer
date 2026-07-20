@@ -109,7 +109,6 @@ def metadata_answer(question: str, events_index: list[dict], characters: dict, s
     ordinal = next((v for k, v in _ORDINALS.items() if re.search(rf"\b{k}\b", q)), None)
     want_last = any(w in q for w in _LAST)
     is_count = bool(re.search(r"how many|number of|count", q))
-    is_list = bool(re.search(r"\ball\b|\blist\b|\bevents\b.*\?|which .*events", q)) or "focus events" in q
 
     def line(i: int, e: dict) -> str:
         return f"[{i}] **{e.get('name')}** ({e.get('nickname')}) — {_fmt_date(e.get('started_at'))}"
