@@ -731,12 +731,12 @@ def ingest(
         False, "--skip-summaries", help="Deprecated alias for --summaries none.",
     ),
     summaries: str = typer.Option(
-        "event",
+        "hierarchical",
         "--summaries",
-        help="Summary strategy: 'local' (embed the FREE locally-generated "
-        "episode/event/unit summaries — no generation cost), 'event' (one per "
-        "event via the API), 'hierarchical' (per-part/episode/year via the API), "
-        "or 'none' (embed raw scenes only).",
+        help="Summary strategy: 'hierarchical' (the inherited linkura Refine "
+        "summarizer — per-part/episode/year via the API; the default), 'local' "
+        "(embed the FREE locally-generated episode/event/unit summaries — no "
+        "generation cost), or 'none' (embed raw scenes only).",
     ),
     only_summaries: bool = typer.Option(
         False,
@@ -831,17 +831,7 @@ def ingest(
                 "[yellow]No local summaries found. Run scripts/summarize_ollama.py first "
                 "and copy episode_/event_/unit_summaries.json here.[/yellow]"
             )
-    elif mode == "event":
-        from .indexer.event_summarizer import summarize_events
-
-        console.print("Generating one summary per event story (--summaries event)...")
-        summary_nodes = summarize_events(
-            raw_nodes, story_order=story_order,
-            cache_path="event_summaries.json",  # readable + resumable
-            log=lambda m: console.print(f"[dim]{m}[/dim]"),
-        )
-        console.print(f"Generated {len(summary_nodes)} event summaries.")
-    else:  # hierarchical
+    else:  # hierarchical (linkura Refine summarizer — the default)
         summarizer = HierarchicalSummarizer(
             glossary=glossary,
             story_order=story_order,
