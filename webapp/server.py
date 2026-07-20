@@ -21,6 +21,7 @@ import os
 import re
 import time
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
@@ -62,7 +63,7 @@ def load_events() -> list[dict]:
     each row `indexed` (has the ingest pipeline embedded it yet?). Falls back to
     the static index when the source is unreachable."""
     now = time.time()
-    if _cache["rows"] is not None and now - float(_cache["at"]) < EVENTS_TTL_SECONDS:
+    if _cache["rows"] is not None and now - float(str(_cache["at"])) < EVENTS_TTL_SECONDS:
         return _cache["rows"]  # type: ignore[return-value]
 
     try:
@@ -98,12 +99,12 @@ def events() -> list[dict]:
 # Per-region event windows (JP/EN/TW/KR). Release schedules are static once set,
 # so cache for a day. Best-effort: any failure -> no region data, never fatal.
 _REGION_TTL_SECONDS = int(os.environ.get("SEKAI_REGION_TTL", "86400"))
-_region_cache: dict[str, object] = {"at": 0.0, "times": None}
+_region_cache: dict[str, Any] = {"at": 0.0, "times": None}
 
 
 def _region_times() -> dict:
     now = time.time()
-    if _region_cache["times"] is not None and now - float(_region_cache["at"]) < _REGION_TTL_SECONDS:
+    if _region_cache["times"] is not None and now - float(str(_region_cache["at"])) < _REGION_TTL_SECONDS:
         return _region_cache["times"]  # type: ignore[return-value]
     try:
         from sekai_story_indexer.source import client
@@ -255,7 +256,7 @@ def _query_local(req: QueryRequest) -> dict:
     from sekai_story_indexer.query.condense import condense
     from sekai_story_indexer.query.intent import classify
 
-    engine = _get_local_engine()
+    engine: Any = _get_local_engine()
     # Conversation memory: rewrite a follow-up into a standalone question using
     # recent history, then route/retrieve on that.
     q = condense(req.question, req.history) if req.history else req.question

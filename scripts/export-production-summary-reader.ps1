@@ -2,7 +2,7 @@ param(
     [string]$CacheFile = "summaries_cache.json",
     [string]$OutputDir = "site/summary-reader-production",
     [string]$StoryOrderFile = "story_order.yaml",
-    [string]$SourceDir = "web/summary-reader-production",
+    [string]$SourceDir = "webapp/templates/summary-reader-production",
     [int]$Port = 8011,
     [switch]$Serve
 )

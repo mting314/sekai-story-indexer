@@ -14,8 +14,8 @@ from sekai_story_indexer.indexer.summarizer import (
 from sekai_story_indexer.story_order import StoryOrder, StoryOrderConfigError, natural_sort_key
 
 SUMMARY_READER_DATA_SCHEMA_VERSION = "2"
-DEFAULT_READER_TEMPLATE = Path("web/summary-reader/index.html")
-DEFAULT_PRODUCTION_READER_SOURCE = Path("web/summary-reader-production")
+DEFAULT_READER_TEMPLATE = Path("webapp/templates/summary-reader/index.html")
+DEFAULT_PRODUCTION_READER_SOURCE = Path("webapp/templates/summary-reader-production")
 
 
 def export_summary_reader(
@@ -438,8 +438,8 @@ def _year_sort_key(year: dict[str, Any], story_order: StoryOrder) -> tuple[Any, 
         if configured_arc_id == arc_id
     ]
     if positions:
-        return (min(positions), natural_sort_key(arc_id))
-    return ((9999, 9999), natural_sort_key(arc_id))
+        return (min(positions), (-1, natural_sort_key(arc_id)))
+    return ((9999, 9999), (-1, natural_sort_key(arc_id)))
 
 
 def _episode_sort_key(episode: dict[str, Any], story_order: StoryOrder) -> tuple[Any, ...]:
@@ -472,14 +472,14 @@ def _safe_episode_key(
     episode_name: str,
 ) -> tuple[Any, ...]:
     try:
-        group_index, arc_index, episode_key = story_order.summary_episode_key(
+        res = story_order.summary_episode_key(
             arc_id,
             story_type,
             episode_name,
         )
-        return ((group_index, arc_index), episode_key)
+        return (res[:2], res[2:])
     except StoryOrderConfigError:
-        return ((9999, 9999), natural_sort_key(arc_id), story_type, natural_sort_key(episode_name))
+        return ((9999, 9999), (0 if story_type == "Side" else 1, natural_sort_key(arc_id), natural_sort_key(episode_name)))
 
 
 def _safe_part_key(

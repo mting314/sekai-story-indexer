@@ -41,7 +41,7 @@ The published folder must include:
 ## Zip production page
 
 The production page from `Linkura Summaries.zip` is preserved separately under
-`web\summary-reader-production`. Build it with:
+`webapp\templates\summary-reader-production`. Build it with:
 
 ```powershell
 .\scripts\export-production-summary-reader.ps1
