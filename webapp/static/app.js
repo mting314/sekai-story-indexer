@@ -510,13 +510,17 @@ function renderMarkdown(src) {
       // Emphasis only at word boundaries: opener after start/space/paren, closer
       // before end/space/punct. Stops a stray "*" (e.g. "Cheerful*Days") from
       // italicizing the rest of the line.
+      // Emphasis at word boundaries only: opener not preceded by a word char or
+      // "*", closer followed by end or any non-word/non-"*" char (so an em-dash,
+      // bracket, or quote closes it). A stray "*" inside a word (e.g.
+      // "Cheerful*Days") never opens emphasis.
       .replace(
-        /(^|[\s(>])\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*(?=[\s).,!?;:'"]|$)/g,
-        "$1<strong>$2</strong>"
+        /(?<![\w*])\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*(?=[^\w*]|$)/g,
+        "<strong>$1</strong>"
       )
       .replace(
-        /(^|[\s(>])\*(?=\S)([^*\n]+?)(?<=\S)\*(?=[\s).,!?;:'"]|$)/g,
-        "$1<em>$2</em>"
+        /(?<![\w*])\*(?=\S)([^*\n]+?)(?<=\S)\*(?=[^\w*]|$)/g,
+        "<em>$1</em>"
       )
       // clickable numbered citations: [1] / [2][3]  (also inside `code`/brackets)
       .replace(/\[(\d+)\]/g, '<a href="#" class="cite" data-ref="$1">[$1]</a>');

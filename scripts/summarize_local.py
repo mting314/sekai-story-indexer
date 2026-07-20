@@ -76,11 +76,12 @@ def parse(out: str) -> dict:
 def is_broken(entry) -> bool:
     """A cached entry that looks truncated or scaffolded (needs regen)."""
     text = entry if isinstance(entry, str) else (entry or {}).get("summary", "")
+    text = (text or "").strip()
     if not text:
         return True
     if re.search(r"Refine and Polish|Paragraph \d|Step \d|Draft:|Outline:", text, re.I):
         return True
-    return text.rstrip()[-1] not in ".!?」）)…\""
+    return text[-1] not in ".!?」）)…\""
 
 
 def main() -> int:
