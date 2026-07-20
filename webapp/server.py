@@ -335,13 +335,17 @@ def episode_raw(arc: str, episode: str) -> dict:
     matches = list(root.glob(f"*/*/{arc}/{episode}.md"))
     if not matches:
         return {"title": episode, "text": ""}
-    raw = matches[0].read_text(encoding="utf-8")
+    lines = matches[0].read_text(encoding="utf-8").splitlines()
     title = episode
-    for line in raw.splitlines():
-        if line.startswith("# "):
+    # Pull the H1 out as the title and drop it from the body so the sidebar doesn't
+    # render the title twice (header + heading).
+    body_lines = []
+    for line in lines:
+        if title == episode and line.startswith("# "):
             title = line[2:].strip()
-            break
-    return {"title": title, "text": raw}
+            continue
+        body_lines.append(line)
+    return {"title": title, "text": "\n".join(body_lines).strip()}
 
 
 class QueryRequest(BaseModel):

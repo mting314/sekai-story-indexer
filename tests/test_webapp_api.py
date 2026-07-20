@@ -272,6 +272,7 @@ def test_episode_raw_endpoint(client):
     data = client.get("/api/episode-raw?arc=0002-marionette&episode=01_disappearance").json()
     assert data["title"] == "1. The Captive Marionette"
     assert "Kanade" in data["text"]
+    assert "# 1. The Captive Marionette" not in data["text"]  # H1 pulled into title, not duplicated
 
 
 def test_episode_raw_rejects_path_traversal(client):

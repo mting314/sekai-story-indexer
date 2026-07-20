@@ -98,9 +98,13 @@ function eventsByArc() {
 }
 
 const arcOfEvent = (nodeId) => String(nodeId).replace(/^event:/, "");
-const episodeNumber = (slug) => {
+// Human episode label from a file slug — "Episode N" when numbered; otherwise a
+// de-slugged title. Never surfaces the raw slug (no-slugs-in-UI rule).
+const episodeLabel = (slug) => {
   const m = /^(\d+)/.exec(String(slug || ""));
-  return m ? String(parseInt(m[1], 10)) : String(slug || "");
+  if (m) return `Episode ${parseInt(m[1], 10)}`;
+  const words = String(slug || "").replace(/[-_]+/g, " ").trim();
+  return words ? words.replace(/\b\w/g, (c) => c.toUpperCase()) : "Episode";
 };
 
 async function renderHierarchical(el) {
@@ -186,7 +190,7 @@ function hierEventCard(nodeId, data, evByArc) {
 // One episode: "Episode N" (collapsible summary) + a link to its raw transcript.
 // The redundant single "part" child is collapsed into the episode summary.
 function hierEpisode(node, data, arc) {
-  const num = episodeNumber(node.episodeName);
+  const label = episodeLabel(node.episodeName);
   const wrap = document.createElement("div");
   wrap.className = "hier-ep";
 
@@ -195,14 +199,14 @@ function hierEpisode(node, data, arc) {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "hier-ep-toggle";
-  toggle.innerHTML = `<span class="hier-chev">▸</span>Episode ${escapeHtml(num)}`;
+  toggle.innerHTML = `<span class="hier-chev">▸</span>${escapeHtml(label)}`;
   const link = document.createElement("a");
   link.href = "#";
   link.className = "hier-ep-transcript";
   link.textContent = "📄 transcript";
   link.onclick = (e) => {
     e.preventDefault();
-    openTranscript(arc, node.episodeName, num);
+    openTranscript(arc, node.episodeName, label);
   };
   head.appendChild(toggle);
   head.appendChild(link);
@@ -297,9 +301,9 @@ function eventHero(ev, node) {
 }
 
 // Open the right sidebar with an episode's raw transcript (fetched on demand).
-async function openTranscript(arc, episodeSlug, num) {
+async function openTranscript(arc, episodeSlug, label) {
   const sb = document.getElementById("sidebar");
-  document.getElementById("sb-title").textContent = `Episode ${num}`;
+  document.getElementById("sb-title").textContent = label;
   document.getElementById("sb-sub").textContent = "raw transcript";
   const el = document.getElementById("sb-body");
   el.innerHTML = '<p class="empty">Loading…</p>';
@@ -311,7 +315,7 @@ async function openTranscript(arc, episodeSlug, num) {
     el.innerHTML = '<p class="empty">Transcript unavailable.</p>';
     return;
   }
-  document.getElementById("sb-title").textContent = data.title || `Episode ${num}`;
+  document.getElementById("sb-title").textContent = data.title || label;
   el.innerHTML = renderMarkdown(data.text);
   decorateNames(el, new Set());
   el.scrollTop = 0;
