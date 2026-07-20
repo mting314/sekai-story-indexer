@@ -473,26 +473,143 @@ function renderTimeline() {
     const status = e.indexed
       ? '<span class="status-dot indexed" title="Queryable in chat now"></span>'
       : '<span class="status-dot pending" title="On the timeline; chat-answerable after the next ingest"></span>';
-    // Event art on the right: the wide event-story banner (title + character)
-    // first, then the home banner, then the song jacket.
+    // Banner art fills the card as the visual anchor (Sekai in-game style): the
+    // wide event-story banner (title + character) first, then the home banner,
+    // then the song jacket. A left-to-right scrim keeps the text legible.
     const art = e.story_banner_url || e.banner_url || e.jacket_url || "";
     const artHtml = art
-      ? `<img class="event-art" loading="lazy" src="${proxied(art)}" alt="" ` +
-        `onerror="this.style.display='none'">`
+      ? `<img class="art-bg" loading="lazy" src="${proxied(art)}" alt="" ` +
+        `onerror="this.closest('.event-card').classList.add('no-art'); this.remove()">` +
+        `<div class="scrim"></div>`
       : "";
     card.innerHTML = `
-      ${logo}
-      <div class="meta">
-        <div class="top">${status}<span class="date">${fmtDate(e.started_at)}</span>${nick}
-          ${e.is_key_story ? '<span class="key-badge">key</span>' : ""}</div>
-        <div class="name">${e.name}</div>
-        ${focus}${song}
-      </div>
-      ${artHtml}`;
+      ${artHtml}
+      <div class="card-content">
+        ${logo}
+        <div class="meta">
+          <div class="top">${status}<span class="date">${fmtDate(e.started_at)}</span>${nick}
+            ${e.is_key_story ? '<span class="key-badge">key</span>' : ""}</div>
+          <div class="name">${e.name}</div>
+          ${focus}${song}
+        </div>
+      </div>`;
     card.onclick = () => setScope(e);
     el.appendChild(card);
   }
   if (!rows.length) el.innerHTML = '<p class="empty">No events for this filter.</p>';
+  enableInertialScroll(el);
+}
+
+// Game-style scroll for the event list: grab-and-flick momentum (mouse) with a
+// snap-to-card settle, layered over the browser's native scroll + CSS snap
+// (which already handle wheel, trackpad, touch, and keyboard). Bound once per
+// container; re-running renderTimeline only swaps innerHTML, so the guard holds.
+function enableInertialScroll(el) {
+  if (el._inertiaBound) return;
+  el._inertiaBound = true;
+
+  const reduce =
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const SNAP_PAD = 34; // matches scroll-padding-top (clears the sticky legend)
+
+  // Snap the card whose top is nearest the scroll offset to the top of the view.
+  function snapToNearest() {
+    const cards = el.querySelectorAll(".event-card");
+    if (!cards.length) return;
+    const contTop = el.getBoundingClientRect().top;
+    const ref = SNAP_PAD; // viewport-relative target line
+    let best = null;
+    let bestDist = Infinity;
+    for (const c of cards) {
+      const top = c.getBoundingClientRect().top - contTop;
+      const d = Math.abs(top - ref);
+      if (d < bestDist) {
+        bestDist = d;
+        best = c;
+      }
+    }
+    if (!best) return;
+    const target = best.getBoundingClientRect().top - contTop + el.scrollTop - SNAP_PAD;
+    el.scrollTo({ top: Math.max(0, target), behavior: reduce ? "auto" : "smooth" });
+  }
+
+  if (reduce) return; // native scroll + CSS proximity snap only; no flick inertia
+
+  let dragging = false;
+  let moved = false;
+  let startY = 0;
+  let startScroll = 0;
+  let lastY = 0;
+  let lastT = 0;
+  let vel = 0; // px per frame
+  let raf = 0;
+
+  function stopInertia() {
+    if (raf) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
+  }
+
+  function inertia() {
+    vel *= 0.94; // friction
+    el.scrollTop += vel;
+    const atEdge = el.scrollTop <= 0 || el.scrollTop >= el.scrollHeight - el.clientHeight - 1;
+    if (Math.abs(vel) > 0.4 && !atEdge) {
+      raf = requestAnimationFrame(inertia);
+    } else {
+      raf = 0;
+      snapToNearest();
+    }
+  }
+
+  el.addEventListener("pointerdown", (e) => {
+    // Only hijack mouse drags; touch/trackpad keep their native momentum.
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    stopInertia();
+    dragging = true;
+    moved = false;
+    startY = lastY = e.clientY;
+    startScroll = el.scrollTop;
+    lastT = e.timeStamp;
+    vel = 0;
+    el.classList.add("dragging");
+    try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+  });
+
+  el.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    if (Math.abs(e.clientY - startY) > 4) moved = true;
+    el.scrollTop = startScroll - (e.clientY - startY);
+    const dt = e.timeStamp - lastT || 16;
+    vel = (-(e.clientY - lastY) / dt) * 16; // normalize to ~per-frame px
+    lastY = e.clientY;
+    lastT = e.timeStamp;
+  });
+
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove("dragging");
+    try { el.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    if (Math.abs(vel) > 0.6) inertia();
+    else snapToNearest();
+  }
+  el.addEventListener("pointerup", endDrag);
+  el.addEventListener("pointercancel", endDrag);
+
+  // Swallow the click that ends a real drag so flicking doesn't open a scope.
+  el.addEventListener(
+    "click",
+    (e) => {
+      if (moved) {
+        e.stopPropagation();
+        e.preventDefault();
+        moved = false;
+      }
+    },
+    true
+  );
 }
 
 function setScope(e) {
