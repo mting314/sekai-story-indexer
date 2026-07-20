@@ -164,6 +164,14 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   substitution inside JP sentences isn't genuinely useful without the LLM.
 
 ## 5. Known follow-ups / accuracy notes
+* **Agentic-lite scene selection (local backend, deferred).** A scoped content
+  query currently feeds the WHOLE event (budget-bounded, head+tail) to the answer
+  — complete for small events, but blunt for large scopes. A better design lets
+  the model examine a compact scene "table of contents" (episode title + speakers
+  + first line) and fetch only the scenes it needs (reuse the full engine's
+  `get_scene` tool pattern). Deferred: costs an extra LLM call per turn. Cheaper
+  deterministic alternative if precision is needed first: intent-directed ranking
+  (bias "climax/ending" → late episodes, "beginning" → early) — no extra call.
 * Card/Area fetch flows (Phase 5 remainder) — mirror `fetch_unit_stories`.
 * Full-engine: join `events_index` plot_weight into node metadata at ingest so
   the boost applies there too; inject `chroma_where(scope)` into the query.

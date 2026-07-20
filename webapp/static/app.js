@@ -199,9 +199,17 @@ function summaryBody(s) {
   const hero = document.createElement("div");
   hero.className = "sum-hero";
 
-  const art = s.jacket_url || s.logo_url || "";
-  const artHtml = art
-    ? `<img class="sum-art" src="${art}" alt="" onerror="this.closest('.sum-hero').classList.add('no-art')">`
+  // Album art with a graceful fallback chain: song jacket -> event logo -> unit
+  // symbol. If the jacket fails to load (network/proxy hiccup), swap to the next
+  // source instead of blanking the art. `data-fallbacks` is a "|"-joined queue the
+  // onerror handler pops from; only after all fail do we mark the hero no-art.
+  const artSources = [s.jacket_url, s.logo_url, u.symbol].filter(Boolean);
+  const artHtml = artSources.length
+    ? `<img class="sum-art" src="${artSources[0]}" alt="" ` +
+      `data-fallbacks="${escapeHtml(artSources.slice(1).join("|"))}" ` +
+      `onerror="var f=(this.dataset.fallbacks||'').split('|').filter(Boolean);` +
+      `if(f.length){this.src=f.shift();this.dataset.fallbacks=f.join('|');}` +
+      `else{this.closest('.sum-hero').classList.add('no-art');}">`
     : "";
 
   const rows = [`<div class="hero-title">${escapeHtml(s.name)}</div>`];

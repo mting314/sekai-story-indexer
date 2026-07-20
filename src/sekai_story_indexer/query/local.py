@@ -30,6 +30,13 @@ _WORD_RE = re.compile(r"[a-z0-9]+")
 _CJK_RE = re.compile(r"[぀-ヿ㐀-鿿]")
 _H1_RE = re.compile(r"^#\s*(.+)$")
 
+# When a content query is scoped to a single event, feed the whole event to the
+# answer in reading order (bounded by this char budget) instead of a top-k cut,
+# so endings/climaxes aren't dropped. If an event exceeds the budget, keep its
+# head AND tail (drop the middle) so the opening and finale both survive. ~4
+# chars/token, kept under generate._context's own cap.
+_SCOPED_CTX_CHARS = 80_000
+
 # Unit references in questions (substring, lowercased) -> unit slug.
 _UNIT_KEYWORDS = {
     "leo/need": "leo_need", "leoneed": "leo_need", "leo need": "leo_need",
@@ -216,6 +223,48 @@ class LocalQueryEngine:
         scored.sort(key=lambda s: (-s[0], self._sort_key(self.nodes[s[1]])))
         return [(self.nodes[i], score) for score, i in scored[:k]]
 
+    def _budget_cover(self, idxs: list[int], budget_chars: int) -> list[int]:
+        """Select scenes within a char budget, always keeping the HEAD and TAIL so a
+        scoped event's opening AND ending (climax) both survive; drop from the
+        middle. ``idxs`` must already be in reading order. Returns reading order."""
+        total = sum(len(self.nodes[i].text) for i in idxs)
+        if total <= budget_chars or len(idxs) <= 2:
+            return idxs
+        picked: list[tuple[int, int]] = []  # (position, node index)
+        lo, hi, used, take_low = 0, len(idxs) - 1, 0, True
+        while lo <= hi:
+            pos = lo if take_low else hi
+            cost = len(self.nodes[idxs[pos]].text)
+            if picked and used + cost > budget_chars:
+                break
+            picked.append((pos, idxs[pos]))
+            used += cost
+            if take_low:
+                lo += 1
+            else:
+                hi -= 1
+            take_low = not take_low
+        picked.sort(key=lambda t: t[0])  # restore reading order
+        return [i for _, i in picked]
+
+    def _scoped_event_hits(
+        self, question: str, unit: str | None, arc_id: str
+    ) -> list[tuple[StoryNode, float]]:
+        """Whole scoped event in reading order (budget-bounded), each scored by
+        query overlap so the extractive quote picker still highlights relevant
+        lines. Reading order (not score) so the answer sees the arc start→finale."""
+        idxs = self._candidate_indices(unit, arc_id)
+        idxs.sort(key=lambda i: self._sort_key(self.nodes[i]))
+        idxs = self._budget_cover(idxs, _SCOPED_CTX_CHARS)
+        q_tokens = [t for t in self._expand_tokens(tokenize(question)) if t in self._idf]
+        hits: list[tuple[StoryNode, float]] = []
+        for i in idxs:
+            tf = self._tf[i]
+            score = sum(tf.get(t, 0) * self._idf[t] for t in q_tokens)
+            score *= weight_factor(self._weight_by_arc.get(self.nodes[i].metadata.arc_id))
+            hits.append((self.nodes[i], score))
+        return hits
+
     @staticmethod
     def _sort_key(node: StoryNode) -> tuple:
         m = node.metadata
@@ -269,7 +318,15 @@ class LocalQueryEngine:
         scope = self._scoped(question, unit=unit, event_id=event_id, arc_ids=arc_ids)
         unit, arc_id, arc_ids = scope.unit, scope.arc_id, scope.arc_ids
 
-        hits = self.retrieve(question, k=k, unit=unit, arc_id=arc_id, arc_ids=arc_ids)
+        # Scoped to a single event: answer over the WHOLE event in reading order
+        # (bounded by a char budget, keeping head+tail so the ending/climax always
+        # survives), not a top-k cut. The query is often cross-lingual (EN over JP
+        # scenes), so nothing lexically favors the finale and a top-k would return
+        # the first k episodes — hiding the climax from the answer.
+        if arc_id and not arc_ids:
+            hits = self._scoped_event_hits(question, unit, arc_id)
+        else:
+            hits = self.retrieve(question, k=k, unit=unit, arc_id=arc_id, arc_ids=arc_ids)
         if not hits:
             candidates = (
                 self._candidate_indices(unit, arc_id, arc_ids) if (arc_id or arc_ids) else []

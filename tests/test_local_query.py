@@ -86,3 +86,32 @@ def test_scoped_query_falls_back_to_opening_when_no_lexical_overlap():
     assert r["scope"]["arc_id"] == "0006-lyric"
     assert r["citations"], "scoped query should fall back to opening scenes"
     assert all(c["arc_id"] == "0006-lyric" for c in r["citations"])
+
+
+def test_scoped_single_event_returns_whole_event_not_topk(tmp_path):
+    # 8-episode event; a cross-lingual "climax" query (no JP overlap) must return
+    # the WHOLE event (incl. the finale), not the first k episodes.
+    d = tmp_path / "story" / "more_more_jump" / "event" / "0092-x"
+    d.mkdir(parents=True)
+    for n in range(1, 9):
+        (d / f"{n:02d}.md").write_text(f"# {n}\n\nあいり: これは{n}話だよ。\n", encoding="utf-8")
+    idx = [{"event_id": 92, "arc_slug": "0092-x", "indexed": True,
+            "unit": "more_more_jump", "nickname": "airi9"}]
+    eng = build_local_engine(tmp_path / "story", idx)
+    r = eng.query("what happens at the climax", arc_ids=("0092-x",))
+    episodes = {c["episode"] for c in r["citations"]}
+    assert len(r["citations"]) == 8, "whole event should reach the answer"
+    assert any("08" in e for e in episodes), "the finale episode must not be dropped"
+
+
+def test_budget_cover_keeps_head_and_tail():
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+
+    class _Fake:
+        text = "x" * 100
+
+    eng.nodes = [_Fake() for _ in range(10)]
+    cover = eng._budget_cover(list(range(10)), 350)
+    assert 0 in cover and 9 in cover  # opening AND finale survive
+    assert cover == sorted(cover)  # reading order preserved
+    assert len(cover) < 10  # middle dropped under budget
