@@ -815,6 +815,19 @@ def ingest(
         summary_cache_schema_version=SUMMARY_CACHE_SCHEMA_VERSION,
     )
     mode = "none" if skip_summaries else summaries
+    valid_modes = {"none", "local", "hierarchical"}
+    if mode not in valid_modes:
+        hint = (
+            " ('event' was retired — use 'hierarchical' for the linkura Refine "
+            "summarizer, or 'local' for the free precomputed summaries)"
+            if mode == "event"
+            else ""
+        )
+        console.print(
+            f"[red]Unknown --summaries mode {mode!r}. "
+            f"Choose one of: {', '.join(sorted(valid_modes))}.{hint}[/red]"
+        )
+        raise typer.Exit(1)
     if mode == "none":
         summary_nodes = []
         console.print("[yellow]--summaries none: embedding raw scenes only.[/yellow]")
