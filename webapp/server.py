@@ -362,10 +362,59 @@ def _query_full(req: QueryRequest) -> dict:
         }
 
 
+def _characters_meta() -> dict:
+    p = STATIC / "meta.json"
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8")).get("characters", {})
+        except Exception:
+            return {}
+    return {}
+
+
+def _metadata_intercept(question: str) -> dict | None:
+    """Answer pure-metadata questions (focus events) deterministically, ahead of
+    either RAG backend. Returns None for everything else."""
+    try:
+        from sekai_story_indexer.query.metadata import metadata_answer
+
+        path = _summaries_path()
+        sums = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        return metadata_answer(question, load_events(), _characters_meta(), sums)
+    except Exception:
+        return None
+
+
+def _resolve_focus_scope(req: QueryRequest) -> None:
+    """If the question refers to an event by focus name/nickname, append the event's
+    real name to the question (so retrieval finds it) and scope to its event_id."""
+    try:
+        from sekai_story_indexer.query.metadata import resolve_focus_reference
+
+        ev = resolve_focus_reference(req.question, load_events(), _characters_meta())
+        if not ev:
+            return
+        name, nick = ev.get("name"), ev.get("nickname")
+        tag = f'"{name}"' + (f" [{nick}]" if nick else "")
+        req.question = f"{req.question}\n\n(Note: this question refers to the event {tag}.)"
+        if not req.event_id and ev.get("event_id"):
+            req.event_id = ev["event_id"]
+    except Exception:
+        return
+
+
 @app.post("/api/query")
 def query(req: QueryRequest) -> dict:
     """Answer a question. Uses the local lexical engine by default (runs anywhere);
     set SEKAI_QUERY_BACKEND=full for the Google/Chroma RAG stack."""
+    # Pure identity/count/list focus-event questions -> deterministic answer.
+    md = _metadata_intercept(req.question)
+    if md is not None:
+        return md
+    # Content questions that REFER to an event by focus name/nickname ("what happens
+    # in Saki's first focus event", "summarize saki1") -> resolve to the event and
+    # point the RAG at it, then answer normally.
+    _resolve_focus_scope(req)
     if QUERY_BACKEND == "full":
         return _query_full(req)
     try:
