@@ -5,6 +5,7 @@ const state = {
   events: [], units: [], activeUnit: "all", scopeEventId: null, history: [],
   view: "timeline", summaries: null, meta: { characters: {}, units: {} }, entityRe: null,
   sessionId: null,
+  summaryMode: "event", hier: null, // "event" (per-event) | "hierarchical" (tiered tree)
 };
 
 // Route external (sekai.best) art through the server image proxy so it loads even
@@ -83,8 +84,38 @@ function renderCurrentView() {
   else renderTimeline();
 }
 
+// The Summaries tab has two modes: per-event summaries (the local set) and the
+// hierarchical event -> episode -> part tree (from the full-engine cache).
 async function renderSummaries() {
   const el = document.getElementById("summaries");
+  el.innerHTML = "";
+  el.appendChild(summaryModeToggle());
+  const body = document.createElement("div");
+  body.id = "sum-content";
+  el.appendChild(body);
+  if (state.summaryMode === "hierarchical") await renderHierarchical(body);
+  else await renderEventSummaries(body);
+}
+
+function summaryModeToggle() {
+  const bar = document.createElement("div");
+  bar.className = "sum-modes";
+  for (const [mode, label] of [["event", "Event"], ["hierarchical", "Hierarchical"]]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "sum-mode" + (state.summaryMode === mode ? " active" : "");
+    b.textContent = label;
+    b.onclick = () => {
+      if (state.summaryMode === mode) return;
+      state.summaryMode = mode;
+      renderSummaries();
+    };
+    bar.appendChild(b);
+  }
+  return bar;
+}
+
+async function renderEventSummaries(el) {
   if (state.summaries === null) {
     el.innerHTML = '<p class="empty">Loading…</p>';
     [state.summaries, state.unitSummaries] = await Promise.all([
@@ -108,6 +139,83 @@ async function renderSummaries() {
   if (state.activeUnit !== "all" && us && us.summary) list.appendChild(unitOverviewCard(us));
   for (const s of rows) list.appendChild(summaryCard(s));
   el.appendChild(list);
+}
+
+// Hierarchical tree: event -> episode -> part, each node expandable; nodes with a
+// summary render their sections inline on expand. Data from /api/hierarchical-summaries.
+async function renderHierarchical(el) {
+  if (state.hier === null) {
+    el.innerHTML = '<p class="empty">Loading…</p>';
+    state.hier = await fetch("/api/hierarchical-summaries").then((r) => r.json()).catch(() => null);
+  }
+  const data = state.hier;
+  if (!data || !data.roots || !data.roots.length) {
+    el.innerHTML =
+      '<p class="empty">No hierarchical summaries yet — run <code>indexer ingest ' +
+      "--summaries hierarchical</code> (or the sample generator) to populate " +
+      "<code>summaries_cache.json</code>.</p>";
+    return;
+  }
+  el.innerHTML = "";
+  const c = data.counts || {};
+  const head = document.createElement("div");
+  head.className = "hier-counts";
+  head.textContent = `${c.events || 0} events · ${c.episodes || 0} episodes · ${c.parts || 0} parts`;
+  el.appendChild(head);
+  const tree = document.createElement("div");
+  tree.className = "hier-tree";
+  for (const rootId of data.roots) tree.appendChild(hierNode(rootId, data, 0));
+  el.appendChild(tree);
+}
+
+function hierNode(nodeId, data, depth) {
+  const node = data.nodes[nodeId];
+  const wrap = document.createElement("div");
+  wrap.className = `hier-node hier-${node.kind}`;
+  const childIds = node.children || [];
+  const summary = node.summaryId ? data.summaries[node.summaryId] : null;
+  const hasBody = Boolean(childIds.length || summary);
+
+  const head = document.createElement("button");
+  head.type = "button";
+  head.className = "hier-head";
+  head.style.paddingLeft = `${8 + depth * 16}px`;
+  head.innerHTML =
+    `<span class="hier-chev">${hasBody ? "▸" : "·"}</span>` +
+    `<span class="hier-kind">${node.kind}</span>` +
+    `<span class="hier-label">${escapeHtml(node.label || node.title || nodeId)}</span>`;
+  wrap.appendChild(head);
+
+  const body = document.createElement("div");
+  body.className = "hier-body hidden";
+  wrap.appendChild(body);
+
+  head.onclick = () => {
+    const nowHidden = body.classList.toggle("hidden"); // toggle() -> true when 'hidden' is now set
+    head.querySelector(".hier-chev").textContent = hasBody ? (nowHidden ? "▸" : "▾") : "·";
+    if (!body.dataset.filled && hasBody) {
+      if (summary) body.appendChild(hierSummary(summary));
+      for (const cid of childIds) body.appendChild(hierNode(cid, data, depth + 1));
+      body.dataset.filled = "1";
+    }
+  };
+  return wrap;
+}
+
+function hierSummary(summary) {
+  const box = document.createElement("div");
+  box.className = "hier-summary";
+  for (const label of summary.sectionOrder || []) {
+    const h = document.createElement("div");
+    h.className = "hier-section-label";
+    h.textContent = label;
+    box.appendChild(h);
+    const c = document.createElement("div");
+    c.className = "answer-text";
+    c.innerHTML = renderMarkdown(summary.sections[label] || "");
+    box.appendChild(c);
+  }
+  return box;
 }
 
 function unitOverviewCard(us) {

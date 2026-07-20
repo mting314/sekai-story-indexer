@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
-from sekai_story_indexer.indexer.summarizer import (
+from sekai_story_indexer.indexer.summary_sections import (
     SUMMARY_SECTIONS_BY_LEVEL,
     extract_summary_sections,
 )

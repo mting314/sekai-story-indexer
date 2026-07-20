@@ -14,58 +14,31 @@ from .manifest import (
     stable_hash,
 )
 
+# Section constants + the pure extractor live in a dependency-free module so the
+# reader/web app can parse summaries without the generation stack; re-exported
+# here for back-compat.
+from .summary_sections import (
+    EPISODE_SUMMARY_SECTIONS,
+    EVENT_SUMMARY_SECTIONS,
+    KNOWN_SUMMARY_SECTIONS,
+    PART_SUMMARY_SECTIONS,
+    SUMMARY_SECTIONS_BY_LEVEL,
+    extract_summary_sections,
+)
+
 SUMMARIZATION_PROMPT_VERSION = "3"
 
-PART_SUMMARY_SECTIONS = (
-    "Overview",
-    "Key Events",
-    "Character Developments",
-    "Continuity Facts",
-    "Important Terms",
-)
-EPISODE_SUMMARY_SECTIONS = (
-    "Overview",
-    "Part Index",
-    "Episode Arc",
-    "Character Developments",
-    "Relationship / Unit Developments",
-    "Continuity Facts",
-    "Important Terms",
-)
-EVENT_SUMMARY_SECTIONS = (
-    "Overview",
-    "Episode Index",
-    "Character Trajectories",
-    "Unit / Club State",
-    "Continuity Facts",
-    "Important Terms",
-)
-SUMMARY_SECTIONS_BY_LEVEL = {
-    "Part": PART_SUMMARY_SECTIONS,
-    "Episode": EPISODE_SUMMARY_SECTIONS,
-    "Event": EVENT_SUMMARY_SECTIONS,
-}
-KNOWN_SUMMARY_SECTIONS = frozenset(
-    PART_SUMMARY_SECTIONS + EPISODE_SUMMARY_SECTIONS + EVENT_SUMMARY_SECTIONS
-)
-
-
-def extract_summary_sections(summary: str) -> dict[str, str]:
-    """Extract known fixed-label summary sections from generated Markdown."""
-    sections: dict[str, list[str]] = {}
-    current_label: str | None = None
-
-    for line in summary.splitlines():
-        stripped = line.strip()
-        if stripped.endswith(":") and stripped[:-1] in KNOWN_SUMMARY_SECTIONS:
-            current_label = stripped[:-1]
-            sections.setdefault(current_label, [])
-            continue
-
-        if current_label is not None:
-            sections[current_label].append(line)
-
-    return {label: "\n".join(lines).strip() for label, lines in sections.items()}
+__all__ = [
+    "PART_SUMMARY_SECTIONS",
+    "EPISODE_SUMMARY_SECTIONS",
+    "EVENT_SUMMARY_SECTIONS",
+    "SUMMARY_SECTIONS_BY_LEVEL",
+    "KNOWN_SUMMARY_SECTIONS",
+    "extract_summary_sections",
+    "SUMMARIZATION_PROMPT_VERSION",
+    "HierarchicalSummarizer",
+    "trim_previous_summary_context",
+]
 
 
 def trim_previous_summary_context(prev_summary: str | None) -> str | None:
