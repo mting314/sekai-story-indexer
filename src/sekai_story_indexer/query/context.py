@@ -20,6 +20,8 @@ scene's own semantics.
 
 from __future__ import annotations
 
+import re
+
 from ..source.constants import UNIT_NAMES
 
 
@@ -28,13 +30,19 @@ def _ordinal(n: int) -> str:
     return f"{n}{suffix}"
 
 
-def arc_context_line(meta: dict | None, *, focus_name_en: str | None = None) -> str:
+def arc_context_line(
+    meta: dict | None,
+    *,
+    focus_name_en: str | None = None,
+    extra_titles: tuple[str, ...] = (),
+) -> str:
     """One situating line for an event's scenes, or "" when metadata is missing.
 
     ``meta`` is an events-index row (name, nickname, focus_character [JP],
     focus_character_id, focus_index, unit, song_title). ``focus_name_en`` is the
-    English focus-character name when the caller can resolve it (so both JP and EN
-    name queries match).
+    English focus-character name when resolvable. ``extra_titles`` are additional
+    title forms (e.g. the official English title) to list as aliases so a query in
+    any language/romaji matches.
     """
     if not meta:
         return ""
@@ -59,5 +67,15 @@ def arc_context_line(meta: dict | None, *, focus_name_en: str | None = None) -> 
     song = meta.get("song_title")
     if song:
         bits.append(f"commissioned song {song}")
+
+    # Alias title forms (JP / official EN / romaji) so the same event is findable
+    # however it's referred to; deduped against the primary name.
+    aliases: list[str] = []
+    romaji = re.sub(r"^\d+-", "", meta.get("arc_slug") or "").replace("-", " ").strip()
+    for alt in (meta.get("name_jp"), *extra_titles, romaji):
+        if alt and alt != name and alt.lower() != (name or "").lower() and alt not in aliases:
+            aliases.append(alt)
+    if aliases:
+        bits.append("Also known as: " + "; ".join(aliases))
 
     return (". ".join(bits) + ".") if bits else ""

@@ -291,6 +291,14 @@ def _build_event_context(
     from .source.constants import CHARACTER_ID_TO_JP
 
     jp_to_en = (glossary or {}).get("characters", {})
+    # Official English event titles (keyed by event_id) so the prefix lists the EN
+    # title as an alias — the on-disk index only has JP names. Best-effort/offline-ok.
+    try:
+        from .source.client import en_event_names
+
+        en_titles = en_event_names()
+    except Exception:
+        en_titles = {}
     out: dict[str, str] = {}
     for row in events_index or []:
         arc = row.get("arc_slug")
@@ -298,7 +306,9 @@ def _build_event_context(
             continue
         fcid = row.get("focus_character_id")
         en = jp_to_en.get(CHARACTER_ID_TO_JP.get(fcid)) if fcid else None
-        line = arc_context_line(row, focus_name_en=en)
+        en_title = en_titles.get(row.get("event_id"))
+        extra = (en_title,) if en_title and en_title != row.get("name") else ()
+        line = arc_context_line(row, focus_name_en=en, extra_titles=extra)
         if line:
             out[arc] = line
     return out
