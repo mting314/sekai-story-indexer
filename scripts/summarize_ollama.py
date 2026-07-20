@@ -36,10 +36,26 @@ import time
 import urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-STORY = ROOT / "story"
-META = ROOT / "meta.json"
-CACHE = ROOT / "event_summaries.json"
+_HERE = Path(__file__).resolve().parent
+
+
+def _base() -> Path:
+    """Directory that holds story/ — works for BOTH the zip bundle (everything
+    next to this script) and a git clone (story/ at the repo root, one level up)."""
+    for d in (_HERE, _HERE.parent, Path.cwd()):
+        if (d / "story").exists():
+            return d
+    return _HERE
+
+
+BASE = _base()
+STORY = BASE / "story"
+# meta.json lives next to the script in the zip, or under webapp/static in the repo
+META = next(
+    (p for p in (BASE / "meta.json", BASE / "webapp" / "static" / "meta.json", _HERE / "meta.json") if p.exists()),
+    BASE / "meta.json",
+)
+CACHE = BASE / "event_summaries.json"
 BODY_CHARS = 40000  # Ollama models handle long context; keep a sane cap
 
 _meta = json.loads(META.read_text(encoding="utf-8"))
