@@ -15,7 +15,7 @@ from pathlib import Path
 import yaml
 
 from . import client
-from .catalog import build_catalog
+from .catalog import build_catalog, load_focus_overrides
 from .constants import CHARACTER_ID_TO_JP, DB_UNIT_TO_SLUG
 from .transform import (
     arc_slug,
@@ -261,7 +261,10 @@ def fetch_and_write(
         encoding="utf-8",
     )
 
-    catalog = build_catalog(events, **{k: tables[k] for k in tables if k != "events"})
+    catalog = build_catalog(
+        events, focus_overrides=load_focus_overrides(),
+        **{k: tables[k] for k in tables if k != "events"},
+    )
     for row in catalog:
         row["indexed"] = row["event_id"] in written_ids
 

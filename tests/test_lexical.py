@@ -195,7 +195,7 @@ def test_summary_lexical_document_includes_location_and_tier_header() -> None:
     assert lexical_document.startswith(
         "\n".join(
             [
-                "Year: 103",
+                "Event: 103",
                 "Story type: Main",
                 "Episode: 第1話『花咲きたい！』",
                 "Part: 1",

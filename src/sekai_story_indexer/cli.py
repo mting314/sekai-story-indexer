@@ -207,7 +207,7 @@ def _embedding_document_title(node: StoryNode) -> str:
 
 def _summary_tier(node: StoryNode) -> str:
     if node.summary_level == 1:
-        return "Year"
+        return "Event"
     if node.summary_level == 2:
         return "Episode"
     if node.summary_level == 3:
@@ -221,7 +221,7 @@ def _summary_location_header(node: StoryNode) -> str:
     part_name = meta.part_name if node.summary_level == 3 else "ALL_PARTS"
     return "\n".join(
         [
-            f"Year: {meta.arc_id}",
+            f"Event: {meta.arc_id}",
             f"Story type: {meta.story_type}",
             f"Episode: {episode_name}",
             f"Part: {part_name}",
@@ -256,7 +256,7 @@ def _embedding_document(
     aliases = ", ".join(_translation_aliases(node, glossary)) or "none"
     header = ctx_prefix + "\n".join(
         [
-            f"Year: {meta.arc_id}",
+            f"Event: {meta.arc_id}",
             f"Story type: {meta.story_type}",
             f"Episode: {meta.episode_name}",
             f"Part: {meta.part_name}",
@@ -291,6 +291,14 @@ def _build_event_context(
     from .source.constants import CHARACTER_ID_TO_JP
 
     jp_to_en = (glossary or {}).get("characters", {})
+    # Official English event titles (keyed by event_id) so the prefix lists the EN
+    # title as an alias — the on-disk index only has JP names. Best-effort/offline-ok.
+    try:
+        from .source.client import en_event_names
+
+        en_titles = en_event_names()
+    except Exception:
+        en_titles = {}
     out: dict[str, str] = {}
     for row in events_index or []:
         arc = row.get("arc_slug")
@@ -298,7 +306,9 @@ def _build_event_context(
             continue
         fcid = row.get("focus_character_id")
         en = jp_to_en.get(CHARACTER_ID_TO_JP.get(fcid)) if fcid else None
-        line = arc_context_line(row, focus_name_en=en)
+        en_title = en_titles.get(row.get("event_id"))
+        extra = (en_title,) if en_title and en_title != row.get("name") else ()
+        line = arc_context_line(row, focus_name_en=en, extra_titles=extra)
         if line:
             out[arc] = line
     return out

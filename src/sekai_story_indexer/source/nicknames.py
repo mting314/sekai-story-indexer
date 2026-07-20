@@ -20,11 +20,11 @@ from pathlib import Path
 
 from .constants import CHARACTER_ID_TO_JP
 
-# characterId -> abbreviation. CONFIRMED: 13 (kasa), 20 (mizu). Others: seed.
+# characterId -> abbreviation. CONFIRMED: 11 (aki), 13 (kasa), 20 (mizu). Others: seed.
 CHARACTER_ID_TO_ABBREV: dict[int, str] = {
     1: "ichi", 2: "saki", 3: "hona", 4: "shiho",
     5: "mino", 6: "haru", 7: "airi", 8: "shizu",
-    9: "koha", 10: "an", 11: "akito", 12: "toya",
+    9: "koha", 10: "an", 11: "aki", 12: "toya",
     13: "kasa", 14: "emu", 15: "nene", 16: "rui",
     17: "kana", 18: "mafu", 19: "ena", 20: "mizu",
     21: "miku", 22: "rin", 23: "len", 24: "luka",

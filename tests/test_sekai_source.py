@@ -272,25 +272,37 @@ def test_build_catalog_no_focus_when_no_banner():
     assert r["nickname"] is None
 
 
-def test_cross_unit_collab_is_not_a_focus_event():
+def test_event_without_banner_character_is_not_a_focus_event():
+    # crossover / anniversary events have no bannerGameCharacterUnitId -> no single
+    # focus, so no nickname (the banner char is the authoritative focus signal).
     from sekai_story_indexer.source.catalog import build_catalog
 
-    events = [{"id": 22, "name": "Picnic", "startAt": 1000, "eventType": "marathon"}]
+    events = [{"id": 22, "name": "Anniversary", "startAt": 1000, "eventType": "marathon"}]
     stories = {22: {"id": 122, "eventId": 22, "assetbundleName": "ab", "eventStoryEpisodes": []}}
     su = {122: [{"unit": "school_refusal", "eventStoryUnitRelation": "main"}]}
-    banner = {22: 19}  # Ena on banner
-    # 4* cards span two units (N25 Ena + MMJ Airi) -> collab, not a focus event
-    event_card_ids = {22: [1, 2]}
-    cards_by_id = {
-        1: {"id": 1, "characterId": 19, "cardRarityType": "rarity_4"},  # Ena / N25
-        2: {"id": 2, "characterId": 7, "cardRarityType": "rarity_4"},   # Airi / MMJ
-    }
     cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
-                        music_by_event={}, banner_char_by_event=banner,
-                        event_card_ids=event_card_ids, cards_by_id=cards_by_id)
+                        music_by_event={}, banner_char_by_event={})  # no banner
     r = cat[0]
     assert r["is_focus_event"] is False
     assert r["nickname"] is None and r["focus_character"] == ""
+
+
+def test_cross_unit_guest_spotlight_is_still_a_focus_event():
+    # a modern character-spotlight marathon with cross-unit GUEST 4* cards is still
+    # that character's focus event — the banner char is authoritative (event 0209:
+    # "アイドル・花里みのり" banner=Minori with VBS/WxS guests). Regression.
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    events = [{"id": 50, "name": "Idol Minori", "startAt": 1000, "eventType": "marathon"}]
+    stories = {50: {"id": 150, "eventId": 50, "assetbundleName": "ab", "eventStoryEpisodes": []}}
+    # story's main unit is MMJ (guest 4* cards from other units don't change this)
+    su = {150: [{"unit": "idol", "eventStoryUnitRelation": "main"}]}
+    banner = {50: 5}  # Minori (MORE MORE JUMP!)
+    cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
+                        music_by_event={}, banner_char_by_event=banner)
+    r = cat[0]
+    assert r["is_focus_event"] is True
+    assert r["focus_character_id"] == 5 and r["nickname"] == "mino1"
 
 
 def test_backfill_story_tree(tmp_path: Path):
@@ -334,3 +346,112 @@ def test_remap_summary_cache_keys(tmp_path):
     data = json.loads(p.read_text(encoding="utf-8"))
     assert "0097-hashire" in data and "0097" not in data      # renamed
     assert data["0100-keep"] == {"summary": "y"}              # unmapped key preserved
+
+
+def test_cheerful_carnival_single_unit_is_a_focus_event():
+    # Cheerful Carnival with a single-unit 4* focus counts toward nickname numbering
+    # (the community numbers CC events too) — regression for saki7-vs-saki6.
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    events = [{"id": 30, "name": "CC", "startAt": 1000, "eventType": "cheerful_carnival"}]
+    stories = {30: {"id": 130, "eventId": 30, "assetbundleName": "ab", "eventStoryEpisodes": []}}
+    su = {130: [{"unit": "light_sound", "eventStoryUnitRelation": "main"}]}  # Leo/need
+    banner = {30: 2}  # Saki
+    event_card_ids = {30: [1]}
+    cards_by_id = {1: {"id": 1, "characterId": 2, "cardRarityType": "rarity_4"}}  # Saki / Leo/need
+    cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
+                        music_by_event={}, banner_char_by_event=banner,
+                        event_card_ids=event_card_ids, cards_by_id=cards_by_id)
+    r = cat[0]
+    assert r["is_focus_event"] is True
+    assert r["focus_character_id"] == 2 and r["nickname"] == "saki1"
+
+
+def test_virtual_singer_banner_is_not_a_focus_event():
+    # VS headline some events (e.g. New Year) but never get a solo focus event;
+    # the banner char must belong to the single focus unit. Regression for miku1.
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    events = [{"id": 40, "name": "New Year", "startAt": 1000, "eventType": "marathon"}]
+    stories = {40: {"id": 140, "eventId": 40, "assetbundleName": "ab", "eventStoryEpisodes": []}}
+    su = {140: [{"unit": "leo_need", "eventStoryUnitRelation": "main"}]}
+    banner = {40: 21}  # Miku (Virtual Singer) on the banner
+    event_card_ids = {40: [1, 2]}
+    cards_by_id = {
+        1: {"id": 1, "characterId": 21, "cardRarityType": "rarity_4"},  # Miku / VS (excluded)
+        2: {"id": 2, "characterId": 2, "cardRarityType": "rarity_4"},   # Saki / Leo/need
+    }
+    cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
+                        music_by_event={}, banner_char_by_event=banner,
+                        event_card_ids=event_card_ids, cards_by_id=cards_by_id)
+    r = cat[0]
+    assert r["is_focus_event"] is False
+    assert r["focus_character_id"] == 0 and r["nickname"] is None
+
+
+def test_multi_unit_cheerful_carnival_is_not_a_focus_event():
+    # a songless multi-unit CC is a seasonal collab, not a solo focus (Valentine /
+    # White Day / New Year all lack a commissioned song).
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    events = [{"id": 60, "name": "Valentine CC", "startAt": 1000, "eventType": "cheerful_carnival"}]
+    stories = {60: {"id": 160, "eventId": 60, "assetbundleName": "ab", "eventStoryEpisodes": []}}
+    # 3+ units -> seasonal collab, not a solo focus (a 2-unit CC would count)
+    su = {160: [{"unit": "idol", "eventStoryUnitRelation": "main"},
+                {"unit": "light_sound", "eventStoryUnitRelation": "sub"},
+                {"unit": "theme_park", "eventStoryUnitRelation": "sub"}]}
+    banner = {60: 7}  # Airi (MMJ) on banner, but it's a multi-unit collab
+    cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
+                        music_by_event={}, banner_char_by_event=banner)
+    assert cat[0]["is_focus_event"] is False
+
+
+def test_focus_override_forces_and_excludes():
+    # curated overrides: force a focus char (banner!=story lead), or force-exclude.
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    events = [{"id": 97, "name": "Light Up the Fire", "startAt": 1000, "eventType": "marathon"},
+              {"id": 98, "name": "Excluded", "startAt": 2000, "eventType": "marathon"}]
+    stories = {97: {"id": 197, "eventId": 97, "assetbundleName": "a", "eventStoryEpisodes": []},
+               98: {"id": 198, "eventId": 98, "assetbundleName": "b", "eventStoryEpisodes": []}}
+    su = {197: [{"unit": "street", "eventStoryUnitRelation": "main"}],
+          198: [{"unit": "street", "eventStoryUnitRelation": "main"}]}
+    banner = {97: 9, 98: 9}  # master DB banner = Kohane for both
+    cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
+                        music_by_event={}, banner_char_by_event=banner,
+                        focus_overrides={97: 10, 98: 0})
+    by = {r["event_id"]: r for r in cat}
+    assert by[97]["focus_character_id"] == 10 and by[97]["nickname"] == "an1"  # forced -> An
+    assert by[98]["is_focus_event"] is False and by[98]["focus_character_id"] == 0  # excluded
+
+
+def test_multi_unit_marathon_requires_a_song():
+    # multi-unit marathon: a real focus has a commissioned song; a songless
+    # multi-unit event is a collab (regression for 響くトワイライトパレード / 夏祭り).
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    ev = [{"id": 70, "name": "E", "startAt": 1000, "eventType": "marathon"}]
+    base = dict(
+        stories_by_event={70: {"id": 170, "eventId": 70, "assetbundleName": "a", "eventStoryEpisodes": []}},
+        story_units_by_story_id={170: [{"unit": "street", "eventStoryUnitRelation": "main"},
+                                       {"unit": "idol", "eventStoryUnitRelation": "sub"}]},
+        banner_char_by_event={70: 9},  # Kohane (VBS) in the main unit
+    )
+    with_song = build_catalog(ev, music_by_event={70: {"title": "Song", "assetbundleName": "m"}}, **base)
+    assert with_song[0]["is_focus_event"] is True
+    songless = build_catalog(ev, music_by_event={}, **base)
+    assert songless[0]["is_focus_event"] is False
+
+
+def test_single_unit_event_without_song_is_still_a_focus():
+    # a single-unit event is a focus even with no commissioned song (カーテンコール).
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    ev = [{"id": 71, "name": "Curtain", "startAt": 1000, "eventType": "marathon"}]
+    cat = build_catalog(
+        ev,
+        stories_by_event={71: {"id": 171, "eventId": 71, "assetbundleName": "a", "eventStoryEpisodes": []}},
+        story_units_by_story_id={171: [{"unit": "theme_park", "eventStoryUnitRelation": "main"}]},
+        music_by_event={}, banner_char_by_event={71: 16},  # Rui (WxS), no song
+    )
+    assert cat[0]["is_focus_event"] is True

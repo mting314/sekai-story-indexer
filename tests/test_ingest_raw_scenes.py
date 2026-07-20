@@ -63,7 +63,7 @@ def test_part_summary_embedding_document_includes_location_and_tier_header() -> 
     assert embedding_document.text.startswith(
         "\n".join(
             [
-                "Year: 103",
+                "Event: 103",
                 "Story type: Main",
                 "Episode: 第1話『花咲きたい！』",
                 "Part: 1",
@@ -90,7 +90,7 @@ def test_year_summary_embedding_document_uses_all_episode_and_part_header() -> N
     assert "Episode: ALL_EPISODES" in embedding_document.text
     assert "Part: ALL_PARTS" in embedding_document.text
     assert "Summary level: 1" in embedding_document.text
-    assert "Summary tier: Year" in embedding_document.text
+    assert "Summary tier: Event" in embedding_document.text
 
 
 def test_raw_scene_upsert_indexes_every_scene_with_required_metadata(
