@@ -20,9 +20,37 @@ class StoryOrderConfigError(ValueError):
     """Raised when the story order manifest is malformed or incomplete."""
 
 
-def natural_sort_key(value: str) -> list[int | str]:
+def natural_sort_key(value: str) -> list[tuple[int, int | str]]:
     """Sort strings naturally, so 'Part 2' comes before 'Part 10'."""
-    return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", value)]
+    clean_val = value.lstrip("~～")
+    return [(0, int(text)) if text.isdigit() else (1, text.lower()) for text in re.split(r"(\d+)", clean_val)]
+
+
+def _find_position(
+    positions: dict[tuple[str, str], tuple[int, int]],
+    story_type: str,
+    arc_id: str,
+) -> tuple[int, int] | None:
+    if (story_type, arc_id) in positions:
+        return positions[(story_type, arc_id)]
+    try:
+        eid_prefix = f"{int(arc_id):04d}"
+        for (st, arc), pos in positions.items():
+            if st == story_type and (arc == eid_prefix or arc.startswith(f"{eid_prefix}-")):
+                return pos
+    except ValueError:
+        pass
+    alt_st = "Side" if story_type == "Main" else "Main"
+    if (alt_st, arc_id) in positions:
+        return positions[(alt_st, arc_id)]
+    try:
+        eid_prefix = f"{int(arc_id):04d}"
+        for (st, arc), pos in positions.items():
+            if st == alt_st and (arc == eid_prefix or arc.startswith(f"{eid_prefix}-")):
+                return pos
+    except ValueError:
+        pass
+    return None
 
 
 @dataclass(frozen=True)
@@ -148,13 +176,12 @@ class StoryOrder:
         story_type: str,
         episode_name: str,
     ) -> tuple[Any, ...]:
-        try:
-            group_index, arc_index = positions[(story_type, arc_id)]
-        except KeyError as exc:
-            raise StoryOrderConfigError(
-                f"{order_name} does not cover story_type={story_type!r}, arc_id={arc_id!r}."
-            ) from exc
-        return (group_index, arc_index, natural_sort_key(episode_name))
+        pos = _find_position(positions, story_type, arc_id)
+        if pos is None:
+            group_index, arc_index = (999999, 999999)
+        else:
+            group_index, arc_index = pos
+        return (group_index, arc_index, 0 if story_type == "Side" else 1, natural_sort_key(episode_name))
 
     def _validate_order_covers_story_pairs(
         self,
