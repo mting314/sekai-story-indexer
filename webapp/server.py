@@ -307,6 +307,9 @@ _ARC_RE = re.compile(r"\d{4}(?:-[a-z0-9-]+)?")
 _CIT_RE = re.compile(
     r"\(?\s*CITATION:\s*([^\s;)\]]+)(?:\s*;[^)]*)?\)?"
     r"|\[([^\]\n]*\d{4}(?:-[a-z0-9-]+)?[^\]\n]*)\]"
+    # bare form: "<arc-slug> · Side Story … · Part … · Scene 1" (no brackets).
+    # Requires at least one " · " segment so a plain 4-digit number won't match.
+    r"|(\d{4}(?:-[a-z0-9-]+)?(?:\s*·\s*[^·\n.]+)+)"
 )
 _TAG_STRIP = re.compile(r"\{char_id=\d+\}")
 
@@ -319,7 +322,7 @@ def _structure_full_answer(answer: str) -> dict:
     order: list[str] = []
 
     def _repl(m: re.Match) -> str:
-        label = m.group(1) or m.group(2) or ""
+        label = m.group(1) or m.group(2) or m.group(3) or ""
         am = _ARC_RE.search(label)
         arc = am.group(0) if am else label.strip()
         if arc not in refs:
