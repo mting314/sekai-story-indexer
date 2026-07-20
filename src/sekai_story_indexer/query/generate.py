@@ -36,7 +36,13 @@ _STYLE = (
     "prose over headings and bullet lists for short answers.\n"
     "Cite every claim with the bracketed source NUMBER(S) shown in the evidence "
     "(e.g. [1], or [2][3]). Use only those numbers — never invent a citation or "
-    "cite an episode title."
+    "cite an episode title. Cite only the sources you actually draw from — do not "
+    "list sources you didn't use.\n"
+    "When you state something a character said, felt, or decided, ground it with a "
+    "SHORT quote in double quotes, translated into English (do NOT include the "
+    "original Japanese in the answer), then the citation — e.g. she resolves to "
+    'keep it secret ("I\'ll never tell anyone how I feel") [3]. Keep quotes to one '
+    "line; the citation still points to the exact source line."
 )
 
 
@@ -107,6 +113,28 @@ def _context(citations: list[dict], max_chars: int = 120_000) -> str:
     return "\n\n".join(blocks)
 
 
+def _build_prompts(
+    question: str, citations: list[dict], glossary: dict | None
+) -> tuple[str, str]:
+    """(system, user) prompts shared by the one-shot and streaming generators."""
+    arc_ids = {c.get("arc_id") for c in citations if c.get("arc_id")}
+    system = render_system_prompt(
+        context_kind="raw",
+        glossary=_glossary_str(glossary if glossary is not None else _load_glossary()),
+        state_ledger=_state_ledger_str(arc_ids),
+        year_summaries="None available (local retrieval mode).",
+    )
+    system += _STYLE  # the original prompt has no length control; add brevity
+    user = render_user_prompt(
+        context_kind="raw", question=question, context=_context(citations)
+    )
+    return system, user
+
+
+def _resolved_model(model: str | None) -> str:
+    return model or os.getenv("SEKAI_CHAT_MODEL") or "gemini-flash-latest"
+
+
 def generate_answer(
     question: str,
     citations: list[dict],
@@ -121,25 +149,13 @@ def generate_answer(
         from google import genai
         from google.genai import types
 
-        arc_ids = {c.get("arc_id") for c in citations if c.get("arc_id")}
-        system = render_system_prompt(
-            context_kind="raw",
-            glossary=_glossary_str(glossary if glossary is not None else _load_glossary()),
-            state_ledger=_state_ledger_str(arc_ids),
-            year_summaries="None available (local retrieval mode).",
-        )
-        # The original prompt has no length control; add chat-appropriate brevity.
-        system += _STYLE
-        user = render_user_prompt(
-            context_kind="raw", question=question, context=_context(citations)
-        )
+        system, user = _build_prompts(question, citations, glossary)
         client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-        model = model or os.getenv("SEKAI_CHAT_MODEL") or "gemini-flash-latest"
         # Gemini-3 flash models spend output tokens on internal "thinking", so a
         # small max_output_tokens truncates the visible answer mid-sentence. Give
         # ample budget so thinking + answer both fit.
         resp = client.models.generate_content(
-            model=model,
+            model=_resolved_model(model),
             contents=user,
             config=types.GenerateContentConfig(
                 system_instruction=system, temperature=0.2, max_output_tokens=4096
@@ -149,3 +165,35 @@ def generate_answer(
         return text or None
     except Exception:
         return None  # any API/quota/network error -> caller keeps extractive answer
+
+
+def generate_answer_stream(
+    question: str,
+    citations: list[dict],
+    *,
+    glossary: dict | None = None,
+    model: str | None = None,
+):
+    """Yield the grounded NL answer as text deltas (real token streaming). Yields
+    nothing when generation is unavailable, so the caller falls back to chunking
+    the extractive answer."""
+    if not citations or not generation_available():
+        return
+    try:
+        from google import genai
+        from google.genai import types
+
+        system, user = _build_prompts(question, citations, glossary)
+        client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+        for chunk in client.models.generate_content_stream(
+            model=_resolved_model(model),
+            contents=user,
+            config=types.GenerateContentConfig(
+                system_instruction=system, temperature=0.2, max_output_tokens=4096
+            ),
+        ):
+            piece = getattr(chunk, "text", None)
+            if piece:
+                yield piece
+    except Exception:
+        return  # caller falls back to the extractive answer

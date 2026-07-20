@@ -14,7 +14,12 @@ identical by construction.
 
 from __future__ import annotations
 
-from .assets import event_banner_url, event_logo_url, music_jacket_url
+from .assets import (
+    event_banner_url,
+    event_logo_url,
+    event_story_banner_url,
+    music_jacket_url,
+)
 from .constants import CHARACTER_ID_TO_JP, CHARACTER_ID_TO_UNIT
 from .nicknames import assign_focus_nicknames
 from .relevance import classify_event
@@ -65,6 +70,7 @@ def event_record(
         **song,
         "logo_url": event_logo_url(asset_bundle) if asset_bundle else "",
         "banner_url": event_banner_url(asset_bundle) if asset_bundle else "",
+        "story_banner_url": event_story_banner_url(asset_bundle) if asset_bundle else "",
         "jacket_url": (
             music_jacket_url(song["song_assetbundle"]) if song.get("song_assetbundle") else ""
         ),

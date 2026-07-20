@@ -58,6 +58,11 @@
       "question": "Why has Mafuyu disappeared?",
       "unit": "nightcord",
       "expect_unit": "nightcord"
+    },
+    {
+      "id": "contextual-focus-event",
+      "question": "What happens in Kohane's first focus event?",
+      "expect_arc": "0006-lyric"
     }
   ]
 }

@@ -2,7 +2,7 @@ import json
 import os
 import re
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -2213,9 +2213,15 @@ class StoryQueryEngine:
             answer_text=answer_text,
         )
 
-    def query(self, question: str) -> str:
-        """Executes the raw-first RAG query flow."""
-        prepared = self._prepare_query(question)
+    def query(self, question: str, *, arc_ids: tuple[str, ...] = ()) -> str:
+        """Executes the raw-first RAG query flow.
+
+        ``arc_ids`` scopes retrieval to those story arcs (from a caller that has
+        already resolved the referenced event, e.g. a nickname like 'airi1'). This
+        is the guarantee that a scoped follow-up ("the climax of that story")
+        stays on the resolved event instead of vector-searching the whole corpus.
+        """
+        prepared = self._prepare_query(question, scope_arc_ids=arc_ids)
         answer = self._answer_from_prepared(prepared)
         return self._append_audit(question, answer, list(prepared.audit_nodes))
 
@@ -2241,7 +2247,9 @@ class StoryQueryEngine:
             return "No answer generated."
         return self._answer_from_prompts(prepared.system_prompt, prepared.user_prompt)
 
-    def _prepare_query(self, question: str) -> _PreparedQuery:
+    def _prepare_query(
+        self, question: str, *, scope_arc_ids: tuple[str, ...] = ()
+    ) -> _PreparedQuery:
         if self._config().routing_mode == "agentic":
             safe_print("Running the agentic retrieval loop...")
             routed = self._agent_dispatch_with_trace(question)
@@ -2295,6 +2303,17 @@ class StoryQueryEngine:
             structured_answer = self._structured_answer(question, analysis)
             if structured_answer is not None:
                 return _PreparedQuery(immediate_answer=structured_answer)
+        # Caller-resolved scope (e.g. nickname 'airi1' -> its arc) constrains
+        # retrieval via the same arc_ids machinery the heuristic analyzer uses, so
+        # it applies even in the default routing_mode="off" (where analysis is None
+        # and retrieval would otherwise search the whole corpus). Explicit resolved
+        # scope wins over anything the analyzer inferred from the raw text.
+        if scope_arc_ids:
+            analysis = (
+                QueryAnalysis(arc_ids=scope_arc_ids)
+                if analysis is None
+                else replace(analysis, arc_ids=scope_arc_ids)
+            )
         expanded_question = self._expanded_question(question)
         query_embedding = self._query_embedding(expanded_question)
         retrieved_nodes = self._raw_only_retrieve(

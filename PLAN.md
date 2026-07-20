@@ -136,13 +136,23 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   `answer_parts` (text + clickable quote blocks) and `citations[].excerpt`; the
   web app renders quotes inline and opens a side panel with the full scene on
   click. (Full engine gains the same structure in Phase 4.)
-- [~] **Phase 4 — Full-engine scoping.** Shared resolver `query/scoping.py`
-  (`ScopeIndex` + `chroma_where`) DONE and wired into the local engine + per-unit
-  golden cases; `unit`/`arc_id` already flow into Chroma metadata (via
-  `model_dump`), so `chroma_where` filters are ready. Injecting the filter into
-  `engine.py`'s query call + a keyed golden run against `--backend full` is
-  raised (untestable here). `ALLOWED_STORY_TYPES` is fine — content_type maps to
-  Main/Side.
+- [x] **Phase 4 — Full-engine scoping.** Shared resolver `query/scoping.py`
+  (`ScopeIndex` + `chroma_where`) wired into the local engine + per-unit golden
+  cases. **Full-engine scope now wired + verified live:** `engine.query(question,
+  arc_ids=…)` threads a caller-resolved scope into the arc-filter machinery
+  (works even in `routing_mode="off"`), and `webapp/server.py` passes the resolved
+  event's arc(s) (union, so comparisons aren't locked to one). Fixed the
+  scope-drop that switched a follow-up to a different arc (airi1→airi2).
+- [x] **Phase 7 — Natural-chat conversation layer.** Server-side per-session focus
+  state (`webapp/sessions.py`: carry the current event/character across pronoun
+  follow-ups, reset on topic switch); clarify-instead-of-guess gate
+  (`query/disambiguation.py`); deterministic contextual-retrieval prefixes
+  (`query/context.py`: nickname / "character X's Nth focus event" / unit / song) —
+  **live now for the local TF-IDF (free, no re-embed)** and **teed up for the full
+  engine** (prepended to the Chroma embedding + lexical text; takes effect on the
+  next `indexer ingest` re-embed); history windowing (`condense.window_history`);
+  and SSE streaming (`/api/query/stream` + `generate_answer_stream`). See
+  `docs/contextual_embeddings_plan.md`.
 - [~] **Phase 5 — Content beyond events.** **Unit stories DONE** (real fetch:
   `sekai fetch-unit-stories` → `story/<unit>/unit/…`, tested); non-event content
   is always-queryable. Card side-stories + Area conversations: modeled/scaffolded,
@@ -154,6 +164,30 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   substitution inside JP sentences isn't genuinely useful without the LLM.
 
 ## 5. Known follow-ups / accuracy notes
+* **Game-style event timeline scrolling (webapp, deferred).** Rework the event
+  timeline scroll to feel like Project Sekai's in-game event list — smooth
+  momentum/inertia scrolling, snap-to-card, and the banner art (now on each row)
+  as the visual anchor. Currently a plain vertical list (`renderTimeline` +
+  `.event-card` in `webapp/static/`).
+* **Official English story quotes (deferred).** Quotes in answers are currently
+  the LLM's English translation of the JP source line. The data source likely has
+  official EN scenario text (the EN region assets — cf. `client.en_event_names` /
+  `en_music_titles` already read the EN master DB). Ingest the EN scenario text
+  per scene and quote it verbatim (with the JP as source-of-truth fallback for
+  events not yet localized), so quotes are authentic rather than paraphrased.
+* **Lyrics analysis via chat (deferred).** Let the chat answer about a
+  commissioned song's lyrics — e.g. "what do the lyrics of BAKENOHANA mean / how
+  do they tie to the event?" Needs a lyrics source (not in the current master-DB
+  ingest — song jacket/title/composer are captured, lyrics are not), then a
+  retrieval/answer path that links `song_title` ↔ event ↔ lyrics.
+* **Agentic-lite scene selection (local backend, deferred).** A scoped content
+  query currently feeds the WHOLE event (budget-bounded, head+tail) to the answer
+  — complete for small events, but blunt for large scopes. A better design lets
+  the model examine a compact scene "table of contents" (episode title + speakers
+  + first line) and fetch only the scenes it needs (reuse the full engine's
+  `get_scene` tool pattern). Deferred: costs an extra LLM call per turn. Cheaper
+  deterministic alternative if precision is needed first: intent-directed ranking
+  (bias "climax/ending" → late episodes, "beginning" → early) — no extra call.
 * Card/Area fetch flows (Phase 5 remainder) — mirror `fetch_unit_stories`.
 * Full-engine: join `events_index` plot_weight into node metadata at ingest so
   the boost applies there too; inject `chroma_where(scope)` into the query.

@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -257,6 +257,15 @@ class QueryRequest(BaseModel):
     unit: str | None = None
     event_id: int | None = None
     history: list[dict] = []  # prior turns: [{role, text}, ...] for follow-ups
+    session_id: str | None = None  # stable per-chat id for server-side focus state
+
+
+# Server-side conversation focus: remembers the current event/character per chat
+# session, so pronoun follow-ups stay on topic (even with no condense key) and a
+# topic switch resets it. See webapp/sessions.py.
+from webapp.sessions import Focus, SessionStore, is_followup, resolve_turn  # noqa: E402
+
+_SESSIONS = SessionStore()
 
 
 # Backend selection: "local" (default) = dependency-light lexical engine that
@@ -290,47 +299,132 @@ def _get_local_engine():
 GENERATE = os.environ.get("SEKAI_GENERATE", "1") != "0"
 
 
-def _query_local(req: QueryRequest) -> dict:
+def _local_retrieval(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> dict:
+    """Local retrieval only (count/summarize/query) — no NL generation. Shared by
+    the JSON and streaming paths so streaming can emit citations, then stream the
+    answer over them. ``scope_arc_ids`` carries explicit refs or conversation
+    focus so a follow-up stays on the remembered event."""
     from sekai_story_indexer.query.condense import condense
     from sekai_story_indexer.query.intent import classify
 
     engine: Any = _get_local_engine()
-    # Conversation memory: rewrite a follow-up into a standalone question using
-    # recent history, then route/retrieve on that.
     q = condense(req.question, req.history) if req.history else req.question
     intent = classify(q)
 
-    # Deterministic paths for common shapes (mirrors the original's routing).
     if intent == "count":
         result = engine.count_dialogue(q, unit=req.unit, event_id=req.event_id)
-        result["error"] = None
-        result["resolved_question"] = q
-        return result  # exact count — never LLM-generated
-    if intent == "summarize":
-        result = engine.summarize(q, unit=req.unit, event_id=req.event_id)
+    elif intent == "summarize":
+        result = engine.summarize(q, unit=req.unit, event_id=req.event_id, arc_ids=scope_arc_ids)
     else:
-        result = engine.query(q, unit=req.unit, event_id=req.event_id)
+        result = engine.query(q, unit=req.unit, event_id=req.event_id, arc_ids=scope_arc_ids)
     result.setdefault("intent", intent)
     result["resolved_question"] = q
     result["error"] = None
+    return result
 
-    # Pre-computed summaries are returned as-is — no re-summarizing raw scenes.
+
+def _can_generate_over(result: dict) -> bool:
+    """NL generation applies only to non-count, non-pre-summarized results that
+    actually retrieved evidence."""
+    return bool(
+        GENERATE
+        and result.get("intent") != "count"
+        and not result.get("pre_summarized")
+        and result.get("citations")
+    )
+
+
+def _best_supporting_line(excerpt: str, answer: str) -> str:
+    """The line in a cited scene most relevant to the answer — pins WHERE a claim
+    came from (the UI highlights it in the excerpt), instead of the whole episode."""
+    from sekai_story_indexer.query.local import tokenize
+
+    atoks = set(tokenize(answer))
+    best, best_overlap = "", 0
+    for ln in (excerpt or "").splitlines():
+        s = ln.strip()
+        if not s or s.startswith("#"):
+            continue
+        overlap = len(atoks & set(tokenize(s)))
+        if overlap > best_overlap:
+            best, best_overlap = s, overlap
+    return best
+
+
+def _finalize_citations(nl: str, citations: list[dict]) -> tuple[str, list[dict]]:
+    """Keep only the citations the answer actually references, in first-cited order,
+    renumber them contiguously, rewrite the answer's [n], and pin each kept citation
+    to its most-relevant supporting line. Leaves things unchanged if the model cited
+    nothing resolvable (so we never blank the sources)."""
+    refs: list[int] = []
+    for m in re.findall(r"\[(\d+)\]", nl):
+        r = int(m)
+        if r not in refs:
+            refs.append(r)
+    by_ref = {c.get("ref"): c for c in citations}
+    remap: dict[int, int] = {}
+    kept: list[dict] = []
+    for old in refs:
+        c = by_ref.get(old)
+        if c is None:
+            continue
+        remap[old] = len(kept) + 1
+        c = {**c, "ref": remap[old]}
+        pinned = _best_supporting_line(c.get("excerpt", ""), nl)
+        if pinned:
+            c["quote"] = pinned
+        kept.append(c)
+    if not kept:
+        return nl, citations  # model didn't cite resolvably -> don't strip sources
+    nl2 = re.sub(r"\[(\d+)\]", lambda m: f"[{remap[int(m.group(1))]}]"
+                 if int(m.group(1)) in remap else "", nl)
+    # a stripped hallucinated ref can leave " ." / doubled spaces — tidy them
+    nl2 = re.sub(r"\s+([.,;:!?])", r"\1", nl2)
+    nl2 = re.sub(r" {2,}", " ", nl2)
+    return nl2, kept
+
+
+def _apply_generated_answer(result: dict, nl: str) -> None:
+    nl, kept = _finalize_citations(nl, result.get("citations") or [])
+    result["answer"] = nl
+    result["citations"] = kept
+    # prose + a supporting-quote block per cited source (the exact line, [ref]).
+    parts: list[dict] = [{"type": "text", "text": nl}]
+    for c in kept:
+        if c.get("quote"):
+            parts.append({"type": "quote", "ref": c["ref"], "text": c["quote"]})
+    result["answer_parts"] = parts
+    result["generated"] = True
+
+
+def _trim_extractive_citations(result: dict) -> None:
+    """For an extractive (non-generated) answer, keep only the citations the quote
+    blocks actually reference — otherwise a scoped whole-event query would list the
+    entire event as sources (mirrors the generated path's referenced-only trim)."""
+    refs = {
+        p.get("ref")
+        for p in (result.get("answer_parts") or [])
+        if p.get("type") == "quote" and p.get("ref") is not None
+    }
+    if refs:
+        result["citations"] = [
+            c for c in (result.get("citations") or []) if c.get("ref") in refs
+        ]
+
+
+def _query_local(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> dict:
+    result = _local_retrieval(req, scope_arc_ids)
     if result.get("pre_summarized"):
         result["generated"] = True
         return result
-
-    if GENERATE and result.get("citations"):
+    if _can_generate_over(result):
         from sekai_story_indexer.query.generate import generate_answer
 
-        nl = generate_answer(q, result["citations"])
+        nl = generate_answer(result["resolved_question"], result["citations"])
         if nl:
-            # Natural-language answer up top; keep quotes as supporting evidence.
-            result["answer"] = nl
-            result["answer_parts"] = (
-                [{"type": "text", "text": nl}]
-                + [p for p in result.get("answer_parts", []) if p.get("type") == "quote"]
-            )
-            result["generated"] = True
+            _apply_generated_answer(result, nl)
+    if not result.get("generated"):
+        _trim_extractive_citations(result)
     return result
 
 
@@ -393,7 +487,7 @@ def _structure_full_answer(answer: str) -> dict:
     }
 
 
-def _query_full(req: QueryRequest) -> dict:
+def _query_full(req: QueryRequest, *, arc_ids: tuple[str, ...] = ()) -> dict:
     try:
         from sekai_story_indexer.database import initialize_query_settings
         from sekai_story_indexer.query.engine import RetrievalConfig, StoryQueryEngine
@@ -402,7 +496,9 @@ def _query_full(req: QueryRequest) -> dict:
     try:
         initialize_query_settings()
         engine = StoryQueryEngine(retrieval_config=RetrievalConfig())
-        return _structure_full_answer(engine.query(req.question))
+        # Pass the resolved event scope so a follow-up ("the climax of that story")
+        # stays on the resolved arc instead of vector-searching the whole corpus.
+        return _structure_full_answer(engine.query(req.question, arc_ids=arc_ids))
     except Exception as exc:  # pragma: no cover - runtime/config
         return {
             "answer": None,
@@ -435,6 +531,52 @@ def _metadata_intercept(question: str) -> dict | None:
         return metadata_answer(question, load_events(), _characters_meta(), sums)
     except Exception:
         return None
+
+
+def _clarify_intercept(question: str, focus_character_id: int | None = None) -> dict | None:
+    """Clarify-instead-of-guess: if the reference is ambiguous (>=2 distinct
+    interpretations, e.g. an event title AND a character's multi-event arc), ask
+    which one rather than silently answering from one. ``focus_character_id`` is the
+    remembered focus (for the conversational event-vs-arc case). None otherwise."""
+    try:
+        from sekai_story_indexer.query.disambiguation import maybe_clarify
+
+        return maybe_clarify(
+            question, load_events(), _characters_meta(),
+            focus_character_id=focus_character_id,
+        )
+    except Exception:
+        return None
+
+
+def _named_character_id(question: str) -> int | None:
+    """The character explicitly named in the question, if any (for focus state)."""
+    try:
+        from sekai_story_indexer.query.metadata import _resolve_char
+
+        return _resolve_char(question.lower(), _characters_meta())
+    except Exception:
+        return None
+
+
+def _referenced_arcs(question: str, events: list[dict]) -> list[str]:
+    """All arcs referenced by a nickname token in the question, in first-seen order.
+    Scoping to the UNION (not just the first) keeps multi-story questions — e.g.
+    "compare koha1 and mafu1" — confined to exactly those stories instead of
+    hard-locking to whichever nickname appeared first."""
+    from sekai_story_indexer.query.metadata import _NICK_RE
+
+    by_nick = {
+        (e.get("nickname") or "").lower(): e.get("arc_slug")
+        for e in events
+        if e.get("nickname") and e.get("arc_slug")
+    }
+    arcs: list[str] = []
+    for m in _NICK_RE.finditer(question):
+        arc = by_nick.get(m.group(1).lower())
+        if arc and arc not in arcs:
+            arcs.append(arc)
+    return arcs
 
 
 def _resolve_focus_scope(req: QueryRequest) -> dict | None:
@@ -498,7 +640,9 @@ def _summarize_intercept(question: str) -> dict | None:
             "answer_parts": [{"type": "text", "text": ent["summary"]}],
             "characters": ent["characters"],
             "citations": [{
-                "ref": 1, "arc_id": ev.get("arc_slug"), "label": ev.get("name"),
+                "ref": 1, "arc_id": ev.get("arc_slug"),
+                "label": f"{ev.get('name')} — event summary",
+                "episode_title": "Event summary",
                 "nickname": ev.get("nickname"), "excerpt": ent["summary"],
             }],
             "intent": "summarize", "backend": "summary", "error": None,
@@ -507,53 +651,274 @@ def _summarize_intercept(question: str) -> dict | None:
         return None
 
 
-@app.post("/api/query")
-def query(req: QueryRequest) -> dict:
-    """Answer a question. Uses the local lexical engine by default (runs anywhere);
-    set SEKAI_QUERY_BACKEND=full for the Google/Chroma RAG stack."""
-    raw = req.question
-    log: dict = {"question": raw, "history_len": len(req.history or [])}
+def _with_focus(result: dict, focus: Focus | None) -> dict:
+    """Attach the current focus to a response so the UI chip reflects it, enriched
+    with the focus event's unit + nickname (for the chip's icon/label)."""
+    if focus and (focus.arcs or focus.character_id):
+        fd = focus.as_dict()
+        if focus.arcs:
+            ev = next((e for e in load_events() if e.get("arc_slug") == focus.arcs[0]), None)
+            if ev:
+                fd["unit"] = ev.get("unit")
+                fd["nickname"] = ev.get("nickname")
+        result = {**result, "focus": fd}
+    return result
 
-    # Resolve follow-ups into a standalone question up front, so BOTH backends and
-    # the intercepts see the full context (the full engine has no history of its own).
+
+def _remember_focus(session_id: str | None, focus: Focus) -> Focus:
+    focus.updated_at = time.time()
+    _SESSIONS.set(session_id, focus)
+    return focus
+
+
+def _rag_log(log: dict, result: dict, scope_arc_ids: tuple[str, ...], **extra) -> dict:
+    """Uniform RAG-turn log (both JSON + streaming) — enough to SEE a silent guess:
+    an unscoped summarize with a weak top score is the 'rise as one' fingerprint."""
+    scope = result.get("scope") or {}
+    cits = result.get("citations") or []
+    return {
+        **log, "route": "rag", "backend": result.get("backend"),
+        "citations": len(cits),
+        "scoped": bool(scope.get("arc_id") or scope.get("arc_ids") or scope.get("unit")
+                       or scope_arc_ids),
+        "scope_arc": scope.get("arc_id"),
+        "top_arc": cits[0].get("arc_id") if cits else None,
+        "top_score": cits[0].get("score") if cits else None,
+        "fell_back": result.get("summarize_fell_back"),
+        "error": result.get("error"),
+        **extra,
+    }
+
+
+def _resolve_request(req: QueryRequest) -> tuple[dict | None, tuple[str, ...], Focus | None, dict]:
+    """Shared pipeline for the JSON and streaming endpoints.
+
+    Returns ``(early_result, scope_arc_ids, focus, log)``. When ``early_result`` is
+    non-None it's a finished intercept answer (metadata / clarify / summary);
+    otherwise the caller runs the RAG backend with ``scope_arc_ids``.
+    """
+    raw = req.question
+    log: dict = {"question": raw, "history_len": len(req.history or []),
+                 "session_id": req.session_id}
+    followup = is_followup(raw)
+
+    # Windowed condense: bound history, then rewrite follow-ups to standalone so
+    # both backends + intercepts see full context.
     if req.history:
         try:
-            from sekai_story_indexer.query.condense import condense
+            from sekai_story_indexer.query.condense import condense, window_history
 
-            req.question = condense(req.question, req.history)
+            req.history = window_history(req.history)
+            req.question = condense(raw, req.history)
         except Exception:
             pass
         if req.question != raw:
             log["condensed"] = req.question
-        req.history = []  # consumed -> no double-condense in _query_local
+        req.history = []
+
+    events = load_events()
+    prev = _SESSIONS.get(req.session_id)
 
     # Pure identity/count/list focus-event questions -> deterministic answer.
     md = _metadata_intercept(req.question)
     if md is not None:
-        _log_turn({**log, "route": "metadata", "backend": md.get("backend"), "citations": len(md.get("citations") or [])})
-        return md
-    # "Summarize <event>" -> serve the pre-computed summary, not a raw-scene RAG dump.
+        return md, (), prev, {**log, "route": "metadata", "backend": md.get("backend"),
+                              "citations": len(md.get("citations") or [])}
+    # Ambiguous reference -> ask (with remembered focus for the conversational case).
+    cl = _clarify_intercept(req.question, prev.character_id if prev else None)
+    if cl is not None:
+        return cl, (), prev, {**log, "route": "clarify", "backend": "clarify",
+                              "candidates": [o.get("label") for o in cl.get("options") or []]}
+    # "Summarize <event>" -> pre-computed summary; update focus to that event.
     sm = _summarize_intercept(req.question)
     if sm is not None:
-        _log_turn({**log, "route": "summarize", "citations": len(sm.get("citations") or [])})
-        return sm
-    # Other content questions that REFER to an event by focus name/nickname -> resolve
-    # to the event and point the RAG at it, then answer normally.
+        arcs = tuple(c.get("arc_id") for c in (sm.get("citations") or []) if c.get("arc_id"))
+        focus = _remember_focus(req.session_id, Focus(
+            arcs=arcs, character_id=prev.character_id if prev else None,
+            label=(sm.get("citations") or [{}])[0].get("label"),
+        )) if arcs else prev
+        return sm, (), focus, {**log, "route": "summarize",
+                               "citations": len(sm.get("citations") or [])}
+
+    # Content path. Union of arcs the question references (so comparisons aren't
+    # locked to one), plus the focus-resolved event.
+    referenced = _referenced_arcs(req.question, events)
+    named_cid = _named_character_id(req.question)
     ev = _resolve_focus_scope(req)
+    label = None
     if ev:
         log["resolved_event"] = ev.get("arc_slug")
+        label = ev.get("name")
+        if ev.get("arc_slug") and ev["arc_slug"] not in referenced:
+            referenced.append(ev["arc_slug"])
+    # Focus character: a named character, else the resolved event's own focus
+    # character (so a nickname turn like 'koha1' still seeds the focus character —
+    # what the conversational event-vs-arc clarify needs on the next turn).
+    focus_cid = named_cid or (ev.get("focus_character_id") if ev else None) or None
+
+    focus, scope_arcs = resolve_turn(
+        prev, referenced_arcs=tuple(referenced), character_id=focus_cid,
+        label=label, followup=followup,
+    )
+    _remember_focus(req.session_id, focus)
+    log["focus"] = focus.as_dict()
+    if scope_arcs and not referenced:
+        log["carried_focus_arc"] = list(scope_arcs)
+
+    return None, tuple(scope_arcs), focus, log
+
+
+@app.post("/api/query")
+def query(req: QueryRequest) -> dict:
+    """Answer a question. Uses the local lexical engine by default (runs anywhere);
+    set SEKAI_QUERY_BACKEND=full for the Google/Chroma RAG stack."""
+    early, scope_arc_ids, focus, log = _resolve_request(req)
+    if early is not None:
+        _log_turn(log)
+        return _with_focus(early, focus)
+
     if QUERY_BACKEND == "full":
-        result = _query_full(req)
+        result = _query_full(req, arc_ids=scope_arc_ids)
     else:
         try:
-            result = _query_local(req)
+            result = _query_local(req, scope_arc_ids)
         except Exception as exc:  # pragma: no cover - defensive
             result = {"answer": None, "error": f"local query failed: {exc}", "backend": "local"}
-    _log_turn({
-        **log, "route": "rag", "backend": result.get("backend"),
-        "citations": len(result.get("citations") or []), "error": result.get("error"),
-    })
-    return result
+    _log_turn(_rag_log(log, result, scope_arc_ids))
+    return _with_focus(result, focus)
+
+
+def _sse(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def _chunk_text(text: str, size: int = 24):
+    for i in range(0, len(text), size):
+        yield text[i : i + size]
+
+
+def _stream_events(req: QueryRequest):
+    """SSE event stream: a `meta` event, `delta` text events (real token streaming
+    for local generation; chunked otherwise), then a `done` event with the full
+    structured result (citations, scope, focus) for final rendering."""
+    early, scope_arc_ids, focus, log = _resolve_request(req)
+    focus_d = focus.as_dict() if focus and (focus.arcs or focus.character_id) else None
+
+    if early is not None:
+        _log_turn({**log, "streamed": True})
+        yield _sse({"type": "meta", "backend": early.get("backend"),
+                    "intent": early.get("intent"), "focus": focus_d})
+        for piece in _chunk_text(early.get("answer") or ""):
+            yield _sse({"type": "delta", "text": piece})
+        yield _sse({"type": "done", **_with_focus(early, focus)})
+        return
+
+    if QUERY_BACKEND == "full":
+        # NOTE: the full engine generates the whole answer before returning (its
+        # citation post-processing needs the complete text), so these deltas are
+        # chunked-after-the-fact, not true token streaming. Real token streaming
+        # here would need engine.stream_query wired through _structure_full_answer.
+        result = _query_full(req, arc_ids=scope_arc_ids)
+        yield _sse({"type": "meta", "backend": result.get("backend"), "focus": focus_d})
+        for piece in _chunk_text(result.get("answer") or ""):
+            yield _sse({"type": "delta", "text": piece})
+        _log_turn(_rag_log(log, result, scope_arc_ids, streamed=True))
+        yield _sse({"type": "done", **_with_focus(result, focus)})
+        return
+
+    # Local: retrieve first (so we can stream the answer over the citations).
+    try:
+        result = _local_retrieval(req, scope_arc_ids)
+    except Exception as exc:  # pragma: no cover - defensive
+        yield _sse({"type": "done", "answer": None,
+                    "error": f"local query failed: {exc}", "backend": "local"})
+        return
+    yield _sse({"type": "meta", "backend": "local", "intent": result.get("intent"),
+                "scope": result.get("scope"), "focus": focus_d})
+
+    streamed = ""
+    if not result.get("pre_summarized") and _can_generate_over(result):
+        from sekai_story_indexer.query.generate import generate_answer_stream
+
+        for piece in generate_answer_stream(result["resolved_question"], result["citations"]):
+            streamed += piece
+            yield _sse({"type": "delta", "text": piece})
+    if streamed:
+        _apply_generated_answer(result, streamed)
+    else:  # extractive / pre-summarized / no key -> chunk the computed answer
+        if result.get("pre_summarized"):
+            result["generated"] = True
+        else:
+            _trim_extractive_citations(result)
+        for piece in _chunk_text(result.get("answer") or ""):
+            yield _sse({"type": "delta", "text": piece})
+
+    _log_turn(_rag_log(log, result, scope_arc_ids, streamed=True, generated=bool(streamed)))
+    yield _sse({"type": "done", **_with_focus(result, focus)})
+
+
+@app.post("/api/query/stream")
+def query_stream(req: QueryRequest):
+    """Streaming variant of /api/query (Server-Sent Events) for responsive output."""
+    from fastapi.responses import StreamingResponse
+
+    return StreamingResponse(
+        _stream_events(req),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# Image proxy: the browser often can't reach the sekai.best asset CDN directly
+# (restricted network), but the server can. Proxy those images through the app so
+# event art / jackets / logos load from same-origin. Host-allowlisted (SSRF guard)
+# + tiny in-memory cache.
+_ART_HOST = "storage.sekai.best"
+_ART_MAX_BYTES = 8 * 1024 * 1024  # event art / jackets are tiny; cap to be safe
+_art_cache: dict[str, tuple[bytes, str]] = {}
+
+
+def _art_ssl():
+    import ssl
+
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:  # pragma: no cover - certifi optional
+        return ssl.create_default_context()
+
+
+_ART_SSL = _art_ssl()
+
+
+@app.get("/api/img")
+def proxy_image(u: str) -> Response:
+    import urllib.request
+    from urllib.parse import urlparse
+
+    parsed = urlparse(u)
+    if parsed.scheme != "https" or parsed.hostname != _ART_HOST:
+        return Response(status_code=400)  # only the sekai asset CDN
+    cached = _art_cache.get(u)
+    if cached is None:
+        try:
+            req = urllib.request.Request(u, headers={"User-Agent": "sekai-story-indexer"})
+            with urllib.request.urlopen(req, timeout=15, context=_ART_SSL) as r:
+                # cap the body so a large asset URL can't balloon server memory
+                data = r.read(_ART_MAX_BYTES + 1)
+                if len(data) > _ART_MAX_BYTES:
+                    return Response(status_code=502)
+                cached = (data, r.headers.get("Content-Type", "image/webp"))
+        except Exception:
+            return Response(status_code=502)
+        if len(_art_cache) > 512:
+            _art_cache.clear()
+        _art_cache[u] = cached
+    return Response(
+        content=cached[0], media_type=cached[1],
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.get("/api/health")

@@ -4,7 +4,27 @@
 const state = {
   events: [], units: [], activeUnit: "all", scopeEventId: null, history: [],
   view: "timeline", summaries: null, meta: { characters: {}, units: {} }, entityRe: null,
+  sessionId: null,
 };
+
+// Route external (sekai.best) art through the server image proxy so it loads even
+// when the browser can't reach the CDN directly. Local /static paths pass through.
+function proxied(u) {
+  return u && /^https?:\/\//.test(u) ? "/api/img?u=" + encodeURIComponent(u) : (u || "");
+}
+
+// Stable per-chat session id so the server can keep conversation focus state.
+function ensureSessionId() {
+  if (state.sessionId) return state.sessionId;
+  let sid = null;
+  try { sid = localStorage.getItem("sekai_session_id"); } catch (e) { /* ignore */ }
+  if (!sid) {
+    sid = "s-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { localStorage.setItem("sekai_session_id", sid); } catch (e) { /* ignore */ }
+  }
+  state.sessionId = sid;
+  return sid;
+}
 
 async function boot() {
   const [units, events, meta] = await Promise.all([
@@ -185,9 +205,17 @@ function summaryBody(s) {
   const hero = document.createElement("div");
   hero.className = "sum-hero";
 
-  const art = s.jacket_url || s.logo_url || "";
-  const artHtml = art
-    ? `<img class="sum-art" src="${art}" alt="" onerror="this.closest('.sum-hero').classList.add('no-art')">`
+  // Album art with a graceful fallback chain: song jacket -> event logo -> unit
+  // symbol. If the jacket fails to load (network/proxy hiccup), swap to the next
+  // source instead of blanking the art. `data-fallbacks` is a "|"-joined queue the
+  // onerror handler pops from; only after all fail do we mark the hero no-art.
+  const artSources = [s.jacket_url, s.logo_url, u.symbol].filter(Boolean).map(proxied);
+  const artHtml = artSources.length
+    ? `<img class="sum-art" src="${artSources[0]}" alt="" ` +
+      `data-fallbacks="${escapeHtml(artSources.slice(1).join("|"))}" ` +
+      `onerror="var f=(this.dataset.fallbacks||'').split('|').filter(Boolean);` +
+      `if(f.length){this.src=f.shift();this.dataset.fallbacks=f.join('|');}` +
+      `else{this.closest('.sum-hero').classList.add('no-art');}">`
     : "";
 
   const rows = [`<div class="hero-title">${escapeHtml(s.name)}</div>`];
@@ -435,7 +463,7 @@ function renderTimeline() {
     card.className =
       "event-card" + (e.is_key_story ? " key" : "") + (e.indexed ? " indexed" : " pending");
     const logo = e.logo_url
-      ? `<img class="logo" loading="lazy" src="${e.logo_url}" alt="" onerror="this.style.display='none'">`
+      ? `<img class="logo" loading="lazy" src="${proxied(e.logo_url)}" alt="" onerror="this.style.display='none'">`
       : "";
     const nick = e.nickname ? `<span class="nick">${e.nickname}</span>` : "";
     const song = e.song_title ? `<div class="song">🎵 ${e.song_title}</div>` : "";
@@ -445,6 +473,13 @@ function renderTimeline() {
     const status = e.indexed
       ? '<span class="status-dot indexed" title="Queryable in chat now"></span>'
       : '<span class="status-dot pending" title="On the timeline; chat-answerable after the next ingest"></span>';
+    // Event art on the right: the wide event-story banner (title + character)
+    // first, then the home banner, then the song jacket.
+    const art = e.story_banner_url || e.banner_url || e.jacket_url || "";
+    const artHtml = art
+      ? `<img class="event-art" loading="lazy" src="${proxied(art)}" alt="" ` +
+        `onerror="this.style.display='none'">`
+      : "";
     card.innerHTML = `
       ${logo}
       <div class="meta">
@@ -452,7 +487,8 @@ function renderTimeline() {
           ${e.is_key_story ? '<span class="key-badge">key</span>' : ""}</div>
         <div class="name">${e.name}</div>
         ${focus}${song}
-      </div>`;
+      </div>
+      ${artHtml}`;
     card.onclick = () => setScope(e);
     el.appendChild(card);
   }
@@ -497,9 +533,23 @@ function addMessage(role, text) {
   return div;
 }
 
+// Animated "…" typing indicator shown while the model thinks (before the first
+// streamed token) so the bubble isn't blank during generation latency.
+function showThinking(el) {
+  el.classList.add("thinking");
+  el.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
+  document.getElementById("messages").scrollTop = 1e9;
+}
+
+function clearThinking(el) {
+  el.classList.remove("thinking");
+  el.textContent = "";
+}
+
 // Render a rich assistant answer: text runs + clickable quote blocks that open
 // the excerpt sidebar, plus a compact source list.
 function renderAssistant(container, res) {
+  container.classList.remove("thinking");
   container.textContent = "";
   const byRef = {};
   for (const c of res.citations || []) byRef[c.ref] = c;
@@ -665,6 +715,99 @@ function closeExcerpt() {
   document.getElementById("sidebar").classList.add("hidden");
 }
 
+// Show what the conversation is currently "about" (server-inferred focus), unless
+// the user has a manually-clicked timeline scope. Lets the user clear it.
+function showFocusChip(focus) {
+  if (state.scopeEventId) return; // manual scope chip takes precedence
+  const hint = document.getElementById("scope-hint");
+  if (!hint) return;
+  const label = focus && focus.label;
+  if (!label) return;
+
+  const u = (state.meta.units || {})[focus.unit] || {};
+  const ch = (state.meta.characters || {})[focus.character_id];
+  const color = u.color || (ch && ch.color) || "";
+  const icoStyle =
+    "width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:6px;object-fit:cover";
+  // unit symbol normally; a mixed event (or a unit with no symbol) shows the
+  // focus character's icon instead.
+  let icon = "";
+  if (focus.unit && focus.unit !== "mixed" && u.symbol) {
+    icon = `<img src="${u.symbol}" alt="" style="${icoStyle}" onerror="this.style.display='none'">`;
+  } else if (ch && ch.icon) {
+    icon = `<img src="${ch.icon}" alt="" style="${icoStyle}" onerror="this.style.display='none'">`;
+  }
+  const nick = focus.nickname
+    ? ` <span style="opacity:.7">[${escapeHtml(focus.nickname)}]</span>`
+    : "";
+  const sub = (u.name ? escapeHtml(u.name) + " · " : "") + escapeHtml(label);
+  if (color) hint.style.setProperty("--scope-color", color);
+  else hint.style.removeProperty("--scope-color");
+  hint.innerHTML =
+    `<div class="reply-body"><div class="reply-title"${color ? ` style="color:${color}"` : ""}>` +
+    `${icon}In focus${nick}</div>` +
+    `<div class="reply-sub">${sub}</div></div>` +
+    `<button class="reply-close" id="clear-focus" title="Clear focus" aria-label="Clear focus">×</button>`;
+  hint.classList.remove("hidden");
+  const btn = document.getElementById("clear-focus");
+  if (btn) btn.onclick = () => {
+    // abandon server-side focus by rotating the session id, and hide the chip
+    try { localStorage.removeItem("sekai_session_id"); } catch (e) { /* ignore */ }
+    state.sessionId = null;
+    ensureSessionId();
+    hint.classList.add("hidden");
+    hint.innerHTML = "";
+  };
+}
+
+// Consume the SSE stream: append `delta` text as it arrives, finalize on `done`.
+async function streamAnswer(q, pending) {
+  const resp = await fetch("/api/query/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      question: q,
+      unit: state.activeUnit === "all" ? null : state.activeUnit,
+      event_id: state.scopeEventId,
+      history: state.history.slice(-6),
+      session_id: ensureSessionId(),
+    }),
+  });
+  if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let text = "";
+  let done = null;
+  let firstDelta = true;
+  showThinking(pending); // animated "…" until the first token arrives
+  for (;;) {
+    const { value, done: streamDone } = await reader.read();
+    if (streamDone) break;
+    buf += decoder.decode(value, { stream: true });
+    const frames = buf.split("\n\n");
+    buf = frames.pop() || ""; // keep the incomplete tail
+    for (const frame of frames) {
+      const line = frame.split("\n").find((l) => l.startsWith("data: "));
+      if (!line) continue;
+      let evt;
+      try { evt = JSON.parse(line.slice(6)); } catch (e) { continue; }
+      if (evt.type === "delta") {
+        if (firstDelta) { clearThinking(pending); firstDelta = false; }
+        text += evt.text || "";
+        pending.textContent = text; // progressive plain-text render
+        document.getElementById("messages").scrollTop = 1e9;
+      } else if (evt.type === "meta") {
+        if (evt.focus) showFocusChip(evt.focus);
+      } else if (evt.type === "done") {
+        done = evt;
+      }
+    }
+  }
+  return done || { answer: text };
+}
+
 document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const input = document.getElementById("question");
@@ -672,22 +815,32 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   if (!q) return;
   input.value = "";
   addMessage("user", q);
-  const pending = addMessage("assistant", "…");
+  const pending = addMessage("assistant", "");
+  showThinking(pending);
   try {
-    const res = await fetch("/api/query", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question: q,
-        unit: state.activeUnit === "all" ? null : state.activeUnit,
-        event_id: state.scopeEventId,
-        history: state.history.slice(-6), // conversation memory
-      }),
-    }).then((r) => r.json());
+    let res;
+    try {
+      res = await streamAnswer(q, pending);
+    } catch (streamErr) {
+      // SSE can be blocked/buffered by proxies — fall back to the JSON endpoint.
+      showThinking(pending);
+      res = await fetch("/api/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: q,
+          unit: state.activeUnit === "all" ? null : state.activeUnit,
+          event_id: state.scopeEventId,
+          history: state.history.slice(-6),
+          session_id: ensureSessionId(),
+        }),
+      }).then((r) => r.json());
+    }
     if (res.error && !res.answer) {
       pending.textContent = `⚠ ${res.error}`;
     } else {
-      renderAssistant(pending, res);
+      renderAssistant(pending, res); // swap progressive text for the rich view
+      if (res.focus) showFocusChip(res.focus);
       state.history.push({ role: "user", text: q });
       state.history.push({ role: "assistant", text: res.answer || "" });
     }

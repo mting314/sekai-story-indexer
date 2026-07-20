@@ -23,11 +23,19 @@ from ..indexer.processor import StoryProcessor
 from ..models.story import StoryNode
 from ..source.constants import CHARACTER_ID_TO_JP, CHARACTER_ID_TO_UNIT, UNIT_NAMES
 from ..source.relevance import weight_factor
-from .scoping import ScopeIndex
+from .context import arc_context_line
+from .scoping import Scope, ScopeIndex
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 _CJK_RE = re.compile(r"[぀-ヿ㐀-鿿]")
 _H1_RE = re.compile(r"^#\s*(.+)$")
+
+# When a content query is scoped to a single event, feed the whole event to the
+# answer in reading order (bounded by this char budget) instead of a top-k cut,
+# so endings/climaxes aren't dropped. If an event exceeds the budget, keep its
+# head AND tail (drop the middle) so the opening and finale both survive. ~4
+# chars/token, kept under generate._context's own cap.
+_SCOPED_CTX_CHARS = 80_000
 
 # Unit references in questions (substring, lowercased) -> unit slug.
 _UNIT_KEYWORDS = {
@@ -72,15 +80,6 @@ class LocalQueryEngine:
         # pre-computed event summaries {arc_id: text} (from event_summaries.json) —
         # used to answer 'summarize X' cheaply instead of re-reading raw scenes.
         self._event_summaries: dict[str, str] = event_summaries or {}
-        self._tokens: list[list[str]] = [tokenize(n.text) for n in nodes]
-        self._tf: list[Counter] = [Counter(t) for t in self._tokens]
-        df: Counter = Counter()
-        for toks in self._tokens:
-            df.update(set(toks))
-        n_docs = max(1, len(nodes))
-        self._idf: dict[str, float] = {
-            term: math.log(1 + n_docs / (1 + count)) for term, count in df.items()
-        }
         # shared scope resolver (nickname/unit/event) + plot-weight + human-name lookups
         self._scope_index = ScopeIndex(events_index)
         self._weight_by_arc: dict[str, str] = {}
@@ -117,6 +116,35 @@ class LocalQueryEngine:
                 if jp_toks and en_toks:
                     self._expansions.append((frozenset(en_toks), jp_toks))
                     self._expansions.append((frozenset(jp_toks), en_toks))
+        # Contextual retrieval (deterministic, free): index each scene as its
+        # situating context (nickname / "character X's Nth focus event" / unit /
+        # song) + the raw text, so those queries match by meaning. Only the token
+        # source is augmented — node.text (shown/quoted) is untouched. Requires the
+        # meta/char maps above, hence built here.
+        self._tokens: list[list[str]] = [tokenize(self._index_text(n)) for n in nodes]
+        self._tf: list[Counter] = [Counter(t) for t in self._tokens]
+        df: Counter = Counter()
+        for toks in self._tokens:
+            df.update(set(toks))
+        n_docs = max(1, len(nodes))
+        self._idf: dict[str, float] = {
+            term: math.log(1 + n_docs / (1 + count)) for term, count in df.items()
+        }
+
+    def _context_line(self, arc_id: str | None) -> str:
+        """The deterministic contextual-retrieval prefix for an arc (or "")."""
+        meta = self._meta_by_arc.get(arc_id or "")
+        if not meta:
+            return ""
+        fcid = meta.get("focus_character_id")
+        en = self._char_by_id.get(fcid, (None, None))[1] if fcid else None
+        return arc_context_line(meta, focus_name_en=en)
+
+    def _index_text(self, node: StoryNode) -> str:
+        """Text used for TF-IDF indexing: situating context + the scene text. The
+        context is index-only; node.text (shown/quoted) is never modified."""
+        ctx = self._context_line(node.metadata.arc_id)
+        return f"{ctx}\n{node.text}" if ctx else node.text
 
     def _expand_tokens(self, tokens: list[str]) -> list[str]:
         """Augment query tokens with glossary equivalents whose trigger appears."""
@@ -130,6 +158,28 @@ class LocalQueryEngine:
         return expanded
 
     # -- scoping -------------------------------------------------------------
+    def _scoped(
+        self,
+        question: str,
+        *,
+        unit: str | None = None,
+        event_id: int | None = None,
+        arc_ids: tuple[str, ...] = (),
+    ) -> Scope:
+        """Resolve scope from the question, but let caller-supplied ``arc_ids``
+        (explicit references or carried conversation focus) take precedence — so a
+        follow-up stays on the remembered event without an event_id round-trip."""
+        scope = self._scope_index.resolve(question, unit=unit, event_id=event_id)
+        if arc_ids:
+            return Scope(
+                unit=scope.unit or unit,
+                arc_id=arc_ids[0] if len(arc_ids) == 1 else None,
+                arc_ids=tuple(arc_ids) if len(arc_ids) > 1 else (),
+                nickname=scope.nickname,
+                label=scope.label,
+            )
+        return scope
+
     def _candidate_indices(
         self,
         unit: str | None,
@@ -172,6 +222,48 @@ class LocalQueryEngine:
         # deterministic tie-break: score desc, then stable source order
         scored.sort(key=lambda s: (-s[0], self._sort_key(self.nodes[s[1]])))
         return [(self.nodes[i], score) for score, i in scored[:k]]
+
+    def _budget_cover(self, idxs: list[int], budget_chars: int) -> list[int]:
+        """Select scenes within a char budget, always keeping the HEAD and TAIL so a
+        scoped event's opening AND ending (climax) both survive; drop from the
+        middle. ``idxs`` must already be in reading order. Returns reading order."""
+        total = sum(len(self.nodes[i].text) for i in idxs)
+        if total <= budget_chars or len(idxs) <= 2:
+            return idxs
+        picked: list[tuple[int, int]] = []  # (position, node index)
+        lo, hi, used, take_low = 0, len(idxs) - 1, 0, True
+        while lo <= hi:
+            pos = lo if take_low else hi
+            cost = len(self.nodes[idxs[pos]].text)
+            if picked and used + cost > budget_chars:
+                break
+            picked.append((pos, idxs[pos]))
+            used += cost
+            if take_low:
+                lo += 1
+            else:
+                hi -= 1
+            take_low = not take_low
+        picked.sort(key=lambda t: t[0])  # restore reading order
+        return [i for _, i in picked]
+
+    def _scoped_event_hits(
+        self, question: str, unit: str | None, arc_id: str
+    ) -> list[tuple[StoryNode, float]]:
+        """Whole scoped event in reading order (budget-bounded), each scored by
+        query overlap so the extractive quote picker still highlights relevant
+        lines. Reading order (not score) so the answer sees the arc start→finale."""
+        idxs = self._candidate_indices(unit, arc_id)
+        idxs.sort(key=lambda i: self._sort_key(self.nodes[i]))
+        idxs = self._budget_cover(idxs, _SCOPED_CTX_CHARS)
+        q_tokens = [t for t in self._expand_tokens(tokenize(question)) if t in self._idf]
+        hits: list[tuple[StoryNode, float]] = []
+        for i in idxs:
+            tf = self._tf[i]
+            score = sum(tf.get(t, 0) * self._idf[t] for t in q_tokens)
+            score *= weight_factor(self._weight_by_arc.get(self.nodes[i].metadata.arc_id))
+            hits.append((self.nodes[i], score))
+        return hits
 
     @staticmethod
     def _sort_key(node: StoryNode) -> tuple:
@@ -221,11 +313,20 @@ class LocalQueryEngine:
         unit: str | None = None,
         event_id: int | None = None,
         k: int = 5,
+        arc_ids: tuple[str, ...] = (),
     ) -> dict:
-        scope = self._scope_index.resolve(question, unit=unit, event_id=event_id)
+        scope = self._scoped(question, unit=unit, event_id=event_id, arc_ids=arc_ids)
         unit, arc_id, arc_ids = scope.unit, scope.arc_id, scope.arc_ids
 
-        hits = self.retrieve(question, k=k, unit=unit, arc_id=arc_id, arc_ids=arc_ids)
+        # Scoped to a single event: answer over the WHOLE event in reading order
+        # (bounded by a char budget, keeping head+tail so the ending/climax always
+        # survives), not a top-k cut. The query is often cross-lingual (EN over JP
+        # scenes), so nothing lexically favors the finale and a top-k would return
+        # the first k episodes — hiding the climax from the answer.
+        if arc_id and not arc_ids:
+            hits = self._scoped_event_hits(question, unit, arc_id)
+        else:
+            hits = self.retrieve(question, k=k, unit=unit, arc_id=arc_id, arc_ids=arc_ids)
         if not hits:
             candidates = (
                 self._candidate_indices(unit, arc_id, arc_ids) if (arc_id or arc_ids) else []
@@ -332,19 +433,24 @@ class LocalQueryEngine:
     # -- intent-routed paths -------------------------------------------------
     def summarize(
         self, question: str, *, unit: str | None = None, event_id: int | None = None,
-        max_scenes: int = 16,
+        max_scenes: int = 16, arc_ids: tuple[str, ...] = (),
     ) -> dict:
         """Deterministic 'summarize <entity>' path: resolve the entity and pull
         its WHOLE scope in reading order (no lexical top-k), so the summary is
         complete. Falls back to general retrieval if no entity is resolved."""
-        scope = self._scope_index.resolve(question, unit=unit, event_id=event_id)
+        scope = self._scoped(question, unit=unit, event_id=event_id, arc_ids=arc_ids)
         idxs = (
             self._candidate_indices(scope.unit, scope.arc_id, scope.arc_ids)
             if (scope.unit or scope.arc_id or scope.arc_ids)
             else []
         )
         if not idxs:
-            return self.query(question, unit=unit, event_id=event_id)  # general fallback
+            # No entity resolved for a 'summarize X' request -> we fall back to
+            # general lexical retrieval and answer from the top-ranked arc. Flag it
+            # so callers/logs can see this guess (the "rise as one" failure mode).
+            fallback = self.query(question, unit=unit, event_id=event_id, arc_ids=arc_ids)
+            fallback["summarize_fell_back"] = True
+            return fallback
         # chronological across parts (arc_slugs are zero-padded by date)
         idxs.sort(key=lambda i: (self.nodes[i].metadata.arc_id, *self._sort_key(self.nodes[i])[2:]))
         if scope.arc_ids:  # multi-part: sample evenly so every part is represented

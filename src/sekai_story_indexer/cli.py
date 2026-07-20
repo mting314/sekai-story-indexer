@@ -232,17 +232,29 @@ def _summary_location_header(node: StoryNode) -> str:
     )
 
 
-def _embedding_document(node: StoryNode, glossary: dict | None = None) -> EmbeddingDocument:
+def _embedding_document(
+    node: StoryNode,
+    glossary: dict | None = None,
+    event_context: dict[str, str] | None = None,
+) -> EmbeddingDocument:
+    # Contextual retrieval (Anthropic-style): prepend a short situating line
+    # (nickname / "character X's Nth focus event" / unit / song) so those queries
+    # match by meaning. Same builder as the local backend (query/context.py). Only
+    # the EMBEDDED/lexical text carries it; the stored Chroma document stays raw.
+    # NOTE: takes effect only after a re-ingest (re-embeds every node).
+    ctx = (event_context or {}).get(node.metadata.arc_id or "", "")
+    ctx_prefix = f"{ctx}\n" if ctx else ""
+
     if node.summary_level != 4:
         return EmbeddingDocument(
-            text=f"{_summary_location_header(node)}{node.text}",
+            text=f"{ctx_prefix}{_summary_location_header(node)}{node.text}",
             title=_embedding_document_title(node),
         )
 
     meta = node.metadata
     speakers = ", ".join(meta.detected_speakers) if meta.detected_speakers else "none"
     aliases = ", ".join(_translation_aliases(node, glossary)) or "none"
-    header = "\n".join(
+    header = ctx_prefix + "\n".join(
         [
             f"Year: {meta.arc_id}",
             f"Story type: {meta.story_type}",
@@ -260,11 +272,36 @@ def _embedding_document(node: StoryNode, glossary: dict | None = None) -> Embedd
     return EmbeddingDocument(text=f"{header}{node.text}", title=_embedding_document_title(node))
 
 
-def _lexical_document(node: StoryNode, glossary: dict | None = None) -> str:
-    embedding_document = _embedding_document(node, glossary)
-    if node.summary_level != 4:
-        return embedding_document.text
-    return embedding_document.text
+def _lexical_document(
+    node: StoryNode,
+    glossary: dict | None = None,
+    event_context: dict[str, str] | None = None,
+) -> str:
+    # Contextual BM25: same situating prefix as the embedding text (built once in
+    # _embedding_document), so lexical retrieval gains the nickname/focus signal too.
+    return _embedding_document(node, glossary, event_context).text
+
+
+def _build_event_context(
+    events_index: list[dict] | None, glossary: dict | None
+) -> dict[str, str]:
+    """arc_slug -> deterministic contextual-retrieval line, resolving the focus
+    character's English name from the glossary so EN queries match too."""
+    from .query.context import arc_context_line
+    from .source.constants import CHARACTER_ID_TO_JP
+
+    jp_to_en = (glossary or {}).get("characters", {})
+    out: dict[str, str] = {}
+    for row in events_index or []:
+        arc = row.get("arc_slug")
+        if not arc:
+            continue
+        fcid = row.get("focus_character_id")
+        en = jp_to_en.get(CHARACTER_ID_TO_JP.get(fcid)) if fcid else None
+        line = arc_context_line(row, focus_name_en=en)
+        if line:
+            out[arc] = line
+    return out
 
 
 def _metadata_for_node(node: StoryNode) -> dict:
@@ -326,6 +363,7 @@ def _upsert_story_nodes(
     progress_label: str,
     glossary: dict | None = None,
     lexical_index: LexicalIndex | None = None,
+    event_context: dict[str, str] | None = None,
 ) -> list[str]:
     collection = get_chroma_collection()
     batch_size = 32
@@ -336,8 +374,12 @@ def _upsert_story_nodes(
         for start in range(0, len(nodes), batch_size):
             batch = nodes[start : start + batch_size]
             documents = [node.text for node in batch]
-            embedding_documents = [_embedding_document(node, glossary) for node in batch]
-            lexical_documents = [_lexical_document(node, glossary) for node in batch]
+            embedding_documents = [
+                _embedding_document(node, glossary, event_context) for node in batch
+            ]
+            lexical_documents = [
+                _lexical_document(node, glossary, event_context) for node in batch
+            ]
             metadatas = [_metadata_for_node(node) for node in batch]
             ids = [_node_id(node) for node in batch]
             emitted_ids.extend(ids)
@@ -732,6 +774,20 @@ def ingest(
             glossary = json.load(f)
             console.print("Loaded glossary for translation invariants.")
 
+    # Contextual-retrieval prefixes (nickname / focus-event / unit / song) keyed by
+    # arc, prepended to the embedded + lexical text so those queries match. Built
+    # from events_index.json; takes effect on this (re-)ingest's embeddings.
+    events_index = None
+    events_index_path = Path("events_index.json")
+    if events_index_path.exists():
+        with open(events_index_path, encoding="utf-8") as f:
+            events_index = json.load(f)
+    event_context = _build_event_context(events_index, glossary)
+    if event_context:
+        console.print(
+            f"Built contextual-retrieval prefixes for {len(event_context)} events."
+        )
+
     # Generate Tier 1-3 hierarchical summaries
     generation_provider = get_generation_provider_name()
     generation_model = get_generation_model_name()
@@ -799,6 +855,7 @@ def ingest(
             progress_label="[green]Embedding raw retrieval chunks...",
             glossary=glossary,
             lexical_index=lexical_index,
+            event_context=event_context,
         )
     summary_ids = (
         _upsert_story_nodes(
@@ -806,6 +863,7 @@ def ingest(
             progress_label="[green]Embedding summaries...",
             glossary=glossary,
             lexical_index=lexical_index,
+            event_context=event_context,
         )
         if summary_nodes
         else set()
