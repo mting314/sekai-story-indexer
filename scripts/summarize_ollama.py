@@ -56,34 +56,114 @@ META = next(
     BASE / "meta.json",
 )
 CACHE = BASE / "event_summaries.json"
-BODY_CHARS = 40000  # Ollama models handle long context; keep a sane cap
+BODY_CHARS = 24000  # keep the JA source within the model's context window
 
 _meta = json.loads(META.read_text(encoding="utf-8"))
 NAMES = [c["en"] for c in _meta["characters"].values()]
 NAME_TO_ID = {c["en"]: int(cid) for cid, c in _meta["characters"].items()}
+ID_TO_EN = {int(cid): c["en"] for cid, c in _meta["characters"].items()}
+UNIT_NAMES = {slug: u["name"] for slug, u in _meta.get("units", {}).items()}
 
-PROMPT = """You are an expert at summarizing Project Sekai (Hatsune Miku: Colorful Stage!) event stories.
+# Ground-truth rosters so the model NEVER guesses group membership. Order matters
+# only for readability. Virtual Singers appear across all groups.
+_UNIT_ORDER = [
+    "leo_need", "more_more_jump", "vivid_bad_squad",
+    "wonderlands_showtime", "nightcord", "virtual_singer",
+]
+_roster: dict[str, list[str]] = {}
+for _cid, _c in _meta["characters"].items():
+    _roster.setdefault(_c.get("unit", "other"), []).append(_c["en"])
+ROSTER_TEXT = "\n".join(
+    f"- {UNIT_NAMES.get(slug, slug)}: {', '.join(_roster[slug])}"
+    for slug in _UNIT_ORDER
+    if slug in _roster
+)
 
-Summarize the event story below in 1-2 short English paragraphs. Focus on plot progression and character development; refer to characters by their English names. Do not invent anything that is not in the text.
+# Optional glossary (JP -> EN mandatory translations), matching the Google path.
+# Bundled as glossary.json next to this script, or found in the repo root.
+_glossary = {}
+for _gp in (BASE / "glossary.json", _HERE / "glossary.json"):
+    if _gp.exists():
+        try:
+            _glossary = json.loads(_gp.read_text(encoding="utf-8"))
+        except Exception:
+            _glossary = {}
+        break
+_gloss_lines: list[str] = []
+for _cat, _terms in _glossary.items():
+    if isinstance(_terms, dict) and _terms:
+        _gloss_lines.append(f"{_cat.replace('_', ' ').upper()}:")
+        _gloss_lines += [f" - {jp} -> {en}" for jp, en in _terms.items()]
+GLOSSARY_TEXT = "\n".join(_gloss_lines)
 
-Write clean prose only. Do NOT include headings, numbered steps, bullet points, outlines, draft notes, or labels such as "Paragraph 1" or "Refine". Do NOT describe your process.
+# Optional per-event enrichment (focus character, song) if events_index.json is
+# bundled alongside. Purely additive context; absent -> just the unit.
+_EVENT_META: dict[str, dict] = {}
+for _p in (BASE / "events_index.json", _HERE / "events_index.json"):
+    if _p.exists():
+        try:
+            _EVENT_META = {r.get("arc_slug"): r for r in json.loads(_p.read_text(encoding="utf-8"))}
+        except Exception:
+            _EVENT_META = {}
+        break
 
-After the summary, list which of these characters actually appear (use these exact names): {names}
+# Kept in sync with src/sekai_story_indexer/source/summary_prompt.py (canonical).
+SYSTEM = (
+    "You are an expert archivist and translator indexing Japanese Project Sekai "
+    "(Hatsune Miku: Colorful Stage!) event stories. You write all summaries in "
+    "clear, concise ENGLISH — never Japanese. You use only the character names and "
+    "group memberships given to you; you never invent characters or move a "
+    "character to a different group."
+)
+if GLOSSARY_TEXT:
+    SYSTEM += (
+        "\n\n--- OFFICIAL GLOSSARY (MANDATORY TRANSLATIONS) ---\n"
+        "When translating or referencing names and terms, you MUST use these "
+        "English equivalents:\n" + GLOSSARY_TEXT
+    )
+
+PROMPT = """Character groups (ground truth — use these EXACT English names and do NOT reassign anyone to a different group):
+{roster}
+
+{context}
+
+Summarize the Japanese event story below in 1-2 short paragraphs of clear ENGLISH prose. Focus on plot progression and character development. Do not invent anything that is not in the text. Write the summary in English only.
+
+Write clean prose only: no headings, numbered steps, bullet points, outlines, draft notes, or labels like "Paragraph 1" or "Refine". Do not describe your process.
+
+After the summary, list which of the characters above actually appear in this story (exact English names).
 
 Return ONLY a JSON object and nothing else:
-{{"summary": "<the finished summary>", "characters": ["<name>", "<name>"]}}
+{{"summary": "<the English summary>", "characters": ["<name>", "<name>"]}}
 
-Story:
+Story (Japanese):
 {body}"""
 
 
-def read_arcs() -> dict[str, str]:
-    arcs: dict[str, list[Path]] = {}
+def _context_for(arc: str, unit: str) -> str:
+    """One-line ground-truth context for this event: unit, focus char, song."""
+    bits = [f"This is a {UNIT_NAMES.get(unit, unit)} event story."]
+    rec = _EVENT_META.get(arc, {})
+    fid = rec.get("focus_character_id")
+    if fid and int(fid) in ID_TO_EN:
+        bits.append(f"Its focus character is {ID_TO_EN[int(fid)]}.")
+    song = rec.get("song_title")
+    if song:
+        bits.append(f'The featured song is "{song}".')
+    return " ".join(bits)
+
+
+def read_arcs() -> dict[str, tuple[str, str]]:
+    """arc_slug -> (unit_slug, concatenated scene text)."""
+    files: dict[str, list[Path]] = {}
+    unit: dict[str, str] = {}
     for md in STORY.glob("*/event/*/*.md"):
-        arcs.setdefault(md.parent.name, []).append(md)
+        arc = md.parent.name
+        files.setdefault(arc, []).append(md)
+        unit[arc] = md.parts[md.parts.index("story") + 1] if "story" in md.parts else "mixed"
     return {
-        arc: "\n\n".join(p.read_text(encoding="utf-8") for p in sorted(files))
-        for arc, files in arcs.items()
+        arc: (unit.get(arc, "mixed"), "\n\n".join(p.read_text(encoding="utf-8") for p in sorted(fs)))
+        for arc, fs in files.items()
     }
 
 
@@ -111,13 +191,18 @@ def is_broken(entry) -> bool:
     return text[-1] not in ".!?」）)…\""
 
 
-def ollama_chat(host: str, model: str, prompt: str) -> str:
+def ollama_chat(host: str, model: str, prompt: str, system: str = "") -> str:
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
     body = json.dumps(
         {
             "model": model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
             "stream": False,
-            "options": {"temperature": 0.3, "num_ctx": 16384},
+            # low temp for consistency; big context so full JA events fit
+            "options": {"temperature": 0.2, "num_ctx": 32768},
         }
     ).encode("utf-8")
     req = urllib.request.Request(
@@ -166,10 +251,13 @@ def main() -> int:
 
     print(f"model={args.model}  events to generate: {len(todo)}", flush=True)
     for i, arc in enumerate(todo, 1):
-        prompt = PROMPT.format(names=", ".join(NAMES), body=arcs[arc][:BODY_CHARS])
+        unit, body = arcs[arc]
+        prompt = PROMPT.format(
+            roster=ROSTER_TEXT, context=_context_for(arc, unit), body=body[:BODY_CHARS]
+        )
         t0 = time.time()
         try:
-            out = ollama_chat(args.host, args.model, prompt)
+            out = ollama_chat(args.host, args.model, prompt, system=SYSTEM)
         except Exception as exc:
             print(f"[{i}/{len(todo)}] {arc}: FAILED ({exc}) — skipping", flush=True)
             continue

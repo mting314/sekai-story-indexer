@@ -17,31 +17,45 @@ from collections.abc import Callable
 from pathlib import Path
 
 from ..models.story import StoryMetadata, StoryNode
-from ..source.constants import UNIT_NAMES
+from ..source import summary_prompt
 
-_PROMPT = (
-    "Summarize this Project Sekai event story in 1-2 short paragraphs. Focus on "
-    "plot progression and character development; name the characters involved. "
-    "Do not invent anything not in the text.\n\n"
-    "Output ONLY the finished summary as plain prose. Do NOT include headings, "
-    "numbered steps, bullet points, outlines, draft notes, or labels such as "
-    "'Paragraph 1', 'Refine and Polish', or 'Draft'. Do NOT describe your process "
-    "— write the summary directly.\n\n"
-    "Event: {name}  (unit: {unit})\n\nStory:\n{body}\n\nSummary:"
-)
+
+def _load_event_meta() -> dict[str, dict]:
+    """arc_slug -> event record (for focus character + song context). Optional."""
+    for p in (Path("events_index.json"), Path(__file__).resolve().parents[3] / "events_index.json"):
+        if p.exists():
+            try:
+                return {r.get("arc_slug"): r for r in json.loads(p.read_text(encoding="utf-8"))}
+            except Exception:
+                return {}
+    return {}
+
+
+_EVENT_META = _load_event_meta()
 
 
 def _summarize_text(name: str, unit: str, body: str, model: str) -> str:
+    """Summarize one event with the SHARED prompt (identical to the local/Ollama
+    path): rosters + glossary + per-event context + English-pin. ``name`` is the
+    arc_slug, used to look up focus character + song."""
     from google import genai
     from google.genai import types
 
+    rec = _EVENT_META.get(name, {})
+    prompt = summary_prompt.build_prompt(
+        unit,
+        body[:200_000],
+        focus_id=rec.get("focus_character_id"),
+        song=rec.get("song_title"),
+    )
     client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-    prompt = _PROMPT.format(name=name, unit=UNIT_NAMES.get(unit, unit), body=body[:200_000])
-    # Disable "thinking" so the whole output budget goes to the visible answer.
-    # Gemini-3/2.5 flash otherwise spends tokens on internal planning and either
-    # leaks scaffolding ("Paragraph 1:", "Refine and Polish") into the text or
-    # truncates the summary mid-sentence. thinking_budget=0 fixes both.
-    kwargs: dict = {"temperature": 0.2, "max_output_tokens": 2048}
+    # Disable "thinking" so the whole output budget goes to the answer (Gemini-3/2.5
+    # flash otherwise burns it on planning and truncates mid-sentence).
+    kwargs: dict = {
+        "temperature": 0.2,
+        "max_output_tokens": 2048,
+        "system_instruction": summary_prompt.SYSTEM,
+    }
     try:
         kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
     except Exception:  # older google-genai without ThinkingConfig
@@ -51,7 +65,8 @@ def _summarize_text(name: str, unit: str, body: str, model: str) -> str:
         contents=prompt,
         config=types.GenerateContentConfig(**kwargs),
     )
-    return (resp.text or "").strip()
+    # Shared prompt asks for JSON {summary, characters}; store just the prose.
+    return summary_prompt.parse_summary(resp.text or "")["summary"]
 
 
 def summarize_events(
