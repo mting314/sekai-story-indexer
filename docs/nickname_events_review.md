@@ -1,22 +1,20 @@
 # Event → nickname, by character
 
-Post-fix (banner + story-main-unit rule). One row per focus event per character.
-Flag any wrong numbering / missing / extra events.
+Rule: marathon (banner in single main unit) + single-unit Cheerful Carnivals.
 
-### Ichika Hoshino — Leo/need  (id 1)
+### Ichika Hoshino — Leo/need (id 1) — 6
 | nick | date | type | event |
-|------|------|------|-------|
-| `ichi1` | 2021-04-01 | cheerful_carnival | 君と歌う、桜舞う世界で |
-| `ichi2` | 2021-09-10 | marathon | Knock the Future!! |
-| `ichi3` | 2022-04-21 | marathon | Live with memories |
-| `ichi4` | 2022-11-11 | marathon | Echo my melody |
-| `ichi5` | 2023-07-21 | marathon | つなぐ、星の歌 |
-| `ichi6` | 2024-09-20 | marathon | This moment with you！ |
-| `ichi7` | 2025-10-11 | marathon | 君と繋ぐHeart Beat |
+|---|---|---|---|
+| `ichi1` | 2021-09-10 | marathon | Knock the Future!! |
+| `ichi2` | 2022-04-21 | marathon | Live with memories |
+| `ichi3` | 2022-11-11 | marathon | Echo my melody |
+| `ichi4` | 2023-07-21 | marathon | つなぐ、星の歌 |
+| `ichi5` | 2024-09-20 | marathon | This moment with you！ |
+| `ichi6` | 2025-10-11 | marathon | 君と繋ぐHeart Beat |
 
-### Saki Tenma — Leo/need  (id 2)
+### Saki Tenma — Leo/need (id 2) — 7
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `saki1` | 2020-10-09 | marathon | 雨上がりの一番星 |
 | `saki2` | 2021-06-30 | cheerful_carnival | Unnamed Harmony |
 | `saki3` | 2022-07-21 | marathon | No seek No find |
@@ -25,9 +23,9 @@ Flag any wrong numbering / missing / extra events.
 | `saki6` | 2024-10-31 | marathon | Happy Enjoy Music！ |
 | `saki7` | 2025-11-30 | marathon | 仰ぐ夜空に、星は紛れて |
 
-### Honami Mochizuki — Leo/need  (id 3)
+### Honami Mochizuki — Leo/need (id 3) — 6
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `hona1` | 2021-01-10 | marathon | 揺れるまま、でも君は前へ |
 | `hona2` | 2021-11-11 | marathon | 揺るがぬ想い、今言葉にして |
 | `hona3` | 2023-01-21 | marathon | Little Bravers！ |
@@ -35,9 +33,9 @@ Flag any wrong numbering / missing / extra events.
 | `hona5` | 2025-07-15 | marathon | Unsteady, still steady step |
 | `hona6` | 2026-04-30 | marathon | あたたかな思い出を辿って |
 
-### Shiho Hinomori — Leo/need  (id 4)
+### Shiho Hinomori — Leo/need (id 4) — 7
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `shiho1` | 2021-02-09 | marathon | 響くトワイライトパレード |
 | `shiho2` | 2021-04-21 | marathon | Resonate with you |
 | `shiho3` | 2022-02-18 | marathon | あの日、空は遠かった |
@@ -46,9 +44,9 @@ Flag any wrong numbering / missing / extra events.
 | `shiho6` | 2025-03-30 | marathon | Find the dream view |
 | `shiho7` | 2026-02-10 | marathon | Path made by faith |
 
-### Minori Hanasato — MORE MORE JUMP!  (id 5)
+### Minori Hanasato — MORE MORE JUMP! (id 5) — 7
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `mino1` | 2021-03-22 | marathon | 届け！HOPEFUL STAGE♪ |
 | `mino2` | 2021-12-10 | marathon | MOREMOREMakingXmas |
 | `mino3` | 2022-10-12 | marathon | 拝啓、あの頃のわたしへ |
@@ -57,32 +55,30 @@ Flag any wrong numbering / missing / extra events.
 | `mino6` | 2025-07-23 | marathon | start rolling! stars' crossing |
 | `mino7` | 2026-06-30 | marathon | アイドル・花里みのり～夢の最前線～ |
 
-### Haruka Kiritani — MORE MORE JUMP!  (id 6)
+### Haruka Kiritani — MORE MORE JUMP! (id 6) — 6
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `haru1` | 2021-05-21 | marathon | 頑張るあなたにBreak Time！ |
-| `haru2` | 2021-12-31 | cheerful_carnival | 祈りの先 願う明日は |
-| `haru3` | 2022-04-30 | cheerful_carnival | つなぐPainful Hope |
-| `haru4` | 2022-11-30 | cheerful_carnival | あの日の夢の、彼方向こうへ |
-| `haru5` | 2024-06-10 | marathon | Lead to shine more |
-| `haru6` | 2025-02-10 | marathon | Rise and Strive |
-| `haru7` | 2025-12-21 | marathon | この物語は希望をのせて |
+| `haru2` | 2022-04-30 | cheerful_carnival | つなぐPainful Hope |
+| `haru3` | 2022-11-30 | cheerful_carnival | あの日の夢の、彼方向こうへ |
+| `haru4` | 2024-06-10 | marathon | Lead to shine more |
+| `haru5` | 2025-02-10 | marathon | Rise and Strive |
+| `haru6` | 2025-12-21 | marathon | この物語は希望をのせて |
 
-### Airi Momoi — MORE MORE JUMP!  (id 7)
+### Airi Momoi — MORE MORE JUMP! (id 7) — 7
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `airi1` | 2020-11-19 | marathon | ここからRE:START！ |
 | `airi2` | 2021-08-10 | marathon | ハッピー・ラブリー・エブリデイ！ |
-| `airi3` | 2022-01-31 | cheerful_carnival | 秘密の♡バレンタイン大作戦！ |
-| `airi4` | 2022-08-10 | marathon | 青空の先、輝きを追いかけて |
-| `airi5` | 2023-04-21 | marathon | Re-tie Friendship |
-| `airi6` | 2024-07-31 | marathon | Chase my IDEAL IDOL！ |
-| `airi7` | 2025-05-23 | marathon | Cheer with my Heart! |
-| `airi8` | 2026-03-10 | marathon | Open up new horizons！ |
+| `airi3` | 2022-08-10 | marathon | 青空の先、輝きを追いかけて |
+| `airi4` | 2023-04-21 | marathon | Re-tie Friendship |
+| `airi5` | 2024-07-31 | marathon | Chase my IDEAL IDOL！ |
+| `airi6` | 2025-05-23 | marathon | Cheer with my Heart! |
+| `airi7` | 2026-03-10 | marathon | Open up new horizons！ |
 
-### Shizuku Hinomori — MORE MORE JUMP!  (id 8)
+### Shizuku Hinomori — MORE MORE JUMP! (id 8) — 6
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `shizu1` | 2021-01-21 | marathon | Color of Myself！ |
 | `shizu2` | 2022-03-11 | marathon | Cast Spell on You |
 | `shizu3` | 2023-02-10 | marathon | ほどかれた糸のその先に |
@@ -90,9 +86,9 @@ Flag any wrong numbering / missing / extra events.
 | `shizu5` | 2024-12-11 | marathon | Grow glorious glow |
 | `shizu6` | 2025-10-21 | marathon | 交わる色はあの日のままに |
 
-### Kohane Azusawa — Vivid BAD SQUAD  (id 9)
+### Kohane Azusawa — Vivid BAD SQUAD (id 9) — 8
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `koha1` | 2021-07-09 | marathon | Awakening Beat |
 | `koha2` | 2022-02-09 | marathon | Legend still vivid |
 | `koha3` | 2023-02-19 | marathon | Kick it up a notch |
@@ -102,9 +98,9 @@ Flag any wrong numbering / missing / extra events.
 | `koha7` | 2025-05-31 | marathon | Aim higher and higher！ |
 | `koha8` | 2026-05-08 | marathon | Stay solid, No fold |
 
-### An Shiraishi — Vivid BAD SQUAD  (id 10)
+### An Shiraishi — Vivid BAD SQUAD (id 10) — 6
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `an1` | 2020-11-30 | marathon | いつか、背中あわせのリリックを |
 | `an2` | 2021-10-11 | marathon | Bout for Beside You |
 | `an3` | 2022-07-11 | marathon | The Vivid Old Tale |
@@ -112,9 +108,9 @@ Flag any wrong numbering / missing / extra events.
 | `an5` | 2025-07-31 | marathon | Competitive fire！ |
 | `an6` | 2026-04-09 | marathon | Show 'em what's up！ |
 
-### Akito Shinonome — Vivid BAD SQUAD  (id 11)
+### Akito Shinonome — Vivid BAD SQUAD (id 11) — 7
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `aki1` | 2021-04-30 | cheerful_carnival | STRAY BAD DOG |
 | `aki2` | 2021-07-20 | marathon | 夏祭り、鳴り響く音は |
 | `aki3` | 2022-05-20 | marathon | THE POWER OF UNITY |
@@ -123,9 +119,9 @@ Flag any wrong numbering / missing / extra events.
 | `aki6` | 2024-10-21 | marathon | Rekindle the flame |
 | `aki7` | 2025-11-20 | marathon | Overcome one's limits |
 
-### Toya Aoyagi — Vivid BAD SQUAD  (id 12)
+### Toya Aoyagi — Vivid BAD SQUAD (id 12) — 6
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `toya1` | 2021-01-31 | marathon | Period of NOCTURNE |
 | `toya2` | 2021-12-20 | marathon | Same Dreams,Same Colors |
 | `toya3` | 2022-09-20 | marathon | Walk on and on |
@@ -133,22 +129,20 @@ Flag any wrong numbering / missing / extra events.
 | `toya5` | 2025-01-11 | marathon | Time to take off！ |
 | `toya6` | 2026-01-21 | marathon | GO ALL OUT |
 
-### Tsukasa Tenma — Wonderlands x Showtime  (id 13)
+### Tsukasa Tenma — Wonderlands x Showtime (id 13) — 7
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `kasa1` | 2021-06-11 | marathon | ワンダーマジカルショウタイム！ |
-| `kasa2` | 2022-02-28 | cheerful_carnival | 怪盗紳士のハラハラ！？ホワイトデー |
-| `kasa3` | 2022-04-11 | marathon | まばゆい光のステージで |
-| `kasa4` | 2022-12-31 | cheerful_carnival | 新春！ 獅子舞ロボのお正月ショー！ |
-| `kasa5` | 2023-03-11 | marathon | 天の果てのフェニックスへ |
-| `kasa6` | 2023-11-22 | marathon | 君が主役の物語を |
-| `kasa7` | 2024-07-09 | marathon | お縄を頂戴！？天馬捕物帳 |
-| `kasa8` | 2025-08-30 | marathon | Deep Dark For Light |
-| `kasa9` | 2026-06-20 | marathon | Phantom maze monster |
+| `kasa2` | 2022-04-11 | marathon | まばゆい光のステージで |
+| `kasa3` | 2023-03-11 | marathon | 天の果てのフェニックスへ |
+| `kasa4` | 2023-11-22 | marathon | 君が主役の物語を |
+| `kasa5` | 2024-07-09 | marathon | お縄を頂戴！？天馬捕物帳 |
+| `kasa6` | 2025-08-30 | marathon | Deep Dark For Light |
+| `kasa7` | 2026-06-20 | marathon | Phantom maze monster |
 
-### Emu Otori — Wonderlands x Showtime  (id 14)
+### Emu Otori — Wonderlands x Showtime (id 14) — 7
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `emu1` | 2021-02-28 | marathon | スマイルオブドリーマー |
 | `emu2` | 2022-01-12 | marathon | POP IN MY HEART!! |
 | `emu3` | 2023-01-10 | marathon | 夢の途中、輝く星たちへ |
@@ -157,9 +151,9 @@ Flag any wrong numbering / missing / extra events.
 | `emu6` | 2025-04-22 | marathon | Choices for the future |
 | `emu7` | 2026-02-19 | marathon | CHANGE！えむは王女さま！？ |
 
-### Nene Kusanagi — Wonderlands x Showtime  (id 15)
+### Nene Kusanagi — Wonderlands x Showtime (id 15) — 6
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `nene1` | 2020-12-20 | marathon | 聖なる夜に、この歌声を |
 | `nene2` | 2021-08-20 | marathon | マーメイドにあこがれて |
 | `nene3` | 2022-06-20 | marathon | 絶体絶命！？アイランドパニック！ |
@@ -167,9 +161,9 @@ Flag any wrong numbering / missing / extra events.
 | `nene5` | 2024-11-20 | marathon | The Power Of Regret |
 | `nene6` | 2025-11-10 | marathon | 超克のプロタゴニスタ |
 
-### Rui Kamishiro — Wonderlands x Showtime  (id 16)
+### Rui Kamishiro — Wonderlands x Showtime (id 16) — 6
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `rui1` | 2020-10-31 | marathon | 全力！ワンダーハロウィン！ |
 | `rui2` | 2021-10-21 | marathon | Revival my dream |
 | `rui3` | 2022-10-21 | marathon | カーテンコールに惜別を |
@@ -177,9 +171,9 @@ Flag any wrong numbering / missing / extra events.
 | `rui5` | 2025-07-07 | marathon | Deeper and deeper |
 | `rui6` | 2026-03-30 | marathon | 残照のInside Direction |
 
-### Kanade Yoisaki — Nightcord at 25:00  (id 17)
+### Kanade Yoisaki — Nightcord at 25:00 (id 17) — 6
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `kana1` | 2021-06-21 | marathon | カーネーション・リコレクション |
 | `kana2` | 2022-01-21 | marathon | いつか、絶望の底から |
 | `kana3` | 2023-03-21 | marathon | イミシブル・ディスコード |
@@ -187,21 +181,19 @@ Flag any wrong numbering / missing / extra events.
 | `kana5` | 2025-03-20 | marathon | Unreliable Notes |
 | `kana6` | 2026-01-11 | marathon | 覚めない幻想をノックして |
 
-### Mafuyu Asahina — Nightcord at 25:00  (id 18)
+### Mafuyu Asahina — Nightcord at 25:00 (id 18) — 6
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `mafu1` | 2020-10-20 | marathon | 囚われのマリオネット |
 | `mafu2` | 2021-09-21 | marathon | 灯のミラージュ |
-| `mafu3` | 2021-11-30 | cheerful_carnival | 交わる旋律 灯るぬくもり |
-| `mafu4` | 2022-06-10 | marathon | 迷い子の手を引く、そのさきは |
-| `mafu5` | 2022-09-30 | cheerful_carnival | この祭に 夕闇色も |
-| `mafu6` | 2023-07-11 | marathon | 仮面の私にさよならを |
-| `mafu7` | 2024-06-20 | marathon | 灯を手繰りよせて |
-| `mafu8` | 2025-04-30 | marathon | そして、針は動き出す |
+| `mafu3` | 2022-06-10 | marathon | 迷い子の手を引く、そのさきは |
+| `mafu4` | 2023-07-11 | marathon | 仮面の私にさよならを |
+| `mafu5` | 2024-06-20 | marathon | 灯を手繰りよせて |
+| `mafu6` | 2025-04-30 | marathon | そして、針は動き出す |
 
-### Ena Shinonome — Nightcord at 25:00  (id 19)
+### Ena Shinonome — Nightcord at 25:00 (id 19) — 8
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `ena1` | 2021-02-18 | marathon | 満たされないペイルカラー |
 | `ena2` | 2021-05-10 | marathon | お悩み聞かせて！わくわくピクニック |
 | `ena3` | 2022-03-20 | marathon | 空白のキャンバスに描く私は |
@@ -211,32 +203,31 @@ Flag any wrong numbering / missing / extra events.
 | `ena7` | 2025-10-31 | marathon | Colors of Pure Sense |
 | `ena8` | 2026-07-09 | marathon | 褪せない今を、彩って |
 
-### Mizuki Akiyama — Nightcord at 25:00  (id 20)
+### Mizuki Akiyama — Nightcord at 25:00 (id 20) — 6
 | nick | date | type | event |
-|------|------|------|-------|
+|---|---|---|---|
 | `mizu1` | 2021-04-11 | marathon | シークレット・ディスタンス |
-| `mizu2` | 2021-10-31 | cheerful_carnival | ボクのあしあと キミのゆくさき |
-| `mizu3` | 2022-08-20 | marathon | そしていま、リボンを結んで |
-| `mizu4` | 2023-04-30 | cheerful_carnival | ボク達の生存逃走 |
-| `mizu5` | 2024-10-12 | marathon | 荊棘の道は何処へ |
-| `mizu6` | 2025-08-22 | marathon | ほどけぬ明日に手を伸ばして |
-| `mizu7` | 2026-03-20 | marathon | Amid the Wavering Light |
+| `mizu2` | 2022-08-20 | marathon | そしていま、リボンを結んで |
+| `mizu3` | 2023-04-30 | cheerful_carnival | ボク達の生存逃走 |
+| `mizu4` | 2024-10-12 | marathon | 荊棘の道は何処へ |
+| `mizu5` | 2025-08-22 | marathon | ほどけぬ明日に手を伸ばして |
+| `mizu6` | 2026-03-20 | marathon | Amid the Wavering Light |
 
-### Hatsune Miku — Virtual Singer  (id 21)
-_(no focus events)_
+### Hatsune Miku — Virtual Singer (id 21) — 0
+_(none)_
 
-### Kagamine Rin — Virtual Singer  (id 22)
-_(no focus events)_
+### Kagamine Rin — Virtual Singer (id 22) — 0
+_(none)_
 
-### Kagamine Len — Virtual Singer  (id 23)
-_(no focus events)_
+### Kagamine Len — Virtual Singer (id 23) — 0
+_(none)_
 
-### Megurine Luka — Virtual Singer  (id 24)
-_(no focus events)_
+### Megurine Luka — Virtual Singer (id 24) — 0
+_(none)_
 
-### MEIKO — Virtual Singer  (id 25)
-_(no focus events)_
+### MEIKO — Virtual Singer (id 25) — 0
+_(none)_
 
-### KAITO — Virtual Singer  (id 26)
-_(no focus events)_
+### KAITO — Virtual Singer (id 26) — 0
+_(none)_
 

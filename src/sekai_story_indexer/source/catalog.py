@@ -118,14 +118,19 @@ def build_catalog(
             music=music_by_event.get(event["id"]),
         )
         banner = rec["focus_character_id"]
-        # the banner char must belong to the event story's single main unit (rec
-        # ["unit"]); group/mixed/VS events resolve to "mixed" or virtual_singer and
-        # are excluded.
-        rec["is_focus_event"] = (
-            rec["event_type"] in ("marathon", "cheerful_carnival")
-            and banner != 0
-            and CHARACTER_ID_TO_UNIT.get(banner) == rec["unit"]
-        )
+        # Banner char must belong to the event story's single main unit (rec["unit"];
+        # group/mixed/VS events resolve to "mixed"/virtual_singer -> excluded).
+        # Marathons count on that alone (incl. cross-unit guest spotlights like
+        # 0209). Cheerful Carnivals count ONLY when single-unit — multi-unit CCs are
+        # seasonal collabs (Valentine/White Day/New Year), not a solo focus.
+        distinct_story_units = {u.get("unit") for u in story_units}
+        banner_in_main_unit = banner != 0 and CHARACTER_ID_TO_UNIT.get(banner) == rec["unit"]
+        if rec["event_type"] == "marathon":
+            rec["is_focus_event"] = banner_in_main_unit
+        elif rec["event_type"] == "cheerful_carnival":
+            rec["is_focus_event"] = banner_in_main_unit and len(distinct_story_units) == 1
+        else:
+            rec["is_focus_event"] = False
         if not rec["is_focus_event"]:  # not a solo focus -> no focus attribution
             rec["focus_character_id"] = 0
             rec["focus_character"] = ""

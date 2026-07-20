@@ -387,3 +387,18 @@ def test_virtual_singer_banner_is_not_a_focus_event():
     r = cat[0]
     assert r["is_focus_event"] is False
     assert r["focus_character_id"] == 0 and r["nickname"] is None
+
+
+def test_multi_unit_cheerful_carnival_is_not_a_focus_event():
+    # a seasonal collab CC with guest sub-units is not a solo focus (unlike a
+    # single-unit CC). Regression for airi3 (Valentine) / Tsukasa White Day.
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    events = [{"id": 60, "name": "Valentine CC", "startAt": 1000, "eventType": "cheerful_carnival"}]
+    stories = {60: {"id": 160, "eventId": 60, "assetbundleName": "ab", "eventStoryEpisodes": []}}
+    su = {160: [{"unit": "idol", "eventStoryUnitRelation": "main"},
+                {"unit": "light_sound", "eventStoryUnitRelation": "sub"}]}
+    banner = {60: 7}  # Airi (MMJ) on banner, but it's a multi-unit collab
+    cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
+                        music_by_event={}, banner_char_by_event=banner)
+    assert cat[0]["is_focus_event"] is False
