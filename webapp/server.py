@@ -296,6 +296,51 @@ def _query_local(req: QueryRequest) -> dict:
     return result
 
 
+# The full engine writes inline "CITATION: <label>" markers (optionally wrapped in
+# parens with trailing detail). Turn them into the same clickable [n] + citations
+# shape the local backend returns, so the UI renders links + an excerpt sidebar.
+_CIT_RE = re.compile(r"\(?\s*CITATION:\s*([^\s;)\]]+)(?:\s*;[^)]*)?\)?")
+_ARC_RE = re.compile(r"\d{4}(?:-[a-z0-9-]+)?")
+_TAG_STRIP = re.compile(r"\{char_id=\d+\}")
+
+
+def _structure_full_answer(answer: str) -> dict:
+    events_by_arc = {e.get("arc_slug"): e for e in load_events()}
+    path = _summaries_path()
+    sums = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    refs: dict[str, int] = {}
+    order: list[str] = []
+
+    def _repl(m: re.Match) -> str:
+        label = m.group(1)
+        if label not in refs:
+            refs[label] = len(refs) + 1
+            order.append(label)
+        return f"[{refs[label]}]"
+
+    text = _CIT_RE.sub(_repl, answer or "").strip()
+    citations = []
+    for label in order:
+        am = _ARC_RE.search(label)
+        arc = am.group(0) if am else label
+        e = events_by_arc.get(arc, {})
+        excerpt = _TAG_STRIP.sub("", _entry(sums.get(arc, "")).get("summary", ""))
+        citations.append({
+            "ref": refs[label],
+            "arc_id": arc,
+            "label": e.get("name") or arc,
+            "nickname": e.get("nickname"),
+            "excerpt": excerpt,
+        })
+    return {
+        "answer": text,
+        "answer_parts": [{"type": "text", "text": text}],
+        "citations": citations,
+        "error": None,
+        "backend": "full",
+    }
+
+
 def _query_full(req: QueryRequest) -> dict:
     try:
         from sekai_story_indexer.database import initialize_query_settings
@@ -305,7 +350,7 @@ def _query_full(req: QueryRequest) -> dict:
     try:
         initialize_query_settings()
         engine = StoryQueryEngine(retrieval_config=RetrievalConfig())
-        return {"answer": engine.query(req.question), "error": None, "backend": "full"}
+        return _structure_full_answer(engine.query(req.question))
     except Exception as exc:  # pragma: no cover - runtime/config
         return {
             "answer": None,
