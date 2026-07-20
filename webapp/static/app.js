@@ -538,9 +538,11 @@ function enableWheelInertia(el) {
   const FRICTION = 0.96; // per-frame velocity decay — higher = more inertia
   const WHEEL_GAIN = 0.14; // fraction of a wheel delta added to velocity
   const MAX_V = 90; // cap so a hard flick can't teleport
-  const RUBBER = 0.35; // resistance converting motion into overscroll
+  const RUBBER = 0.35; // resistance converting wheel motion into overscroll
+  const DRAG_RUBBER = 0.5; // resistance when click-dragging past an edge
   const SPRING = 0.16; // per-frame spring-back of the overscroll offset
   const MAX_OVER = 140; // hard cap on how far you can push past an edge
+  const DRAG_THRESHOLD = 4; // px before a press becomes a drag (vs a click)
   const maxScroll = () => Math.max(0, el.scrollHeight - el.clientHeight);
 
   let velocity = 0;
@@ -612,11 +614,108 @@ function enableWheelInertia(el) {
     { passive: false }
   );
 
+  // ---- click-and-drag to scroll (mouse) ----
+  // Capture is deferred until the press actually moves past DRAG_THRESHOLD, so a
+  // plain click still reaches the card's onclick (setScope). Dragging past an
+  // edge feeds the same resisted-overscroll + spring-back as the wheel; a flick
+  // on release hands its velocity to the momentum loop.
+  let dragArmed = false;
+  let dragging = false;
+  let moved = false;
+  let startY = 0;
+  let startScroll = 0;
+  let samples = []; // recent {t, y} for release-velocity estimation
+
+  el.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "mouse" || e.button !== 0) return; // touch keeps native
+    dragArmed = true;
+    dragging = false;
+    moved = false;
+    startY = e.clientY;
+    startScroll = el.scrollTop;
+    samples = [{ t: e.timeStamp, y: e.clientY }];
+    // Stop any in-flight momentum/spring so the grab feels immediate.
+    if (raf) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
+    velocity = 0;
+    over = 0;
+    applyTransform();
+  });
+
+  el.addEventListener("pointermove", (e) => {
+    if (!dragArmed) return;
+    const totalDy = e.clientY - startY;
+    if (!dragging) {
+      if (Math.abs(totalDy) <= DRAG_THRESHOLD) return; // still might be a click
+      dragging = true;
+      moved = true;
+      el.classList.add("dragging");
+      try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    }
+    const rawPos = startScroll - totalDy; // unclamped desired scroll offset
+    const max = maxScroll();
+    if (rawPos < 0) {
+      over = Math.max(-MAX_OVER, rawPos * DRAG_RUBBER); // resisted pull past top
+      el.scrollTop = 0;
+    } else if (rawPos > max) {
+      over = Math.min(MAX_OVER, (rawPos - max) * DRAG_RUBBER); // past bottom
+      el.scrollTop = max;
+    } else {
+      over = 0;
+      el.scrollTop = rawPos;
+    }
+    applyTransform();
+    samples.push({ t: e.timeStamp, y: e.clientY });
+    while (samples.length > 6) samples.shift();
+  });
+
+  function endDrag(e) {
+    if (!dragArmed) return;
+    dragArmed = false;
+    if (!dragging) return; // was a click — leave it for card.onclick
+    dragging = false;
+    el.classList.remove("dragging");
+    try { el.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    // Fling velocity from the last ~90ms of movement (scrollTop moves opposite
+    // to the pointer, hence the negative sign).
+    const end = samples[samples.length - 1];
+    let first = samples[0];
+    for (const s of samples) {
+      if (end.t - s.t <= 90) { first = s; break; }
+    }
+    const dt = end.t - first.t;
+    const resting = e.timeStamp - end.t > 90;
+    const vpf = dt > 0 && !resting ? (-(end.y - first.y) / dt) * 16 : 0;
+    velocity = Math.max(-MAX_V, Math.min(MAX_V, vpf));
+    if (!raf) raf = requestAnimationFrame(frame); // momentum + spring-back
+  }
+  el.addEventListener("pointerup", endDrag);
+  el.addEventListener("pointercancel", endDrag);
+
+  // Swallow the click that ends a real drag so it doesn't also open a scope.
+  el.addEventListener(
+    "click",
+    (e) => {
+      if (moved) {
+        e.stopPropagation();
+        e.preventDefault();
+        moved = false;
+      }
+    },
+    true
+  );
+
   // Called after each render: re-capture the fresh inner wrapper and clear state
   // (innerHTML was rebuilt, so any prior transform/offset is gone).
   function reset() {
     velocity = 0;
     over = 0;
+    dragArmed = false;
+    dragging = false;
+    moved = false;
+    el.classList.remove("dragging");
     if (raf) {
       cancelAnimationFrame(raf);
       raf = 0;
