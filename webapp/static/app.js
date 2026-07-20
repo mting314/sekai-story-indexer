@@ -191,8 +191,8 @@ function hierNode(nodeId, data, depth) {
   wrap.appendChild(body);
 
   head.onclick = () => {
-    const open = body.classList.toggle("hidden");
-    head.querySelector(".hier-chev").textContent = hasBody ? (open ? "▸" : "▾") : "·";
+    const nowHidden = body.classList.toggle("hidden"); // toggle() -> true when 'hidden' is now set
+    head.querySelector(".hier-chev").textContent = hasBody ? (nowHidden ? "▸" : "▾") : "·";
     if (!body.dataset.filled && hasBody) {
       if (summary) body.appendChild(hierSummary(summary));
       for (const cid of childIds) body.appendChild(hierNode(cid, data, depth + 1));

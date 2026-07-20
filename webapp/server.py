@@ -299,17 +299,21 @@ def hierarchical_summaries() -> dict:
         return _EMPTY_HIERARCHY
 
     # Label event-tier nodes with the real event name/nickname instead of "Arc <id>".
-    events_by_arc = {e.get("arc_slug"): e for e in load_events()}
-    for node in data.get("nodes", {}).values():
-        if node.get("kind") != "event":
-            continue
-        arc = str(node.get("id", "")).removeprefix("event:")
-        ev = events_by_arc.get(arc)
-        if ev:
-            name = ev.get("name") or node.get("label")
-            nickname = ev.get("nickname")
-            node["title"] = name
-            node["label"] = f"{name} · {nickname}" if nickname else name
+    # Cosmetic only — never let it sink the already-built tree if load_events hiccups.
+    try:
+        events_by_arc = {e.get("arc_slug"): e for e in load_events()}
+        for node in data.get("nodes", {}).values():
+            if node.get("kind") != "event":
+                continue
+            arc = str(node.get("id", "")).removeprefix("event:")
+            ev = events_by_arc.get(arc)
+            if ev:
+                name = ev.get("name") or node.get("label")
+                nickname = ev.get("nickname")
+                node["title"] = name
+                node["label"] = f"{name} · {nickname}" if nickname else name
+    except Exception:  # noqa: BLE001 - enrichment is best-effort labeling
+        pass
     return data
 
 
