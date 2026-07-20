@@ -209,3 +209,9 @@ def test_finalize_citations_noop_when_nothing_cited():
     nl = "An answer with no citations."
     nl2, kept = server._finalize_citations(nl, cits)
     assert nl2 == nl and kept == cits  # don't blank sources when model didn't cite
+
+
+def test_image_proxy_rejects_non_sekai_host(client):
+    # SSRF guard: only the sekai asset CDN may be proxied.
+    assert client.get("/api/img", params={"u": "https://example.com/x.png"}).status_code == 400
+    assert client.get("/api/img", params={"u": "http://storage.sekai.best/x"}).status_code == 400

@@ -164,6 +164,22 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   substitution inside JP sentences isn't genuinely useful without the LLM.
 
 ## 5. Known follow-ups / accuracy notes
+* **Game-style event timeline scrolling (webapp, deferred).** Rework the event
+  timeline scroll to feel like Project Sekai's in-game event list — smooth
+  momentum/inertia scrolling, snap-to-card, and the banner art (now on each row)
+  as the visual anchor. Currently a plain vertical list (`renderTimeline` +
+  `.event-card` in `webapp/static/`).
+* **Official English story quotes (deferred).** Quotes in answers are currently
+  the LLM's English translation of the JP source line. The data source likely has
+  official EN scenario text (the EN region assets — cf. `client.en_event_names` /
+  `en_music_titles` already read the EN master DB). Ingest the EN scenario text
+  per scene and quote it verbatim (with the JP as source-of-truth fallback for
+  events not yet localized), so quotes are authentic rather than paraphrased.
+* **Lyrics analysis via chat (deferred).** Let the chat answer about a
+  commissioned song's lyrics — e.g. "what do the lyrics of BAKENOHANA mean / how
+  do they tie to the event?" Needs a lyrics source (not in the current master-DB
+  ingest — song jacket/title/composer are captured, lyrics are not), then a
+  retrieval/answer path that links `song_title` ↔ event ↔ lyrics.
 * **Agentic-lite scene selection (local backend, deferred).** A scoped content
   query currently feeds the WHOLE event (budget-bounded, head+tail) to the answer
   — complete for small events, but blunt for large scopes. A better design lets

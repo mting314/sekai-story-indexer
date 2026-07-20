@@ -39,11 +39,10 @@ _STYLE = (
     "cite an episode title. Cite only the sources you actually draw from — do not "
     "list sources you didn't use.\n"
     "When you state something a character said, felt, or decided, ground it with a "
-    "SHORT direct quote copied verbatim from that evidence block, in double quotes. "
-    "If the quote is not in English, add a brief English translation in parentheses "
-    "right after it, then the citation — e.g. she resolves to keep it secret "
-    '("この気持ちは、絶対に言わない" — "I\'ll never tell anyone how I feel") [3]. '
-    "Keep quotes to one line."
+    "SHORT quote in double quotes, translated into English (do NOT include the "
+    "original Japanese in the answer), then the citation — e.g. she resolves to "
+    'keep it secret ("I\'ll never tell anyone how I feel") [3]. Keep quotes to one '
+    "line; the citation still points to the exact source line."
 )
 
 

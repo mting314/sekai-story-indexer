@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -620,7 +620,9 @@ def _summarize_intercept(question: str) -> dict | None:
             "answer_parts": [{"type": "text", "text": ent["summary"]}],
             "characters": ent["characters"],
             "citations": [{
-                "ref": 1, "arc_id": ev.get("arc_slug"), "label": ev.get("name"),
+                "ref": 1, "arc_id": ev.get("arc_slug"),
+                "label": f"{ev.get('name')} — event summary",
+                "episode_title": "Event summary",
                 "nickname": ev.get("nickname"), "excerpt": ent["summary"],
             }],
             "intent": "summarize", "backend": "summary", "error": None,
@@ -842,6 +844,53 @@ def query_stream(req: QueryRequest):
         _stream_events(req),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# Image proxy: the browser often can't reach the sekai.best asset CDN directly
+# (restricted network), but the server can. Proxy those images through the app so
+# event art / jackets / logos load from same-origin. Host-allowlisted (SSRF guard)
+# + tiny in-memory cache.
+_ART_HOST = "storage.sekai.best"
+_art_cache: dict[str, tuple[bytes, str]] = {}
+
+
+def _art_ssl():
+    import ssl
+
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:  # pragma: no cover - certifi optional
+        return ssl.create_default_context()
+
+
+_ART_SSL = _art_ssl()
+
+
+@app.get("/api/img")
+def proxy_image(u: str) -> Response:
+    import urllib.request
+    from urllib.parse import urlparse
+
+    parsed = urlparse(u)
+    if parsed.scheme != "https" or parsed.hostname != _ART_HOST:
+        return Response(status_code=400)  # only the sekai asset CDN
+    cached = _art_cache.get(u)
+    if cached is None:
+        try:
+            req = urllib.request.Request(u, headers={"User-Agent": "sekai-story-indexer"})
+            with urllib.request.urlopen(req, timeout=15, context=_ART_SSL) as r:
+                cached = (r.read(), r.headers.get("Content-Type", "image/webp"))
+        except Exception:
+            return Response(status_code=502)
+        if len(_art_cache) > 512:
+            _art_cache.clear()
+        _art_cache[u] = cached
+    return Response(
+        content=cached[0], media_type=cached[1],
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 

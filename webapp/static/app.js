@@ -7,6 +7,12 @@ const state = {
   sessionId: null,
 };
 
+// Route external (sekai.best) art through the server image proxy so it loads even
+// when the browser can't reach the CDN directly. Local /static paths pass through.
+function proxied(u) {
+  return u && /^https?:\/\//.test(u) ? "/api/img?u=" + encodeURIComponent(u) : (u || "");
+}
+
 // Stable per-chat session id so the server can keep conversation focus state.
 function ensureSessionId() {
   if (state.sessionId) return state.sessionId;
@@ -203,7 +209,7 @@ function summaryBody(s) {
   // symbol. If the jacket fails to load (network/proxy hiccup), swap to the next
   // source instead of blanking the art. `data-fallbacks` is a "|"-joined queue the
   // onerror handler pops from; only after all fail do we mark the hero no-art.
-  const artSources = [s.jacket_url, s.logo_url, u.symbol].filter(Boolean);
+  const artSources = [s.jacket_url, s.logo_url, u.symbol].filter(Boolean).map(proxied);
   const artHtml = artSources.length
     ? `<img class="sum-art" src="${artSources[0]}" alt="" ` +
       `data-fallbacks="${escapeHtml(artSources.slice(1).join("|"))}" ` +
@@ -457,7 +463,7 @@ function renderTimeline() {
     card.className =
       "event-card" + (e.is_key_story ? " key" : "") + (e.indexed ? " indexed" : " pending");
     const logo = e.logo_url
-      ? `<img class="logo" loading="lazy" src="${e.logo_url}" alt="" onerror="this.style.display='none'">`
+      ? `<img class="logo" loading="lazy" src="${proxied(e.logo_url)}" alt="" onerror="this.style.display='none'">`
       : "";
     const nick = e.nickname ? `<span class="nick">${e.nickname}</span>` : "";
     const song = e.song_title ? `<div class="song">🎵 ${e.song_title}</div>` : "";
@@ -471,7 +477,7 @@ function renderTimeline() {
     // first, then the home banner, then the song jacket.
     const art = e.story_banner_url || e.banner_url || e.jacket_url || "";
     const artHtml = art
-      ? `<img class="event-art" loading="lazy" src="${art}" alt="" ` +
+      ? `<img class="event-art" loading="lazy" src="${proxied(art)}" alt="" ` +
         `onerror="this.style.display='none'">`
       : "";
     card.innerHTML = `
