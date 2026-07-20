@@ -296,11 +296,18 @@ def _query_local(req: QueryRequest) -> dict:
     return result
 
 
-# The full engine writes inline "CITATION: <label>" markers (optionally wrapped in
-# parens with trailing detail). Turn them into the same clickable [n] + citations
-# shape the local backend returns, so the UI renders links + an excerpt sidebar.
-_CIT_RE = re.compile(r"\(?\s*CITATION:\s*([^\s;)\]]+)(?:\s*;[^)]*)?\)?")
+# The full engine writes inline citations in two forms: "CITATION: <label>"
+# (optionally paren-wrapped) and bracketed "[<arc-slug> · Episode …]". Turn both
+# into clickable [n] refs (collapsed per event) + a citations array, so the UI
+# renders links + an excerpt sidebar like the local backend.
 _ARC_RE = re.compile(r"\d{4}(?:-[a-z0-9-]+)?")
+# both citation forms in ONE pass (so [n] numbers in reading order): the
+# "CITATION: <label>" form (group 1) and the bracketed "[<arc-slug> · …]" form
+# (group 2, a bracket whose contents include an arc-slug).
+_CIT_RE = re.compile(
+    r"\(?\s*CITATION:\s*([^\s;)\]]+)(?:\s*;[^)]*)?\)?"
+    r"|\[([^\]\n]*\d{4}(?:-[a-z0-9-]+)?[^\]\n]*)\]"
+)
 _TAG_STRIP = re.compile(r"\{char_id=\d+\}")
 
 
@@ -308,25 +315,26 @@ def _structure_full_answer(answer: str) -> dict:
     events_by_arc = {e.get("arc_slug"): e for e in load_events()}
     path = _summaries_path()
     sums = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    refs: dict[str, int] = {}
+    refs: dict[str, int] = {}  # arc_slug -> ref number
     order: list[str] = []
 
     def _repl(m: re.Match) -> str:
-        label = m.group(1)
-        if label not in refs:
-            refs[label] = len(refs) + 1
-            order.append(label)
-        return f"[{refs[label]}]"
+        label = m.group(1) or m.group(2) or ""
+        am = _ARC_RE.search(label)
+        arc = am.group(0) if am else label.strip()
+        if arc not in refs:
+            refs[arc] = len(refs) + 1
+            order.append(arc)
+        return f"[{refs[arc]}]"
 
     text = _CIT_RE.sub(_repl, answer or "").strip()
+
     citations = []
-    for label in order:
-        am = _ARC_RE.search(label)
-        arc = am.group(0) if am else label
+    for arc in order:
         e = events_by_arc.get(arc, {})
         excerpt = _TAG_STRIP.sub("", _entry(sums.get(arc, "")).get("summary", ""))
         citations.append({
-            "ref": refs[label],
+            "ref": refs[arc],
             "arc_id": arc,
             "label": e.get("name") or arc,
             "nickname": e.get("nickname"),
