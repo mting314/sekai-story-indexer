@@ -231,9 +231,8 @@ web/summary-reader-production/data/
 .claude/
 .codex/
 
-# Generated Project Sekai corpus + index (fetched via `sekai fetch`; not source).
-# The committed fixture under sample/ stays tracked.
-/story/
-/events_index.json
-/story_order.yaml
+# The Project Sekai corpus + index (fetched via `sekai fetch`) is checked in so
+# the full app + ingest run without external egress (the restricted harness blocks
+# the CDN/DB hosts). Regenerate with `indexer fetch`. The sample/ fixture also stays
+# tracked for the lightweight test corpus.
 chat_log.jsonl
