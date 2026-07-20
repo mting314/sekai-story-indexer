@@ -1,6 +1,6 @@
 # Event → nickname, by character
 
-Banner+main-unit; CC counts at <=2 units; curated focus_overrides.json.
+Banner+main-unit; multi-unit needs a song; CC<=2 units; curated focus_overrides.json.
 
 ### Ichika Hoshino — Leo/need (id 1) — 6
 | nick | date | type | event | focus song |
@@ -33,16 +33,15 @@ Banner+main-unit; CC counts at <=2 units; curated focus_overrides.json.
 | `hona5` | 2025-07-15 | marathon | Unsteady, still steady step | 透明なパレット |
 | `hona6` | 2026-04-30 | marathon | あたたかな思い出を辿って | 星に一番近い場所 |
 
-### Shiho Hinomori — Leo/need (id 4) — 7
+### Shiho Hinomori — Leo/need (id 4) — 6
 | nick | date | type | event | focus song |
 |---|---|---|---|---|
-| `shiho1` | 2021-02-09 | marathon | 響くトワイライトパレード | — |
-| `shiho2` | 2021-04-21 | marathon | Resonate with you | 「１」 |
-| `shiho3` | 2022-02-18 | marathon | あの日、空は遠かった | Peaky Peaky |
-| `shiho4` | 2022-08-31 | cheerful_carnival | Don't lose faith! | Voices |
-| `shiho5` | 2023-10-22 | marathon | Stick to your faith | purpose |
-| `shiho6` | 2025-03-30 | marathon | Find the dream view | Sympathy |
-| `shiho7` | 2026-02-10 | marathon | Path made by faith | このまんまでいこう |
+| `shiho1` | 2021-04-21 | marathon | Resonate with you | 「１」 |
+| `shiho2` | 2022-02-18 | marathon | あの日、空は遠かった | Peaky Peaky |
+| `shiho3` | 2022-08-31 | cheerful_carnival | Don't lose faith! | Voices |
+| `shiho4` | 2023-10-22 | marathon | Stick to your faith | purpose |
+| `shiho5` | 2025-03-30 | marathon | Find the dream view | Sympathy |
+| `shiho6` | 2026-02-10 | marathon | Path made by faith | このまんまでいこう |
 
 ### Minori Hanasato — MORE MORE JUMP! (id 5) — 7
 | nick | date | type | event | focus song |
@@ -108,16 +107,15 @@ Banner+main-unit; CC counts at <=2 units; curated focus_overrides.json.
 | `an6` | 2025-07-31 | marathon | Competitive fire！ | アクセラレイト |
 | `an7` | 2026-04-09 | marathon | Show 'em what's up！ | CRASH THE PARTY |
 
-### Akito Shinonome — Vivid BAD SQUAD (id 11) — 7
+### Akito Shinonome — Vivid BAD SQUAD (id 11) — 6
 | nick | date | type | event | focus song |
 |---|---|---|---|---|
 | `aki1` | 2021-04-30 | cheerful_carnival | STRAY BAD DOG | シネマ |
-| `aki2` | 2021-07-20 | marathon | 夏祭り、鳴り響く音は | — |
-| `aki3` | 2022-05-20 | marathon | THE POWER OF UNITY | 月光 |
-| `aki4` | 2022-12-11 | marathon | Find A Way Out | 仮死化 |
-| `aki5` | 2023-10-12 | marathon | BURN MY SOUL | CR詠ZY |
-| `aki6` | 2024-10-21 | marathon | Rekindle the flame | フューエル |
-| `aki7` | 2025-11-20 | marathon | Overcome one's limits | ファイター |
+| `aki2` | 2022-05-20 | marathon | THE POWER OF UNITY | 月光 |
+| `aki3` | 2022-12-11 | marathon | Find A Way Out | 仮死化 |
+| `aki4` | 2023-10-12 | marathon | BURN MY SOUL | CR詠ZY |
+| `aki5` | 2024-10-21 | marathon | Rekindle the flame | フューエル |
+| `aki6` | 2025-11-20 | marathon | Overcome one's limits | ファイター |
 
 ### Toya Aoyagi — Vivid BAD SQUAD (id 12) — 6
 | nick | date | type | event | focus song |
@@ -181,16 +179,15 @@ Banner+main-unit; CC counts at <=2 units; curated focus_overrides.json.
 | `kana5` | 2025-03-20 | marathon | Unreliable Notes | D/N/A |
 | `kana6` | 2026-01-11 | marathon | 覚めない幻想をノックして | 幸福刑 |
 
-### Mafuyu Asahina — Nightcord at 25:00 (id 18) — 7
+### Mafuyu Asahina — Nightcord at 25:00 (id 18) — 6
 | nick | date | type | event | focus song |
 |---|---|---|---|---|
 | `mafu1` | 2020-10-20 | marathon | 囚われのマリオネット | ジャックポットサッドガール |
 | `mafu2` | 2021-09-21 | marathon | 灯のミラージュ | 再生 |
-| `mafu3` | 2021-11-30 | cheerful_carnival | 交わる旋律 灯るぬくもり | — |
-| `mafu4` | 2022-06-10 | marathon | 迷い子の手を引く、そのさきは | バグ |
-| `mafu5` | 2023-07-11 | marathon | 仮面の私にさよならを | 演劇 |
-| `mafu6` | 2024-06-20 | marathon | 灯を手繰りよせて | エンパープル |
-| `mafu7` | 2025-04-30 | marathon | そして、針は動き出す | 虚無さん |
+| `mafu3` | 2022-06-10 | marathon | 迷い子の手を引く、そのさきは | バグ |
+| `mafu4` | 2023-07-11 | marathon | 仮面の私にさよならを | 演劇 |
+| `mafu5` | 2024-06-20 | marathon | 灯を手繰りよせて | エンパープル |
+| `mafu6` | 2025-04-30 | marathon | そして、針は動き出す | 虚無さん |
 
 ### Ena Shinonome — Nightcord at 25:00 (id 19) — 7
 | nick | date | type | event | focus song |

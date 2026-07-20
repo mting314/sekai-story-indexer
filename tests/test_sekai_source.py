@@ -423,3 +423,35 @@ def test_focus_override_forces_and_excludes():
     by = {r["event_id"]: r for r in cat}
     assert by[97]["focus_character_id"] == 10 and by[97]["nickname"] == "an1"  # forced -> An
     assert by[98]["is_focus_event"] is False and by[98]["focus_character_id"] == 0  # excluded
+
+
+def test_multi_unit_marathon_requires_a_song():
+    # multi-unit marathon: a real focus has a commissioned song; a songless
+    # multi-unit event is a collab (regression for 響くトワイライトパレード / 夏祭り).
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    ev = [{"id": 70, "name": "E", "startAt": 1000, "eventType": "marathon"}]
+    base = dict(
+        stories_by_event={70: {"id": 170, "eventId": 70, "assetbundleName": "a", "eventStoryEpisodes": []}},
+        story_units_by_story_id={170: [{"unit": "street", "eventStoryUnitRelation": "main"},
+                                       {"unit": "idol", "eventStoryUnitRelation": "sub"}]},
+        banner_char_by_event={70: 9},  # Kohane (VBS) in the main unit
+    )
+    with_song = build_catalog(ev, music_by_event={70: {"title": "Song", "assetbundleName": "m"}}, **base)
+    assert with_song[0]["is_focus_event"] is True
+    songless = build_catalog(ev, music_by_event={}, **base)
+    assert songless[0]["is_focus_event"] is False
+
+
+def test_single_unit_event_without_song_is_still_a_focus():
+    # a single-unit event is a focus even with no commissioned song (カーテンコール).
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    ev = [{"id": 71, "name": "Curtain", "startAt": 1000, "eventType": "marathon"}]
+    cat = build_catalog(
+        ev,
+        stories_by_event={71: {"id": 171, "eventId": 71, "assetbundleName": "a", "eventStoryEpisodes": []}},
+        story_units_by_story_id={171: [{"unit": "theme_park", "eventStoryUnitRelation": "main"}]},
+        music_by_event={}, banner_char_by_event={71: 16},  # Rui (WxS), no song
+    )
+    assert cat[0]["is_focus_event"] is True

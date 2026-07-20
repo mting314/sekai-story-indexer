@@ -145,12 +145,18 @@ def build_catalog(
         # seasonal collabs (Valentine/White Day/New Year), not a solo focus.
         distinct_story_units = {u.get("unit") for u in story_units}
         banner_in_main_unit = banner != 0 and CHARACTER_ID_TO_UNIT.get(banner) == rec["unit"]
+        single_unit = len(distinct_story_units) == 1
+        has_song = bool(rec.get("song_title"))
+        # A multi-unit event must have a commissioned song to be a solo focus —
+        # a songless multi-unit event is a collab (夏祭り, 響くトワイライトパレード). A
+        # single-unit event is a focus regardless (some genuinely have no song, e.g.
+        # カーテンコールに惜別を).
+        qualifies = banner_in_main_unit and (single_unit or has_song)
         if rec["event_type"] == "marathon":
-            rec["is_focus_event"] = banner_in_main_unit
+            rec["is_focus_event"] = qualifies
         elif rec["event_type"] == "cheerful_carnival":
-            # a unit CC (focus unit + at most one guest unit) is a solo focus; a
-            # 3+-unit CC is a seasonal collab (Valentine/White Day/New Year).
-            rec["is_focus_event"] = banner_in_main_unit and len(distinct_story_units) <= 2
+            # ...and a CC caps at 2 units (3+ = seasonal collab: Valentine/New Year).
+            rec["is_focus_event"] = qualifies and len(distinct_story_units) <= 2
         else:
             rec["is_focus_event"] = False
         if not rec["is_focus_event"]:  # not a solo focus -> no focus attribution
