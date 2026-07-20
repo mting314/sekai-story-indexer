@@ -77,18 +77,6 @@ def event_record(
     }
 
 
-def _focus_units(event_id: int, event_card_ids: dict, cards_by_id: dict) -> set[str]:
-    """Units (excluding Virtual Singer) of an event's featured 4★ cards."""
-    units: set[str] = set()
-    for cid in event_card_ids.get(event_id, []):
-        card = cards_by_id.get(cid, {})
-        if card.get("cardRarityType") in ("rarity_4", "rarity_birthday"):
-            u = CHARACTER_ID_TO_UNIT.get(card.get("characterId"))
-            if u and u != "virtual_singer":
-                units.add(u)
-    return units
-
-
 def build_catalog(
     events: list[dict],
     *,
@@ -102,16 +90,20 @@ def build_catalog(
 ) -> list[dict]:
     """Full enriched, chronologically-sorted catalog with nicknames assigned.
 
-    A true *focus event* (which counts toward a character's kaho5-style nickname
-    number) is a ``marathon`` OR ``cheerful_carnival`` event whose featured 4★
-    cards are all from ONE unit — both have a single solo focus character and the
-    community numbers both. This still excludes cross-unit collabs and World Link
-    (multi-character banners), which aren't anyone's solo focus event. Non-focus
-    events carry no focus/nickname.
+    A *focus event* (which counts toward a character's kasa5-style nickname number)
+    is a ``marathon`` or ``cheerful_carnival`` event whose **banner focus
+    character** (``eventStories.bannerGameCharacterUnitId``) is a member of the
+    event story's single **main unit**. Using the story's main unit — not the 4★
+    card units — correctly includes modern cross-unit-*guest* spotlights (e.g.
+    "アイドル・花里みのり", a MORE MORE JUMP! story with VBS/WxS guest cards) while
+    excluding group/seasonal events (New Year, group CC, collabs) that resolve to
+    ``mixed``, Virtual Singers, World Link, and crossover/anniversary events (no
+    banner). Non-focus events carry no focus/nickname.
+
+    ``event_card_ids``/``cards_by_id`` are accepted for API stability but no longer
+    used for focus detection.
     """
     banner_char_by_event = banner_char_by_event or {}
-    event_card_ids = event_card_ids or {}
-    cards_by_id = cards_by_id or {}
     records: list[dict] = []
     for event in events:
         story = stories_by_event.get(event["id"])
@@ -125,16 +117,14 @@ def build_catalog(
             focus_id=banner_char_by_event.get(event["id"], 0),
             music=music_by_event.get(event["id"]),
         )
-        units = _focus_units(event["id"], event_card_ids, cards_by_id)
-        # A solo focus event: a marathon/CC with exactly one featured unit, whose
-        # banner character actually belongs to that unit. The unit-membership check
-        # excludes Virtual Singers (who headline some events, e.g. New Year, but
-        # never get a solo focus event) and guards against banner/unit mismatches.
-        focus_unit = next(iter(units)) if len(units) == 1 else None
+        banner = rec["focus_character_id"]
+        # the banner char must belong to the event story's single main unit (rec
+        # ["unit"]); group/mixed/VS events resolve to "mixed" or virtual_singer and
+        # are excluded.
         rec["is_focus_event"] = (
             rec["event_type"] in ("marathon", "cheerful_carnival")
-            and focus_unit is not None
-            and CHARACTER_ID_TO_UNIT.get(rec["focus_character_id"]) == focus_unit
+            and banner != 0
+            and CHARACTER_ID_TO_UNIT.get(banner) == rec["unit"]
         )
         if not rec["is_focus_event"]:  # not a solo focus -> no focus attribution
             rec["focus_character_id"] = 0

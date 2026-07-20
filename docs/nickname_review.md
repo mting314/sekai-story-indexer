@@ -23,7 +23,7 @@ can also go in a `nicknames.json`.
 | 8 | MORE MORE JUMP! | 日野森雫 | Shizuku Hinomori | `shizu` | `shizu1` | |
 | 9 | Vivid BAD SQUAD | 小豆沢こはね | Kohane Azusawa | `koha` | `koha1` | |
 | 10 | Vivid BAD SQUAD | 白石杏 | An Shiraishi | `an` | `an1` | |
-| 11 | Vivid BAD SQUAD | 東雲彰人 | Akito Shinonome | `akito` | `akito1` | |
+| 11 | Vivid BAD SQUAD | 東雲彰人 | Akito Shinonome | `aki` | `aki1` | ✅ confirmed |
 | 12 | Vivid BAD SQUAD | 青柳冬弥 | Toya Aoyagi | `toya` | `toya1` | |
 | 13 | Wonderlands x Showtime | 天馬司 | Tsukasa Tenma | `kasa` | `kasa1` | ✅ confirmed |
 | 14 | Wonderlands x Showtime | 鳳えむ | Emu Otori | `emu` | `emu1` | |

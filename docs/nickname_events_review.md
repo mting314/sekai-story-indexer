@@ -1,17 +1,18 @@
 # Event → nickname, by character
 
-One row per focus event, per character (in-game roster order). `type` shows
-marathon vs cheerful_carnival. Flag any wrong numbering / missing / extra events.
+Post-fix (banner + story-main-unit rule). One row per focus event per character.
+Flag any wrong numbering / missing / extra events.
 
 ### Ichika Hoshino — Leo/need  (id 1)
 | nick | date | type | event |
 |------|------|------|-------|
-| `ichi1` | 2021-09-10 | marathon | Knock the Future!! |
-| `ichi2` | 2022-04-21 | marathon | Live with memories |
-| `ichi3` | 2022-11-11 | marathon | Echo my melody |
-| `ichi4` | 2023-07-21 | marathon | つなぐ、星の歌 |
-| `ichi5` | 2024-09-20 | marathon | This moment with you！ |
-| `ichi6` | 2025-10-11 | marathon | 君と繋ぐHeart Beat |
+| `ichi1` | 2021-04-01 | cheerful_carnival | 君と歌う、桜舞う世界で |
+| `ichi2` | 2021-09-10 | marathon | Knock the Future!! |
+| `ichi3` | 2022-04-21 | marathon | Live with memories |
+| `ichi4` | 2022-11-11 | marathon | Echo my melody |
+| `ichi5` | 2023-07-21 | marathon | つなぐ、星の歌 |
+| `ichi6` | 2024-09-20 | marathon | This moment with you！ |
+| `ichi7` | 2025-10-11 | marathon | 君と繋ぐHeart Beat |
 
 ### Saki Tenma — Leo/need  (id 2)
 | nick | date | type | event |
@@ -54,27 +55,30 @@ marathon vs cheerful_carnival. Flag any wrong numbering / missing / extra events
 | `mino4` | 2023-06-20 | marathon | STEP by STEP！ |
 | `mino5` | 2024-02-20 | marathon | 刻まれた傷は、やがて |
 | `mino6` | 2025-07-23 | marathon | start rolling! stars' crossing |
+| `mino7` | 2026-06-30 | marathon | アイドル・花里みのり～夢の最前線～ |
 
 ### Haruka Kiritani — MORE MORE JUMP!  (id 6)
 | nick | date | type | event |
 |------|------|------|-------|
 | `haru1` | 2021-05-21 | marathon | 頑張るあなたにBreak Time！ |
-| `haru2` | 2022-04-30 | cheerful_carnival | つなぐPainful Hope |
-| `haru3` | 2022-11-30 | cheerful_carnival | あの日の夢の、彼方向こうへ |
-| `haru4` | 2024-06-10 | marathon | Lead to shine more |
-| `haru5` | 2025-02-10 | marathon | Rise and Strive |
-| `haru6` | 2025-12-21 | marathon | この物語は希望をのせて |
+| `haru2` | 2021-12-31 | cheerful_carnival | 祈りの先 願う明日は |
+| `haru3` | 2022-04-30 | cheerful_carnival | つなぐPainful Hope |
+| `haru4` | 2022-11-30 | cheerful_carnival | あの日の夢の、彼方向こうへ |
+| `haru5` | 2024-06-10 | marathon | Lead to shine more |
+| `haru6` | 2025-02-10 | marathon | Rise and Strive |
+| `haru7` | 2025-12-21 | marathon | この物語は希望をのせて |
 
 ### Airi Momoi — MORE MORE JUMP!  (id 7)
 | nick | date | type | event |
 |------|------|------|-------|
 | `airi1` | 2020-11-19 | marathon | ここからRE:START！ |
 | `airi2` | 2021-08-10 | marathon | ハッピー・ラブリー・エブリデイ！ |
-| `airi3` | 2022-08-10 | marathon | 青空の先、輝きを追いかけて |
-| `airi4` | 2023-04-21 | marathon | Re-tie Friendship |
-| `airi5` | 2024-07-31 | marathon | Chase my IDEAL IDOL！ |
-| `airi6` | 2025-05-23 | marathon | Cheer with my Heart! |
-| `airi7` | 2026-03-10 | marathon | Open up new horizons！ |
+| `airi3` | 2022-01-31 | cheerful_carnival | 秘密の♡バレンタイン大作戦！ |
+| `airi4` | 2022-08-10 | marathon | 青空の先、輝きを追いかけて |
+| `airi5` | 2023-04-21 | marathon | Re-tie Friendship |
+| `airi6` | 2024-07-31 | marathon | Chase my IDEAL IDOL！ |
+| `airi7` | 2025-05-23 | marathon | Cheer with my Heart! |
+| `airi8` | 2026-03-10 | marathon | Open up new horizons！ |
 
 ### Shizuku Hinomori — MORE MORE JUMP!  (id 8)
 | nick | date | type | event |
@@ -111,12 +115,13 @@ marathon vs cheerful_carnival. Flag any wrong numbering / missing / extra events
 ### Akito Shinonome — Vivid BAD SQUAD  (id 11)
 | nick | date | type | event |
 |------|------|------|-------|
-| `akito1` | 2021-04-30 | cheerful_carnival | STRAY BAD DOG |
-| `akito2` | 2022-05-20 | marathon | THE POWER OF UNITY |
-| `akito3` | 2022-12-11 | marathon | Find A Way Out |
-| `akito4` | 2023-10-12 | marathon | BURN MY SOUL |
-| `akito5` | 2024-10-21 | marathon | Rekindle the flame |
-| `akito6` | 2025-11-20 | marathon | Overcome one's limits |
+| `aki1` | 2021-04-30 | cheerful_carnival | STRAY BAD DOG |
+| `aki2` | 2021-07-20 | marathon | 夏祭り、鳴り響く音は |
+| `aki3` | 2022-05-20 | marathon | THE POWER OF UNITY |
+| `aki4` | 2022-12-11 | marathon | Find A Way Out |
+| `aki5` | 2023-10-12 | marathon | BURN MY SOUL |
+| `aki6` | 2024-10-21 | marathon | Rekindle the flame |
+| `aki7` | 2025-11-20 | marathon | Overcome one's limits |
 
 ### Toya Aoyagi — Vivid BAD SQUAD  (id 12)
 | nick | date | type | event |
@@ -132,12 +137,14 @@ marathon vs cheerful_carnival. Flag any wrong numbering / missing / extra events
 | nick | date | type | event |
 |------|------|------|-------|
 | `kasa1` | 2021-06-11 | marathon | ワンダーマジカルショウタイム！ |
-| `kasa2` | 2022-04-11 | marathon | まばゆい光のステージで |
-| `kasa3` | 2023-03-11 | marathon | 天の果てのフェニックスへ |
-| `kasa4` | 2023-11-22 | marathon | 君が主役の物語を |
-| `kasa5` | 2024-07-09 | marathon | お縄を頂戴！？天馬捕物帳 |
-| `kasa6` | 2025-08-30 | marathon | Deep Dark For Light |
-| `kasa7` | 2026-06-20 | marathon | Phantom maze monster |
+| `kasa2` | 2022-02-28 | cheerful_carnival | 怪盗紳士のハラハラ！？ホワイトデー |
+| `kasa3` | 2022-04-11 | marathon | まばゆい光のステージで |
+| `kasa4` | 2022-12-31 | cheerful_carnival | 新春！ 獅子舞ロボのお正月ショー！ |
+| `kasa5` | 2023-03-11 | marathon | 天の果てのフェニックスへ |
+| `kasa6` | 2023-11-22 | marathon | 君が主役の物語を |
+| `kasa7` | 2024-07-09 | marathon | お縄を頂戴！？天馬捕物帳 |
+| `kasa8` | 2025-08-30 | marathon | Deep Dark For Light |
+| `kasa9` | 2026-06-20 | marathon | Phantom maze monster |
 
 ### Emu Otori — Wonderlands x Showtime  (id 14)
 | nick | date | type | event |
@@ -167,6 +174,8 @@ marathon vs cheerful_carnival. Flag any wrong numbering / missing / extra events
 | `rui2` | 2021-10-21 | marathon | Revival my dream |
 | `rui3` | 2022-10-21 | marathon | カーテンコールに惜別を |
 | `rui4` | 2024-01-23 | marathon | 逆光のレンズフレア |
+| `rui5` | 2025-07-07 | marathon | Deeper and deeper |
+| `rui6` | 2026-03-30 | marathon | 残照のInside Direction |
 
 ### Kanade Yoisaki — Nightcord at 25:00  (id 17)
 | nick | date | type | event |
@@ -183,21 +192,24 @@ marathon vs cheerful_carnival. Flag any wrong numbering / missing / extra events
 |------|------|------|-------|
 | `mafu1` | 2020-10-20 | marathon | 囚われのマリオネット |
 | `mafu2` | 2021-09-21 | marathon | 灯のミラージュ |
-| `mafu3` | 2022-06-10 | marathon | 迷い子の手を引く、そのさきは |
-| `mafu4` | 2023-07-11 | marathon | 仮面の私にさよならを |
-| `mafu5` | 2024-06-20 | marathon | 灯を手繰りよせて |
-| `mafu6` | 2025-04-30 | marathon | そして、針は動き出す |
+| `mafu3` | 2021-11-30 | cheerful_carnival | 交わる旋律 灯るぬくもり |
+| `mafu4` | 2022-06-10 | marathon | 迷い子の手を引く、そのさきは |
+| `mafu5` | 2022-09-30 | cheerful_carnival | この祭に 夕闇色も |
+| `mafu6` | 2023-07-11 | marathon | 仮面の私にさよならを |
+| `mafu7` | 2024-06-20 | marathon | 灯を手繰りよせて |
+| `mafu8` | 2025-04-30 | marathon | そして、針は動き出す |
 
 ### Ena Shinonome — Nightcord at 25:00  (id 19)
 | nick | date | type | event |
 |------|------|------|-------|
 | `ena1` | 2021-02-18 | marathon | 満たされないペイルカラー |
-| `ena2` | 2022-03-20 | marathon | 空白のキャンバスに描く私は |
-| `ena3` | 2022-11-20 | marathon | 願いは、いつか朝をこえて |
-| `ena4` | 2024-04-10 | marathon | Knowing the Unseen |
-| `ena5` | 2024-11-30 | marathon | 傷だらけの手で、私達は |
-| `ena6` | 2025-10-31 | marathon | Colors of Pure Sense |
-| `ena7` | 2026-07-09 | marathon | 褪せない今を、彩って |
+| `ena2` | 2021-05-10 | marathon | お悩み聞かせて！わくわくピクニック |
+| `ena3` | 2022-03-20 | marathon | 空白のキャンバスに描く私は |
+| `ena4` | 2022-11-20 | marathon | 願いは、いつか朝をこえて |
+| `ena5` | 2024-04-10 | marathon | Knowing the Unseen |
+| `ena6` | 2024-11-30 | marathon | 傷だらけの手で、私達は |
+| `ena7` | 2025-10-31 | marathon | Colors of Pure Sense |
+| `ena8` | 2026-07-09 | marathon | 褪せない今を、彩って |
 
 ### Mizuki Akiyama — Nightcord at 25:00  (id 20)
 | nick | date | type | event |
