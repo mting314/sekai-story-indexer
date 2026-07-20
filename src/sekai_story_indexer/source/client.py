@@ -128,6 +128,25 @@ REGION_DBS = {
 }
 
 
+def en_event_names() -> dict[int, str]:
+    """Official English event titles from the EN master DB, keyed by event id.
+    Only events localized so far are present (EN lags JP)."""
+    try:
+        rows = fetch_json(f"{REGION_DBS['en']}/events.json")
+    except Exception:
+        return {}
+    return {e["id"]: e.get("name", "") for e in rows if e.get("id") and e.get("name")}
+
+
+def en_music_titles() -> dict[int, str]:
+    """Official English song titles from the EN master DB, keyed by music id."""
+    try:
+        rows = fetch_json(f"{REGION_DBS['en']}/musics.json")
+    except Exception:
+        return {}
+    return {m["id"]: m.get("title", "") for m in rows if m.get("id") and m.get("title")}
+
+
 def region_event_times() -> dict[int, dict[str, dict[str, int]]]:
     """Per-region event windows keyed by event id:
     ``{event_id: {"en": {"start": ms, "end": ms}, "tw": {...}, "kr": {...}}}``.

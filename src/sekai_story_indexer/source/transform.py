@@ -164,6 +164,7 @@ def song_info(music: dict | None) -> dict:
     if not music:
         return {}
     return {
+        "song_id": music.get("id", 0),
         "song_title": music.get("title", ""),
         "song_composer": music.get("composer", ""),
         "song_lyricist": music.get("lyricist", ""),

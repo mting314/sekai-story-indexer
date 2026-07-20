@@ -78,9 +78,47 @@ def load_events() -> list[dict]:
     except Exception:
         rows = _static_events()  # offline / source down -> last snapshot
 
+    _overlay_en_titles(rows)
     _cache["rows"] = rows
     _cache["at"] = now
     return rows
+
+
+# Official English titles (event names + song titles) from the EN master DB, so
+# the UI/citations show English instead of Japanese where localized. Cached a day.
+_EN_TTL_SECONDS = int(os.environ.get("SEKAI_EN_TTL", "86400"))
+_en_cache: dict[str, object] = {"at": 0.0, "names": None, "songs": None}
+
+
+def _en_maps() -> tuple[dict, dict]:
+    now = time.time()
+    if _en_cache["names"] is not None and now - float(str(_en_cache["at"])) < _EN_TTL_SECONDS:
+        return _en_cache["names"], _en_cache["songs"]  # type: ignore[return-value]
+    try:
+        from sekai_story_indexer.source import client
+
+        names, songs = client.en_event_names(), client.en_music_titles()
+    except Exception:
+        names, songs = {}, {}
+    _en_cache.update(at=now, names=names, songs=songs)
+    return names, songs
+
+
+def _overlay_en_titles(rows: list[dict]) -> None:
+    """Replace event name + song title with official English, keeping JP as
+    *_jp fallbacks. Events/songs not yet localized keep their Japanese."""
+    names, songs = _en_maps()
+    if not names and not songs:
+        return
+    for r in rows:
+        en = names.get(r.get("event_id"))
+        if en and en != r.get("name"):
+            r["name_jp"] = r.get("name")
+            r["name"] = en
+        es = songs.get(r.get("song_id"))
+        if es and es != r.get("song_title"):
+            r["song_title_jp"] = r.get("song_title")
+            r["song_title"] = es
 
 
 app = FastAPI(title="Sekai Story Indexer")
@@ -414,17 +452,65 @@ def _resolve_focus_scope(req: QueryRequest) -> None:
         return
 
 
+_SUMMARIZE_RE = re.compile(r"\b(summar(?:y|ize|ise)|recap|overview|tl;?dr|synops)", re.IGNORECASE)
+
+
+def _summarize_intercept(question: str) -> dict | None:
+    """'Summarize <event>' where the event resolves (nickname/focus) and has a
+    pre-computed summary -> return that summary directly, instead of letting the
+    RAG re-summarize raw scenes (which tends to dump the whole cast)."""
+    if not _SUMMARIZE_RE.search(question):
+        return None
+    try:
+        from sekai_story_indexer.query.metadata import resolve_focus_reference
+
+        ev = resolve_focus_reference(question, load_events(), _characters_meta())
+        if not ev:
+            return None
+        path = _summaries_path()
+        sums = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        ent = _entry(sums.get(ev.get("arc_slug"), ""))
+        if not ent["summary"]:
+            return None
+        return {
+            "answer": ent["summary"],
+            "answer_parts": [{"type": "text", "text": ent["summary"]}],
+            "characters": ent["characters"],
+            "citations": [{
+                "ref": 1, "arc_id": ev.get("arc_slug"), "label": ev.get("name"),
+                "nickname": ev.get("nickname"), "excerpt": ent["summary"],
+            }],
+            "intent": "summarize", "backend": "summary", "error": None,
+        }
+    except Exception:
+        return None
+
+
 @app.post("/api/query")
 def query(req: QueryRequest) -> dict:
     """Answer a question. Uses the local lexical engine by default (runs anywhere);
     set SEKAI_QUERY_BACKEND=full for the Google/Chroma RAG stack."""
+    # Resolve follow-ups into a standalone question up front, so BOTH backends and
+    # the intercepts see the full context (the full engine has no history of its own).
+    if req.history:
+        try:
+            from sekai_story_indexer.query.condense import condense
+
+            req.question = condense(req.question, req.history)
+        except Exception:
+            pass
+        req.history = []  # consumed -> no double-condense in _query_local
+
     # Pure identity/count/list focus-event questions -> deterministic answer.
     md = _metadata_intercept(req.question)
     if md is not None:
         return md
-    # Content questions that REFER to an event by focus name/nickname ("what happens
-    # in Saki's first focus event", "summarize saki1") -> resolve to the event and
-    # point the RAG at it, then answer normally.
+    # "Summarize <event>" -> serve the pre-computed summary, not a raw-scene RAG dump.
+    sm = _summarize_intercept(req.question)
+    if sm is not None:
+        return sm
+    # Other content questions that REFER to an event by focus name/nickname -> resolve
+    # to the event and point the RAG at it, then answer normally.
     _resolve_focus_scope(req)
     if QUERY_BACKEND == "full":
         return _query_full(req)
