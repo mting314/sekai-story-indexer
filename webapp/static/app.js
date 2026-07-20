@@ -759,7 +759,24 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   addMessage("user", q);
   const pending = addMessage("assistant", "…");
   try {
-    const res = await streamAnswer(q, pending);
+    let res;
+    try {
+      res = await streamAnswer(q, pending);
+    } catch (streamErr) {
+      // SSE can be blocked/buffered by proxies — fall back to the JSON endpoint.
+      pending.textContent = "…";
+      res = await fetch("/api/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: q,
+          unit: state.activeUnit === "all" ? null : state.activeUnit,
+          event_id: state.scopeEventId,
+          history: state.history.slice(-6),
+          session_id: ensureSessionId(),
+        }),
+      }).then((r) => r.json());
+    }
     if (res.error && !res.answer) {
       pending.textContent = `⚠ ${res.error}`;
     } else {

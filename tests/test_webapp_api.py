@@ -166,6 +166,9 @@ def test_session_focus_carries_scope_on_followup(client, monkeypatch):
     server._SESSIONS.clear("t-focus")
     r1 = client.post("/api/query", json={"question": "What happens in koha1?", "session_id": "t-focus"})
     assert r1.json()["scope"]["arc_id"] == "0006-lyric"
+    # focus character is seeded from the resolved event (koha1 -> Kohane, id 9),
+    # even though the nickname string doesn't name her — needed for later clarify.
+    assert r1.json().get("focus", {}).get("character_id") == 9
     r2 = client.post("/api/query", json={
         "question": "what happens at the climax of that story?", "session_id": "t-focus",
     })

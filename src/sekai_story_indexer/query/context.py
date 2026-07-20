@@ -22,13 +22,10 @@ from __future__ import annotations
 
 from ..source.constants import UNIT_NAMES
 
-_ORDINALS = {1: "1st", 2: "2nd", 3: "3rd"}
-
 
 def _ordinal(n: int) -> str:
-    if 10 <= n % 100 <= 20:
-        return f"{n}th"
-    return _ORDINALS.get(n, f"{n}th") if n < 4 else f"{n}th"
+    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
 
 
 def arc_context_line(meta: dict | None, *, focus_name_en: str | None = None) -> str:

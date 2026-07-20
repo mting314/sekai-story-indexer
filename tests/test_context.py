@@ -17,7 +17,8 @@ def test_focus_event_line_includes_nickname_ordinal_unit_song():
 
 
 def test_ordinal_forms():
-    for idx, word in [(1, "1st"), (2, "2nd"), (3, "3rd"), (4, "4th"), (11, "11th")]:
+    for idx, word in [(1, "1st"), (2, "2nd"), (3, "3rd"), (4, "4th"), (11, "11th"),
+                      (13, "13th"), (21, "21st"), (22, "22nd"), (23, "23rd"), (31, "31st")]:
         meta = {"name": "E", "focus_character": "C", "focus_character_id": 9,
                 "focus_index": idx, "unit": "leo_need"}
         assert f"{word} focus event" in arc_context_line(meta)

@@ -591,6 +591,25 @@ def _remember_focus(session_id: str | None, focus: Focus) -> Focus:
     return focus
 
 
+def _rag_log(log: dict, result: dict, scope_arc_ids: tuple[str, ...], **extra) -> dict:
+    """Uniform RAG-turn log (both JSON + streaming) — enough to SEE a silent guess:
+    an unscoped summarize with a weak top score is the 'rise as one' fingerprint."""
+    scope = result.get("scope") or {}
+    cits = result.get("citations") or []
+    return {
+        **log, "route": "rag", "backend": result.get("backend"),
+        "citations": len(cits),
+        "scoped": bool(scope.get("arc_id") or scope.get("arc_ids") or scope.get("unit")
+                       or scope_arc_ids),
+        "scope_arc": scope.get("arc_id"),
+        "top_arc": cits[0].get("arc_id") if cits else None,
+        "top_score": cits[0].get("score") if cits else None,
+        "fell_back": result.get("summarize_fell_back"),
+        "error": result.get("error"),
+        **extra,
+    }
+
+
 def _resolve_request(req: QueryRequest) -> tuple[dict | None, tuple[str, ...], Focus | None, dict]:
     """Shared pipeline for the JSON and streaming endpoints.
 
@@ -652,9 +671,13 @@ def _resolve_request(req: QueryRequest) -> tuple[dict | None, tuple[str, ...], F
         label = ev.get("name")
         if ev.get("arc_slug") and ev["arc_slug"] not in referenced:
             referenced.append(ev["arc_slug"])
+    # Focus character: a named character, else the resolved event's own focus
+    # character (so a nickname turn like 'koha1' still seeds the focus character —
+    # what the conversational event-vs-arc clarify needs on the next turn).
+    focus_cid = named_cid or (ev.get("focus_character_id") if ev else None) or None
 
     focus, scope_arcs = resolve_turn(
-        prev, referenced_arcs=tuple(referenced), character_id=named_cid,
+        prev, referenced_arcs=tuple(referenced), character_id=focus_cid,
         label=label, followup=followup,
     )
     _remember_focus(req.session_id, focus)
@@ -681,21 +704,7 @@ def query(req: QueryRequest) -> dict:
             result = _query_local(req, scope_arc_ids)
         except Exception as exc:  # pragma: no cover - defensive
             result = {"answer": None, "error": f"local query failed: {exc}", "backend": "local"}
-    # Rich RAG logging: enough to SEE a silent guess — an unscoped summarize with a
-    # weak top score is the signature of the "rise as one" failure mode.
-    scope = result.get("scope") or {}
-    cits = result.get("citations") or []
-    _log_turn({
-        **log, "route": "rag", "backend": result.get("backend"),
-        "citations": len(cits),
-        "scoped": bool(scope.get("arc_id") or scope.get("arc_ids") or scope.get("unit")
-                       or scope_arc_ids),
-        "scope_arc": scope.get("arc_id"),
-        "top_arc": cits[0].get("arc_id") if cits else None,
-        "top_score": cits[0].get("score") if cits else None,
-        "fell_back": result.get("summarize_fell_back"),
-        "error": result.get("error"),
-    })
+    _log_turn(_rag_log(log, result, scope_arc_ids))
     return _with_focus(result, focus)
 
 
@@ -725,12 +734,15 @@ def _stream_events(req: QueryRequest):
         return
 
     if QUERY_BACKEND == "full":
+        # NOTE: the full engine generates the whole answer before returning (its
+        # citation post-processing needs the complete text), so these deltas are
+        # chunked-after-the-fact, not true token streaming. Real token streaming
+        # here would need engine.stream_query wired through _structure_full_answer.
         result = _query_full(req, arc_ids=scope_arc_ids)
         yield _sse({"type": "meta", "backend": result.get("backend"), "focus": focus_d})
         for piece in _chunk_text(result.get("answer") or ""):
             yield _sse({"type": "delta", "text": piece})
-        _log_turn({**log, "route": "rag", "backend": result.get("backend"),
-                   "streamed": True, "citations": len(result.get("citations") or [])})
+        _log_turn(_rag_log(log, result, scope_arc_ids, streamed=True))
         yield _sse({"type": "done", **_with_focus(result, focus)})
         return
 
@@ -759,13 +771,7 @@ def _stream_events(req: QueryRequest):
         for piece in _chunk_text(result.get("answer") or ""):
             yield _sse({"type": "delta", "text": piece})
 
-    scope = result.get("scope") or {}
-    cits = result.get("citations") or []
-    _log_turn({**log, "route": "rag", "backend": "local", "streamed": True,
-               "citations": len(cits), "generated": bool(streamed),
-               "scoped": bool(scope.get("arc_id") or scope.get("arc_ids")
-                              or scope.get("unit") or scope_arc_ids),
-               "fell_back": result.get("summarize_fell_back")})
+    _log_turn(_rag_log(log, result, scope_arc_ids, streamed=True, generated=bool(streamed)))
     yield _sse({"type": "done", **_with_focus(result, focus)})
 
 

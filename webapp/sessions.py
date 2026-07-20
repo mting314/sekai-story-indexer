@@ -14,6 +14,7 @@ unit-tests without any web/session plumbing.
 from __future__ import annotations
 
 import re
+import threading
 from dataclasses import dataclass
 
 # A follow-up leans on prior context: a leading connective, a pronoun, or "the
@@ -79,21 +80,26 @@ class SessionStore:
     def __init__(self, max_sessions: int = 1000) -> None:
         self._focus: dict[str, Focus] = {}
         self.max_sessions = max_sessions
+        # sync endpoints run in FastAPI's threadpool -> guard the check-then-evict
+        self._lock = threading.Lock()
 
     def get(self, session_id: str | None) -> Focus | None:
         if not session_id:
             return None
-        return self._focus.get(session_id)
+        with self._lock:
+            return self._focus.get(session_id)
 
     def set(self, session_id: str | None, focus: Focus) -> None:
         if not session_id:
             return
-        # evict the oldest by update time when over capacity
-        if session_id not in self._focus and len(self._focus) >= self.max_sessions:
-            oldest = min(self._focus, key=lambda k: self._focus[k].updated_at)
-            self._focus.pop(oldest, None)
-        self._focus[session_id] = focus
+        with self._lock:
+            # evict the oldest by update time when over capacity
+            if session_id not in self._focus and len(self._focus) >= self.max_sessions:
+                oldest = min(self._focus, key=lambda k: self._focus[k].updated_at)
+                self._focus.pop(oldest, None)
+            self._focus[session_id] = focus
 
     def clear(self, session_id: str | None) -> None:
         if session_id:
-            self._focus.pop(session_id, None)
+            with self._lock:
+                self._focus.pop(session_id, None)
