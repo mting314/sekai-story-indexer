@@ -36,9 +36,10 @@ resolved). This makes retrieval *find* the entity by meaning in the first place.
   join key is `arc_id == arc_slug` → `events_index.json`, which *does* carry
   `nickname`, `focus_character`, `focus_character_id`, `focus_index`, `name`,
   `unit`, `song_title`, `outline` (built in `catalog.py` + `nicknames.py`).
-* `event_summarizer.py:45` already loads `events_index` and passes
-  `focus_id`/`song` into the **summary prompt** — but that context is used only at
-  summarization time, never carried into the embedding header or metadata.
+* The shared prompt (`source/summary_prompt.py::build_prompt`) already accepts
+  `focus_id`/`song` and folds them into the **summary prompt** — but that context is
+  used only at summarization time, never carried into the embedding header or
+  metadata.
 * Two lexical systems exist and both would need the same prefix for parity:
   full-engine `LexicalIndex` (`cli.py:788`) and the local backend's in-memory
   TF-IDF built from `node.text` (`local.py:75`).

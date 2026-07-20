@@ -21,7 +21,9 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--acce
 
 main {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* chat takes the remaining width; the event panel hugs the ~340px cards
+     (340 + 2×16 panel padding) instead of filling half the viewport. */
+  grid-template-columns: minmax(0, 1fr) 372px;
   gap: 16px;
   padding: 16px 24px 32px;
   align-items: start;
@@ -70,25 +72,68 @@ main {
 .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .chip { padding: 5px 11px; border-radius: 999px; border: 1px solid #2b2f3a; background: transparent; color: var(--muted); cursor: pointer; font-size: 12.5px; }
 .chip.active { background: var(--accent); color: #04222b; border-color: var(--accent); font-weight: 600; }
-.timeline { display: flex; flex-direction: column; gap: 8px; max-height: 70vh; overflow-y: auto; }
-.legend { font-size: 12px; color: var(--muted); padding: 2px 2px 8px; position: sticky; top: 0; background: var(--panel); }
+/* Game-style event list: a vertically-scrolling stack of banner tiles, with the
+   banner art as the visual anchor of each row (Project Sekai in-game style).
+   Extra scroll momentum/inertia is added in app.js (enableWheelInertia). CSS
+   scroll-snap is intentionally NOT used — with scroll-padding + snap-align:start
+   the browser reserves phantom scroll space past the last card (you could scroll
+   into blank space below the bottom), so we let scrolling end exactly at the
+   last card. */
+.timeline {
+  display: flex; flex-direction: column; gap: 12px;
+  max-height: 72vh; overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+/* Only the event timeline is drag-scrollable (JS binds to #timeline); the
+   Summaries list shares .timeline for layout but must not imply grab. */
+#timeline { cursor: grab; }
+#timeline.dragging { cursor: grabbing; user-select: none; }
+#timeline.dragging .event-card { cursor: grabbing; }
+/* cards live here so rubber-band overscroll can translate them past the edges
+   without moving the sticky legend (transform driven by enableWheelInertia) */
+.tl-inner { display: flex; flex-direction: column; gap: 12px; will-change: transform; }
+.legend { font-size: 12px; color: var(--muted); padding: 2px 2px 8px; position: sticky; top: 0; z-index: 2; background: var(--panel); }
 .legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: middle; }
 .dot.indexed, .status-dot.indexed { background: #4ade80; box-shadow: 0 0 6px #4ade8088; }
 .dot.pending, .status-dot.pending { background: transparent; border: 1.5px solid var(--muted); box-shadow: none; }
-.event-card { display: flex; gap: 12px; align-items: center; background: var(--card); border-radius: 10px; padding: 8px 10px; cursor: pointer; border-left: 3px solid transparent; }
-.event-card:hover { outline: 1px solid #2b2f3a; }
-.event-card.key { border-left-color: var(--key); }
-.event-card.pending { opacity: 0.55; cursor: default; }
-.event-card.pending:hover { outline: 1px dashed #2b2f3a; }
+/* banner-forward tile: art fills the card, text rides on a left-to-right scrim */
+.event-card {
+  position: relative; display: block; min-height: 88px; flex-shrink: 0;
+  width: 100%; max-width: 340px; align-self: center;
+  background: var(--card); border-radius: 14px; overflow: hidden; cursor: pointer;
+  border: 1px solid #ffffff10;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.event-card:hover { transform: translateY(-1px); box-shadow: 0 8px 22px #0007; }
+.event-card.key { box-shadow: inset 4px 0 0 0 var(--key); }
+.event-card.key:hover { box-shadow: inset 4px 0 0 0 var(--key), 0 8px 22px #0007; }
+.event-card.pending { opacity: 0.5; }
+.event-card .art-bg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: center 30%;
+}
+.event-card .scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, #0e1017f5 0%, #0e1017e0 30%, #0e101766 60%, #0e101710 100%);
+}
+.event-card.no-art .scrim { display: none; }
+.event-card .card-content { position: relative; display: flex; gap: 11px; align-items: center; padding: 11px 13px; min-height: 88px; }
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.event-card .logo { width: 92px; height: 52px; object-fit: contain; flex-shrink: 0; }
-.event-card .meta { min-width: 0; }
-.event-card .top { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.event-card .logo { width: 80px; height: 46px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 1px 4px #000b); }
+.event-card .meta { min-width: 0; flex: 1; }
+.event-card .top { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); text-shadow: 0 1px 3px #000c; }
 .event-card .date { font-variant-numeric: tabular-nums; }
 .event-card .nick { color: var(--accent); font-weight: 600; }
 .event-card .key-badge { background: var(--key); color: #3a2b00; border-radius: 4px; padding: 0 5px; font-size: 10.5px; font-weight: 700; }
-.event-card .name { font-size: 14px; margin: 1px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.event-card .focus, .event-card .song { font-size: 12px; color: var(--muted); }
+.event-card .name { font-size: 15px; margin: 2px 0; color: #fff; text-shadow: 0 1px 4px #000d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-card .focus, .event-card .song { font-size: 12px; color: #c6ccd8; text-shadow: 0 1px 3px #000c; }
+@media (prefers-reduced-motion: reduce) {
+  .timeline { scroll-behavior: auto; }
+  .event-card { transition: none; }
+  .event-card:hover { transform: none; }
+}
 .empty { color: var(--muted); font-size: 13px; }
 .quotes-head { margin: 10px 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
 .answer-text h4 { margin: 10px 0 4px; font-size: 14px; color: var(--text); }
@@ -180,10 +225,11 @@ a.cite:hover { text-decoration: underline; }
   30% { transform: translateY(-5px); opacity: .95; }
 }
 
-/* Event banner art on the right of each timeline row (fills the wide column). */
-.event-card .event-art {
-  margin-left: auto; flex-shrink: 0; height: 60px; width: auto; max-width: 300px;
-  object-fit: contain; border-radius: 6px; align-self: center;
+/* On narrow screens the banner art gets busy behind text — dim it further so
+   the metadata stays legible. */
+@media (max-width: 720px) {
+  .event-card .art-bg { object-position: right center; }
+  .event-card .scrim { background: linear-gradient(90deg, #0e1017f7 0%, #0e1017e6 55%, #0e101799 100%); }
 }
 @media (max-width: 720px) { .event-card .event-art { display: none; } }
 

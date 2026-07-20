@@ -21,54 +21,9 @@ from __future__ import annotations
 
 import re
 
+from .aliases import event_title_matches
 from .intent import classify
 from .metadata import _NICK_RE, _ORDINALS, _char_id_map
-
-_WORD_RE = re.compile(r"[a-z0-9]+")
-# Generic title words that carry no disambiguating signal on their own, so a
-# match on them alone must not count as recognizing an event title.
-_TITLE_STOP = {
-    "the", "a", "an", "of", "to", "and", "in", "on", "for", "with", "as", "at",
-    "story", "event", "side", "part", "chapter", "tale", "song", "arc", "feat",
-    "ver", "version", "my", "our", "your", "is", "are", "be",
-}
-
-
-def _tokenize(text: str) -> list[str]:
-    return _WORD_RE.findall(text.lower())
-
-
-def _title_distinctive(name: str) -> list[str]:
-    """Content tokens of an event title (drops generic words and 1-char noise)."""
-    return [t for t in _tokenize(name) if t not in _TITLE_STOP and len(t) >= 2]
-
-
-def _event_title_matches(qtokens: set[str], events: list[dict]) -> list[dict]:
-    """Events whose title is strongly present in the question. Strong = at least
-    two distinctive title tokens present, or a single distinctive token that is
-    long enough (>=5) to be specific. Deliberately conservative to avoid firing
-    on incidental word overlap (e.g. a stray 'one' or 'story')."""
-    out: list[dict] = []
-    seen: set[str] = set()
-    for e in events:
-        arc = e.get("arc_slug")
-        if not arc or arc in seen:
-            continue
-        for field in ("name", "name_jp"):
-            name = e.get(field)
-            if not name:
-                continue
-            dist = _title_distinctive(name)
-            if not dist:
-                continue
-            strong = (len(dist) >= 2 and set(dist) <= qtokens) or (
-                len(dist) == 1 and len(dist[0]) >= 5 and dist[0] in qtokens
-            )
-            if strong:
-                out.append(e)
-                seen.add(arc)
-                break
-    return out
 
 
 def _named_char_ids(question_lower: str, characters: dict) -> list[int]:
@@ -145,7 +100,6 @@ def find_candidates(
     if _has_explicit_disambiguator(question, events):
         return []
 
-    qtokens = set(_tokenize(question))
     candidates: list[dict] = []
     seen_arcs: set[str] = set()
 
@@ -158,8 +112,8 @@ def find_candidates(
                 seen_arcs.add(arc)
                 candidates.append(_event_candidate(e))
 
-    # (B) event-title collisions
-    for e in _event_title_matches(qtokens, events):
+    # (B) event-title collisions (JP / EN / romaji, via the shared matcher)
+    for e in event_title_matches(question, events):
         arc = e.get("arc_slug")
         if arc and arc not in seen_arcs:
             seen_arcs.add(arc)

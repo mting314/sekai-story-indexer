@@ -291,6 +291,14 @@ def _build_event_context(
     from .source.constants import CHARACTER_ID_TO_JP
 
     jp_to_en = (glossary or {}).get("characters", {})
+    # Official English event titles (keyed by event_id) so the prefix lists the EN
+    # title as an alias — the on-disk index only has JP names. Best-effort/offline-ok.
+    try:
+        from .source.client import en_event_names
+
+        en_titles = en_event_names()
+    except Exception:
+        en_titles = {}
     out: dict[str, str] = {}
     for row in events_index or []:
         arc = row.get("arc_slug")
@@ -298,7 +306,9 @@ def _build_event_context(
             continue
         fcid = row.get("focus_character_id")
         en = jp_to_en.get(CHARACTER_ID_TO_JP.get(fcid)) if fcid else None
-        line = arc_context_line(row, focus_name_en=en)
+        en_title = en_titles.get(row.get("event_id"))
+        extra = (en_title,) if en_title and en_title != row.get("name") else ()
+        line = arc_context_line(row, focus_name_en=en, extra_titles=extra)
         if line:
             out[arc] = line
     return out
@@ -721,12 +731,12 @@ def ingest(
         False, "--skip-summaries", help="Deprecated alias for --summaries none.",
     ),
     summaries: str = typer.Option(
-        "event",
+        "hierarchical",
         "--summaries",
-        help="Summary strategy: 'local' (embed the FREE locally-generated "
-        "episode/event/unit summaries — no generation cost), 'event' (one per "
-        "event via the API), 'hierarchical' (per-part/episode/event via the API), "
-        "or 'none' (embed raw scenes only).",
+        help="Summary strategy: 'hierarchical' (the inherited linkura Refine "
+        "summarizer — per-part/episode/event via the API; the default), 'local' "
+        "(embed the FREE locally-generated episode/event/unit summaries — no "
+        "generation cost), or 'none' (embed raw scenes only).",
     ),
     only_summaries: bool = typer.Option(
         False,
@@ -805,6 +815,19 @@ def ingest(
         summary_cache_schema_version=SUMMARY_CACHE_SCHEMA_VERSION,
     )
     mode = "none" if skip_summaries else summaries
+    valid_modes = {"none", "local", "hierarchical"}
+    if mode not in valid_modes:
+        hint = (
+            " ('event' was retired — use 'hierarchical' for the linkura Refine "
+            "summarizer, or 'local' for the free precomputed summaries)"
+            if mode == "event"
+            else ""
+        )
+        console.print(
+            f"[red]Unknown --summaries mode {mode!r}. "
+            f"Choose one of: {', '.join(sorted(valid_modes))}.{hint}[/red]"
+        )
+        raise typer.Exit(1)
     if mode == "none":
         summary_nodes = []
         console.print("[yellow]--summaries none: embedding raw scenes only.[/yellow]")
@@ -821,17 +844,7 @@ def ingest(
                 "[yellow]No local summaries found. Run scripts/summarize_ollama.py first "
                 "and copy episode_/event_/unit_summaries.json here.[/yellow]"
             )
-    elif mode == "event":
-        from .indexer.event_summarizer import summarize_events
-
-        console.print("Generating one summary per event story (--summaries event)...")
-        summary_nodes = summarize_events(
-            raw_nodes, story_order=story_order,
-            cache_path="event_summaries.json",  # readable + resumable
-            log=lambda m: console.print(f"[dim]{m}[/dim]"),
-        )
-        console.print(f"Generated {len(summary_nodes)} event summaries.")
-    else:  # hierarchical
+    else:  # hierarchical (linkura Refine summarizer — the default)
         summarizer = HierarchicalSummarizer(
             glossary=glossary,
             story_order=story_order,

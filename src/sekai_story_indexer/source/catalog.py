@@ -77,16 +77,23 @@ def event_record(
     }
 
 
-def _focus_units(event_id: int, event_card_ids: dict, cards_by_id: dict) -> set[str]:
-    """Units (excluding Virtual Singer) of an event's featured 4★ cards."""
-    units: set[str] = set()
-    for cid in event_card_ids.get(event_id, []):
-        card = cards_by_id.get(cid, {})
-        if card.get("cardRarityType") in ("rarity_4", "rarity_birthday"):
-            u = CHARACTER_ID_TO_UNIT.get(card.get("characterId"))
-            if u and u != "virtual_singer":
-                units.add(u)
-    return units
+def load_focus_overrides(path: str = "focus_overrides.json") -> dict[int, int]:
+    """Curated ``event_id -> focus character id`` overrides (``0`` = force-exclude),
+    for events whose story protagonist differs from the master-DB banner artwork
+    character (which no single field distinguishes). Best-effort; missing/unreadable
+    file -> ``{}``."""
+    import json
+    from pathlib import Path
+
+    for candidate in (Path(path), Path(__file__).resolve().parents[3] / path):
+        if candidate.exists():
+            try:
+                data = json.loads(candidate.read_text(encoding="utf-8"))
+                # skip non-numeric keys (e.g. a "_comment") so docs don't break it
+                return {int(k): int(v) for k, v in data.items() if str(k).lstrip("-").isdigit()}
+            except Exception:
+                return {}
+    return {}
 
 
 def build_catalog(
@@ -98,19 +105,28 @@ def build_catalog(
     banner_char_by_event: dict[int, int] | None = None,
     event_card_ids: dict[int, list[int]] | None = None,
     cards_by_id: dict[int, dict] | None = None,
+    focus_overrides: dict[int, int] | None = None,
     **_ignored: object,
 ) -> list[dict]:
     """Full enriched, chronologically-sorted catalog with nicknames assigned.
 
-    A true *focus event* (which counts toward a character's kaho5-style nickname
-    number) is a ``marathon`` event whose featured 4★ cards are all from ONE unit
-    — this excludes cross-unit collabs, Cheerful Carnival, and World Link, which
-    have a banner character but aren't anyone's solo focus event. Non-focus events
-    carry no focus/nickname.
+    A *focus event* (which counts toward a character's kasa5-style nickname number)
+    is a ``marathon`` or ``cheerful_carnival`` event that
+      1. has a **banner focus character** (``eventStories.bannerGameCharacterUnitId``)
+         who belongs to the event story's **main unit** (excludes Virtual Singers,
+         World Link, and crossover/anniversary events with no banner char); and
+      2. **debuts a commissioned song** — a dedicated character event always does;
+         mixed / collab / seasonal events (New Year, group Cheerful Carnivals,
+         Valentine, …) do not, which is exactly what separates them from a focus.
+
+    The one exception to (2) is a **single-unit story** (the event story involves
+    only the focus character's own unit): those are inherently dedicated events, and
+    a few early ones simply have no recorded song (e.g. カーテンコールに惜別を), so they
+    count regardless. Non-focus events carry no focus/nickname.
+
+    ``event_card_ids``/``cards_by_id`` are accepted for API stability but not used.
     """
     banner_char_by_event = banner_char_by_event or {}
-    event_card_ids = event_card_ids or {}
-    cards_by_id = cards_by_id or {}
     records: list[dict] = []
     for event in events:
         story = stories_by_event.get(event["id"])
@@ -124,11 +140,31 @@ def build_catalog(
             focus_id=banner_char_by_event.get(event["id"], 0),
             music=music_by_event.get(event["id"]),
         )
-        units = _focus_units(event["id"], event_card_ids, cards_by_id)
-        rec["is_focus_event"] = rec["event_type"] == "marathon" and len(units) == 1
+        banner = rec["focus_character_id"]
+        distinct_story_units = {u.get("unit") for u in story_units}
+        banner_in_main_unit = banner != 0 and CHARACTER_ID_TO_UNIT.get(banner) == rec["unit"]
+        single_unit = len(distinct_story_units) == 1
+        has_song = bool(rec.get("song_title"))
+        # A dedicated focus event debuts a commissioned song; mixed/collab/seasonal
+        # events don't. Single-unit stories are inherently dedicated, so they count
+        # even without a recorded song (legacy events like カーテンコールに惜別を).
+        rec["is_focus_event"] = (
+            rec["event_type"] in ("marathon", "cheerful_carnival")
+            and banner_in_main_unit
+            and (has_song or single_unit)
+        )
         if not rec["is_focus_event"]:  # not a solo focus -> no focus attribution
             rec["focus_character_id"] = 0
             rec["focus_character"] = ""
+        # Curated override for events the master DB gets wrong — e.g. "Light Up the
+        # Fire" has bannerGameCharacterUnitId=Kohane (a sekai.best data error; the
+        # actual banner shows An, who debuts the event's new 4★ card). event_id ->
+        # focus char id, or 0 to force-exclude. Applied before nickname numbering.
+        if focus_overrides and event["id"] in focus_overrides:
+            forced = focus_overrides[event["id"]]
+            rec["is_focus_event"] = forced != 0
+            rec["focus_character_id"] = forced if forced != 0 else 0
+            rec["focus_character"] = CHARACTER_ID_TO_JP.get(forced, "") if forced != 0 else ""
         records.append(rec)
 
     nicknames = assign_focus_nicknames(
