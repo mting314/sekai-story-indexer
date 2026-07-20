@@ -1,29 +1,35 @@
 #!/usr/bin/env python3
-"""Local event summarizer via Ollama — runs anywhere Ollama runs (Windows/Mac/Linux).
+"""Hierarchical local summarizer via Ollama — runs anywhere Ollama runs.
 
-No pip dependencies (Python standard library only). Reads the story tree and
-meta.json sitting next to this script, asks a local Ollama model for a 1-2
-paragraph English summary PLUS the roster of characters that appear, and writes a
-resumable cache to event_summaries.json:
+Builds the summary tree bottom-up, mirroring the original linkura summarizer:
 
-    {"<arc_slug>": {"summary": "...", "characters": [<gameCharacterId>, ...]}}
+    Episode summary (per NN.md, rolling context within the event)
+      -> Event summary  (synthesizes the event's episode summaries)
+        -> Unit summary (synthesizes a group's event summaries)
 
-Old string entries (from the earlier Google run) are read fine by the web app;
-this upgrades broken/missing ones and adds character tagging.
+Each summary is inline-tagged markdown: every character mention is written as
+`Name{char_id=ID}`, so the reader colors names by exact span + id. Output files
+(all resumable, written after each item):
 
-Setup (Windows):
+    episode_summaries.json  {arc: {ep_key: {summary, characters}}}
+    event_summaries.json    {arc: {summary, characters}}
+    unit_summaries.json     {unit: {summary, characters}}
+
+No pip dependencies (standard library only). Setup on Windows:
   1. Install Ollama:  https://ollama.com/download   (auto-uses your GPU)
-  2. Pull a model:    ollama pull qwen2.5:7b     (or qwen2.5:3b if CPU-only)
+  2. Pull a model:    ollama pull qwen2.5:7b     (or :14b for better quality)
   3. Run:             python summarize_ollama.py --only broken
 
-Then copy event_summaries.json back next to the web app on the Mac.
-
 Options:
-  --only {broken,missing,all}   what to (re)generate (default broken = truncated + missing)
-  --model NAME                  Ollama model tag (default qwen2.5:7b)
-  --limit N                     cap number of events (0 = no cap)
-  --arc SLUG                    just one event, e.g. --arc 0009
-  --host URL                    Ollama base URL (default http://localhost:11434)
+  --tier {all,episode,event,unit}   which tiers to (re)build (default all)
+  --only {broken,missing,all}       which items within a tier (default broken)
+  --model NAME                      Ollama model tag (default qwen2.5:7b)
+  --arc SLUG                        just one event (its episodes + event)
+  --limit N                         cap events processed (0 = no cap)
+  --host URL                        Ollama base URL (default http://localhost:11434)
+
+Prompt strings are kept in sync with
+src/sekai_story_indexer/source/summary_prompt.py (canonical).
 """
 
 from __future__ import annotations
@@ -40,8 +46,6 @@ _HERE = Path(__file__).resolve().parent
 
 
 def _base() -> Path:
-    """Directory that holds story/ — works for BOTH the zip bundle (everything
-    next to this script) and a git clone (story/ at the repo root, one level up)."""
     for d in (_HERE, _HERE.parent, Path.cwd()):
         if (d / "story").exists():
             return d
@@ -50,37 +54,40 @@ def _base() -> Path:
 
 BASE = _base()
 STORY = BASE / "story"
-# meta.json lives next to the script in the zip, or under webapp/static in the repo
-META = next(
-    (p for p in (BASE / "meta.json", BASE / "webapp" / "static" / "meta.json", _HERE / "meta.json") if p.exists()),
-    BASE / "meta.json",
-)
-CACHE = BASE / "event_summaries.json"
-BODY_CHARS = 24000  # keep the JA source within the model's context window
+
+
+def _find(name: str) -> Path:
+    for p in (BASE / name, BASE / "webapp" / "static" / name, _HERE / name):
+        if p.exists():
+            return p
+    return BASE / name
+
+
+META = _find("meta.json")
+EPISODE_CACHE = BASE / "episode_summaries.json"
+EVENT_CACHE = BASE / "event_summaries.json"
+UNIT_CACHE = BASE / "unit_summaries.json"
+BODY_CHARS = 24000
 
 _meta = json.loads(META.read_text(encoding="utf-8"))
-NAMES = [c["en"] for c in _meta["characters"].values()]
-NAME_TO_ID = {c["en"]: int(cid) for cid, c in _meta["characters"].items()}
 ID_TO_EN = {int(cid): c["en"] for cid, c in _meta["characters"].items()}
+VALID_IDS = set(ID_TO_EN)
 UNIT_NAMES = {slug: u["name"] for slug, u in _meta.get("units", {}).items()}
 
-# Ground-truth rosters so the model NEVER guesses group membership. Order matters
-# only for readability. Virtual Singers appear across all groups.
 _UNIT_ORDER = [
     "leo_need", "more_more_jump", "vivid_bad_squad",
     "wonderlands_showtime", "nightcord", "virtual_singer",
 ]
-_roster: dict[str, list[str]] = {}
+_roster: dict[str, list[tuple[int, str]]] = {}
 for _cid, _c in _meta["characters"].items():
-    _roster.setdefault(_c.get("unit", "other"), []).append(_c["en"])
+    _roster.setdefault(_c.get("unit", "other"), []).append((int(_cid), _c["en"]))
 ROSTER_TEXT = "\n".join(
-    f"- {UNIT_NAMES.get(slug, slug)}: {', '.join(_roster[slug])}"
+    f"- {UNIT_NAMES.get(slug, slug)}: "
+    + ", ".join(f"{en}{{char_id={cid}}}" for cid, en in _roster[slug])
     for slug in _UNIT_ORDER
     if slug in _roster
 )
 
-# Optional glossary (JP -> EN mandatory translations), matching the Google path.
-# Bundled as glossary.json next to this script, or found in the repo root.
 _glossary = {}
 for _gp in (BASE / "glossary.json", _HERE / "glossary.json"):
     if _gp.exists():
@@ -89,15 +96,13 @@ for _gp in (BASE / "glossary.json", _HERE / "glossary.json"):
         except Exception:
             _glossary = {}
         break
-_gloss_lines: list[str] = []
+_gl = []
 for _cat, _terms in _glossary.items():
     if isinstance(_terms, dict) and _terms:
-        _gloss_lines.append(f"{_cat.replace('_', ' ').upper()}:")
-        _gloss_lines += [f" - {jp} -> {en}" for jp, en in _terms.items()]
-GLOSSARY_TEXT = "\n".join(_gloss_lines)
+        _gl.append(f"{_cat.replace('_', ' ').upper()}:")
+        _gl += [f" - {jp} -> {en}" for jp, en in _terms.items()]
+GLOSSARY_TEXT = "\n".join(_gl)
 
-# Optional per-event enrichment (focus character, song) if events_index.json is
-# bundled alongside. Purely additive context; absent -> just the unit.
 _EVENT_META: dict[str, dict] = {}
 for _p in (BASE / "events_index.json", _HERE / "events_index.json"):
     if _p.exists():
@@ -107,13 +112,17 @@ for _p in (BASE / "events_index.json", _HERE / "events_index.json"):
             _EVENT_META = {}
         break
 
-# Kept in sync with src/sekai_story_indexer/source/summary_prompt.py (canonical).
 SYSTEM = (
     "You are an expert archivist and translator indexing Japanese Project Sekai "
     "(Hatsune Miku: Colorful Stage!) event stories. You write all summaries in "
     "clear, concise ENGLISH — never Japanese. You use only the character names and "
     "group memberships given to you; you never invent characters or move a "
-    "character to a different group."
+    "character to a different group.\n\n"
+    "CHARACTER TAGGING (REQUIRED): every time you mention a character, write their "
+    "exact English name immediately followed by their id tag, e.g. "
+    "`Kohane Azusawa{char_id=13}` (and `Kohane{char_id=13}` for later short "
+    "references). Tag EVERY mention, in prose and bullets alike, using the ids from "
+    "the roster. Never tag a character with another character's id."
 )
 if GLOSSARY_TEXT:
     SYSTEM += (
@@ -122,63 +131,105 @@ if GLOSSARY_TEXT:
         "English equivalents:\n" + GLOSSARY_TEXT
     )
 
-PROMPT = """Character groups (ground truth — use these EXACT English names and do NOT reassign anyone to a different group):
-{roster}
+_GLOBAL_RULES = (
+    "Global formatting rules:\n"
+    "- Write in clear, concise English.\n"
+    "- Use exactly the required `## ` section headings for the tier, and emit every one.\n"
+    "- If a bullet-list section has no entries, write exactly `- None`.\n"
+    "- Tag every character mention as Name{char_id=ID}.\n"
+    "- Do not add extra sections, tables, or bold text."
+)
+_FORMATS = {
+    "episode": (
+        "Required Episode summary format:\n\n## Overview\n[2-4 sentences of concrete "
+        "scene progression for THIS episode, inline-tagged.]\n\n## Key Events\n- "
+        "[chronological beat, inline-tagged]\n\n## Character Developments\n- "
+        "Name{char_id=ID}: [concrete emotional/relational/goal change]"
+    ),
+    "event": (
+        "Required Event summary format:\n\n## Overview\n[1-2 short paragraphs "
+        "synthesizing the whole event arc, inline-tagged. Do not copy the episode "
+        "sections verbatim.]\n\n## Key Events\n- [major beat across the event, "
+        "inline-tagged]\n\n## Character Developments\n- Name{char_id=ID}: [change "
+        "across the event]"
+    ),
+    "unit": (
+        "Required Unit summary format:\n\n## Overview\n[1-2 short paragraphs on this "
+        "group's overall story so far, inline-tagged.]\n\n## Arc Progression\n- "
+        "[event name]: [one line of what it advances, inline-tagged]\n\n## Character "
+        "Arcs\n- Name{char_id=ID}: [their through-line across events]"
+    ),
+}
+_INPUT_LABEL = {
+    "episode": "CURRENT EPISODE TEXT (RAW JAPANESE STORY)",
+    "event": "CURRENT EVENT INPUT (THIS EVENT'S EPISODE SUMMARIES)",
+    "unit": "CURRENT UNIT INPUT (THIS UNIT'S EVENT SUMMARIES)",
+}
+_INPUT_INSTR = {
+    "episode": "Summarize only this episode's source text; use previous context only to resolve references.",
+    "event": "Synthesize across the child episode summaries into one event-level summary. Do not concatenate or copy child sections verbatim.",
+    "unit": "Synthesize across the event summaries into a unit-level through-line. Do not concatenate or copy child sections verbatim.",
+}
+_TAG_RE = re.compile(r"\{char_id=(\d+)\}")
+_FORMAT_SCHEMA = {
+    "type": "object",
+    "properties": {"summary": {"type": "string"}},
+    "required": ["summary"],
+}
 
-{context}
 
-Summarize the Japanese event story below in 1-2 short paragraphs of clear ENGLISH prose. Focus on plot progression and character development. Do not invent anything that is not in the text. Write the summary in English only.
-
-Write clean prose only: no headings, numbered steps, bullet points, outlines, draft notes, or labels like "Paragraph 1" or "Refine". Do not describe your process.
-
-After the summary, list which of the characters above actually appear in this story (exact English names).
-
-Return ONLY a JSON object and nothing else:
-{{"summary": "<the English summary>", "characters": ["<name>", "<name>"]}}
-
-Story (Japanese):
-{body}"""
-
-
-def _context_for(arc: str, unit: str) -> str:
-    """One-line ground-truth context for this event: unit, focus char, song."""
+def build_context(unit: str, focus_id=None, song=None) -> str:
     bits = [f"This is a {UNIT_NAMES.get(unit, unit)} event story."]
-    rec = _EVENT_META.get(arc, {})
-    fid = rec.get("focus_character_id")
-    if fid and int(fid) in ID_TO_EN:
-        bits.append(f"Its focus character is {ID_TO_EN[int(fid)]}.")
-    song = rec.get("song_title")
+    if focus_id and int(focus_id) in ID_TO_EN:
+        bits.append(f"Its focus character is {ID_TO_EN[int(focus_id)]}{{char_id={int(focus_id)}}}.")
     if song:
         bits.append(f'The featured song is "{song}".')
     return " ".join(bits)
 
 
-def read_arcs() -> dict[str, tuple[str, str]]:
-    """arc_slug -> (unit_slug, concatenated scene text)."""
-    files: dict[str, list[Path]] = {}
-    unit: dict[str, str] = {}
-    for md in STORY.glob("*/event/*/*.md"):
-        arc = md.parent.name
-        files.setdefault(arc, []).append(md)
-        unit[arc] = md.parts[md.parts.index("story") + 1] if "story" in md.parts else "mixed"
-    return {
-        arc: (unit.get(arc, "mixed"), "\n\n".join(p.read_text(encoding="utf-8") for p in sorted(fs)))
-        for arc, fs in files.items()
-    }
+def build_prompt(tier, unit, current_text, *, prev_summary=None, focus_id=None, song=None) -> str:
+    parts = [
+        "Character groups (ground truth — use these EXACT names and ids; do NOT reassign anyone):",
+        ROSTER_TEXT,
+        build_context(unit, focus_id, song),
+    ]
+    if prev_summary:
+        parts += [
+            "--- PREVIOUS CONTEXT (for continuity only) ---",
+            prev_summary.strip(),
+            "Use previous context only to resolve references, pronouns, chronology, and "
+            "ongoing situations. Do not re-summarize prior events or copy prior sections.",
+        ]
+    parts += [
+        f"--- {_INPUT_LABEL[tier]} ---",
+        current_text,
+        _INPUT_INSTR[tier],
+        _GLOBAL_RULES,
+        _FORMATS[tier],
+        f"Write the {tier} summary now using exactly the required format, in English, with inline character tags.",
+    ]
+    return "\n\n".join(p for p in parts if p)
 
 
-def parse(out: str) -> dict:
-    m = re.search(r"\{.*\}", out, re.S)
+def clean_markdown(md: str) -> str:
+    return _TAG_RE.sub(lambda m: "" if int(m.group(1)) not in VALID_IDS else m.group(0), md or "")
+
+
+def parse_summary(out: str) -> dict:
+    md = None
+    m = re.search(r"\{.*\}", out or "", re.S)
     if m:
         try:
             obj = json.loads(m.group(0))
-            summ = (obj.get("summary") or "").strip()
-            chars = sorted({NAME_TO_ID[n] for n in obj.get("characters", []) if n in NAME_TO_ID})
-            if summ:
-                return {"summary": summ, "characters": chars}
+            if isinstance(obj, dict) and obj.get("summary"):
+                md = obj["summary"]
         except Exception:
-            pass
-    return {"summary": out.strip(), "characters": []}
+            md = None
+    if md is None:
+        md = (out or "").strip()
+    md = clean_markdown(md).strip()
+    ids = sorted({int(x) for x in _TAG_RE.findall(md)} & VALID_IDS)
+    return {"summary": md, "characters": ids}
 
 
 def is_broken(entry) -> bool:
@@ -188,10 +239,11 @@ def is_broken(entry) -> bool:
         return True
     if re.search(r"Refine and Polish|Paragraph \d|Step \d|Draft:|Outline:", text, re.I):
         return True
-    return text[-1] not in ".!?」）)…\""
+    # a valid tiered summary should have at least the Overview heading
+    return "## Overview" not in text and "Overview" not in text
 
 
-def ollama_chat(host: str, model: str, prompt: str, system: str = "") -> str:
+def ollama_chat(host, model, prompt, system="") -> str:
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
@@ -201,74 +253,161 @@ def ollama_chat(host: str, model: str, prompt: str, system: str = "") -> str:
             "model": model,
             "messages": messages,
             "stream": False,
-            # low temp for consistency; big context so full JA events fit
+            "format": _FORMAT_SCHEMA,
             "options": {"temperature": 0.2, "num_ctx": 32768},
         }
     ).encode("utf-8")
     req = urllib.request.Request(
         f"{host}/api/chat", data=body, headers={"Content-Type": "application/json"}
     )
-    with urllib.request.urlopen(req, timeout=600) as resp:
-        data = json.loads(resp.read())
-    return (data.get("message", {}).get("content") or "").strip()
+    with urllib.request.urlopen(req, timeout=900) as resp:
+        return (json.loads(resp.read()).get("message", {}).get("content") or "").strip()
+
+
+def _load(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def _save(path: Path, data: dict) -> None:
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def read_arcs() -> dict[str, dict]:
+    """arc_slug -> {unit, episodes: [(ep_key, text), ... in reading order]}."""
+    tmp: dict[str, dict] = {}
+    for md in STORY.glob("*/event/*/*.md"):
+        arc = md.parent.name
+        unit = md.parts[md.parts.index("story") + 1] if "story" in md.parts else "mixed"
+        tmp.setdefault(arc, {"unit": unit, "files": []})["files"].append(md)
+    out = {}
+    for arc, d in tmp.items():
+        def epnum(p: Path) -> int:
+            m = re.match(r"(\d+)", p.stem)
+            return int(m.group(1)) if m else 0
+        files = sorted(d["files"], key=epnum)
+        out[arc] = {
+            "unit": d["unit"],
+            "episodes": [(p.stem, p.read_text(encoding="utf-8")) for p in files],
+        }
+    return out
+
+
+def _arc_order(arcs: dict) -> list[str]:
+    """Chronological arc order (by release date if events_index is present)."""
+    def key(a):
+        return (_EVENT_META.get(a, {}).get("started_at", 0), a)
+    return sorted(arcs, key=key)
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--tier", choices=["all", "episode", "event", "unit"], default="all")
     ap.add_argument("--only", choices=["broken", "missing", "all"], default="broken")
     ap.add_argument("--model", default="qwen2.5:7b")
-    ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--arc", default="")
+    ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--host", default="http://localhost:11434")
     args = ap.parse_args()
 
     if not STORY.exists():
-        print(f"ERROR: no story/ folder next to this script ({STORY}).", file=sys.stderr)
+        print(f"ERROR: no story/ folder found ({STORY}).", file=sys.stderr)
         return 2
-
-    cache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
-    arcs = read_arcs()
-
-    if args.arc:
-        todo = [args.arc]
-    elif args.only == "missing":
-        todo = [a for a in arcs if a not in cache]
-    elif args.only == "all":
-        todo = list(arcs)
-    else:
-        todo = [a for a in arcs if a not in cache or is_broken(cache.get(a))]
-    todo = sorted(a for a in todo if a in arcs)
-    if args.limit:
-        todo = todo[: args.limit]
-
-    # fail fast if Ollama isn't reachable
     try:
-        ollama_chat(args.host, args.model, "Reply with OK.")
+        ollama_chat(args.host, args.model, '{"summary":"ok"} reply with OK')
     except Exception as exc:
-        print(f"ERROR: can't reach Ollama at {args.host} with model '{args.model}': {exc}", file=sys.stderr)
-        print("Install from https://ollama.com/download and run:  ollama pull " + args.model, file=sys.stderr)
+        print(f"ERROR: can't reach Ollama at {args.host} with '{args.model}': {exc}", file=sys.stderr)
+        print("Install https://ollama.com/download then:  ollama pull " + args.model, file=sys.stderr)
         return 2
 
-    print(f"model={args.model}  events to generate: {len(todo)}", flush=True)
-    for i, arc in enumerate(todo, 1):
-        unit, body = arcs[arc]
-        prompt = PROMPT.format(
-            roster=ROSTER_TEXT, context=_context_for(arc, unit), body=body[:BODY_CHARS]
-        )
-        t0 = time.time()
-        try:
-            out = ollama_chat(args.host, args.model, prompt, system=SYSTEM)
-        except Exception as exc:
-            print(f"[{i}/{len(todo)}] {arc}: FAILED ({exc}) — skipping", flush=True)
-            continue
-        entry = parse(out)
-        cache[arc] = entry
-        CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(
-            f"[{i}/{len(todo)}] {arc}: {len(entry['summary'])} chars, "
-            f"{len(entry['characters'])} chars-tagged, {time.time() - t0:.0f}s",
-            flush=True,
-        )
+    arcs = read_arcs()
+    ep_cache, ev_cache, un_cache = _load(EPISODE_CACHE), _load(EVENT_CACHE), _load(UNIT_CACHE)
+    order = [args.arc] if args.arc else _arc_order(arcs)
+    order = [a for a in order if a in arcs]
+    if args.limit:
+        order = order[: args.limit]
+
+    def want(entry) -> bool:  # should we (re)generate this cached entry?
+        if args.only == "all":
+            return True
+        if entry is None:
+            return True
+        return args.only == "broken" and is_broken(entry)
+
+    run_ep = args.tier in ("all", "episode")
+    run_ev = args.tier in ("all", "event")
+    run_un = args.tier in ("all", "unit")
+
+    # ---- Tier 1 + 2: episodes then event, per arc, chronological ----
+    last_event_by_unit: dict[str, str] = {}
+    for i, arc in enumerate(order, 1):
+        unit = arcs[arc]["unit"]
+        rec = _EVENT_META.get(arc, {})
+        focus, song = rec.get("focus_character_id"), rec.get("song_title")
+        ep_cache.setdefault(arc, {})
+
+        # Tier 1: episodes with rolling within-event context
+        prev = None
+        for ep_key, text in arcs[arc]["episodes"]:
+            existing = ep_cache[arc].get(ep_key)
+            if run_ep and want(existing):
+                t0 = time.time()
+                prompt = build_prompt("episode", unit, text[:BODY_CHARS], prev_summary=prev, focus_id=focus, song=song)
+                try:
+                    entry = parse_summary(ollama_chat(args.host, args.model, prompt, SYSTEM))
+                    ep_cache[arc][ep_key] = entry
+                    _save(EPISODE_CACHE, ep_cache)
+                    print(f"[{i}/{len(order)}] {arc}/{ep_key} episode: {len(entry['summary'])}c "
+                          f"{len(entry['characters'])}tags {time.time()-t0:.0f}s", flush=True)
+                    existing = entry
+                except Exception as exc:
+                    print(f"[{i}/{len(order)}] {arc}/{ep_key} FAILED: {exc}", flush=True)
+            if existing:
+                prev = existing["summary"] if isinstance(existing, dict) else existing
+
+        # Tier 2: event from its episode summaries (rolling prev event in unit)
+        if run_ev and want(ev_cache.get(arc)):
+            child = "\n\n".join(
+                f"### Episode {k}\n{(ep_cache[arc].get(k) or {}).get('summary','')}"
+                for k, _ in arcs[arc]["episodes"] if ep_cache[arc].get(k)
+            )
+            if child.strip():
+                t0 = time.time()
+                prompt = build_prompt("event", unit, child, prev_summary=last_event_by_unit.get(unit), focus_id=focus, song=song)
+                try:
+                    entry = parse_summary(ollama_chat(args.host, args.model, prompt, SYSTEM))
+                    ev_cache[arc] = entry
+                    _save(EVENT_CACHE, ev_cache)
+                    print(f"[{i}/{len(order)}] {arc} EVENT: {len(entry['summary'])}c "
+                          f"{len(entry['characters'])}tags {time.time()-t0:.0f}s", flush=True)
+                except Exception as exc:
+                    print(f"[{i}/{len(order)}] {arc} EVENT FAILED: {exc}", flush=True)
+        if ev_cache.get(arc):
+            last_event_by_unit[unit] = ev_cache[arc]["summary"]
+
+    # ---- Tier 3: unit from its event summaries ----
+    if run_un and not args.arc:
+        units: dict[str, list[str]] = {}
+        for arc in _arc_order(arcs):
+            units.setdefault(arcs[arc]["unit"], []).append(arc)
+        for unit, unit_arcs in units.items():
+            if not want(un_cache.get(unit)):
+                continue
+            child = "\n\n".join(
+                f"### {_EVENT_META.get(a, {}).get('name', a)}\n{ev_cache[a]['summary']}"
+                for a in unit_arcs if ev_cache.get(a)
+            )
+            if not child.strip():
+                continue
+            t0 = time.time()
+            prompt = build_prompt("unit", unit, child[:60000])
+            try:
+                entry = parse_summary(ollama_chat(args.host, args.model, prompt, SYSTEM))
+                un_cache[unit] = entry
+                _save(UNIT_CACHE, un_cache)
+                print(f"UNIT {unit}: {len(entry['summary'])}c {len(entry['characters'])}tags {time.time()-t0:.0f}s", flush=True)
+            except Exception as exc:
+                print(f"UNIT {unit} FAILED: {exc}", flush=True)
+
     print("done", flush=True)
     return 0
 
