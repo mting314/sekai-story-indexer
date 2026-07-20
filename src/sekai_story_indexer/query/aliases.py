@@ -70,9 +70,11 @@ def _matches(question: str, qtokens: set[str], event: dict) -> bool:
         if not dist:
             continue
         overlap = qtokens & dist
-        # >=2 distinctive tokens, or one long distinctive token — enough to be
-        # specific without firing on incidental common-word overlap.
-        if len(overlap) >= 2 or any(len(t) >= 6 for t in overlap):
+        # >=2 distinctive title tokens present, OR the title is essentially a single
+        # distinctive word and that word appears. Requiring 2 tokens for multi-word
+        # titles avoids false scope from one common word (e.g. "friendship" alone
+        # must not match "Re-tie Friendship").
+        if len(overlap) >= 2 or (len(dist) == 1 and overlap):
             return True
     return False
 

@@ -141,11 +141,6 @@ def build_catalog(
             music=music_by_event.get(event["id"]),
         )
         banner = rec["focus_character_id"]
-        # Banner char must belong to the event story's single main unit (rec["unit"];
-        # group/mixed/VS events resolve to "mixed"/virtual_singer -> excluded).
-        # Marathons count on that alone (incl. cross-unit guest spotlights like
-        # 0209). Cheerful Carnivals count ONLY when single-unit — multi-unit CCs are
-        # seasonal collabs (Valentine/White Day/New Year), not a solo focus.
         distinct_story_units = {u.get("unit") for u in story_units}
         banner_in_main_unit = banner != 0 and CHARACTER_ID_TO_UNIT.get(banner) == rec["unit"]
         single_unit = len(distinct_story_units) == 1
@@ -161,10 +156,10 @@ def build_catalog(
         if not rec["is_focus_event"]:  # not a solo focus -> no focus attribution
             rec["focus_character_id"] = 0
             rec["focus_character"] = ""
-        # Curated override for events the master DB can't disambiguate (the banner
-        # artwork char differs from the story protagonist — e.g. "Light Up the Fire"
-        # is An's story with Kohane banner art). event_id -> focus char id, or 0 to
-        # force-exclude. Applied before nickname numbering.
+        # Curated override for events the master DB gets wrong — e.g. "Light Up the
+        # Fire" has bannerGameCharacterUnitId=Kohane (a sekai.best data error; the
+        # actual banner shows An, who debuts the event's new 4★ card). event_id ->
+        # focus char id, or 0 to force-exclude. Applied before nickname numbering.
         if focus_overrides and event["id"] in focus_overrides:
             forced = focus_overrides[event["id"]]
             rec["is_focus_event"] = forced != 0
