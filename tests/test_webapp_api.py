@@ -215,3 +215,17 @@ def test_image_proxy_rejects_non_sekai_host(client):
     # SSRF guard: only the sekai asset CDN may be proxied.
     assert client.get("/api/img", params={"u": "https://example.com/x.png"}).status_code == 400
     assert client.get("/api/img", params={"u": "http://storage.sekai.best/x"}).status_code == 400
+
+
+def test_trim_extractive_citations_keeps_only_quoted():
+    from webapp import server
+    result = {
+        "answer_parts": [
+            {"type": "text", "text": "..."},
+            {"type": "quote", "ref": 2, "text": "a"},
+            {"type": "quote", "ref": 5, "text": "b"},
+        ],
+        "citations": [{"ref": i} for i in range(1, 9)],
+    }
+    server._trim_extractive_citations(result)
+    assert {c["ref"] for c in result["citations"]} == {2, 5}

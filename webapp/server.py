@@ -378,6 +378,9 @@ def _finalize_citations(nl: str, citations: list[dict]) -> tuple[str, list[dict]
         return nl, citations  # model didn't cite resolvably -> don't strip sources
     nl2 = re.sub(r"\[(\d+)\]", lambda m: f"[{remap[int(m.group(1))]}]"
                  if int(m.group(1)) in remap else "", nl)
+    # a stripped hallucinated ref can leave " ." / doubled spaces — tidy them
+    nl2 = re.sub(r"\s+([.,;:!?])", r"\1", nl2)
+    nl2 = re.sub(r" {2,}", " ", nl2)
     return nl2, kept
 
 
@@ -394,6 +397,21 @@ def _apply_generated_answer(result: dict, nl: str) -> None:
     result["generated"] = True
 
 
+def _trim_extractive_citations(result: dict) -> None:
+    """For an extractive (non-generated) answer, keep only the citations the quote
+    blocks actually reference — otherwise a scoped whole-event query would list the
+    entire event as sources (mirrors the generated path's referenced-only trim)."""
+    refs = {
+        p.get("ref")
+        for p in (result.get("answer_parts") or [])
+        if p.get("type") == "quote" and p.get("ref") is not None
+    }
+    if refs:
+        result["citations"] = [
+            c for c in (result.get("citations") or []) if c.get("ref") in refs
+        ]
+
+
 def _query_local(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> dict:
     result = _local_retrieval(req, scope_arc_ids)
     if result.get("pre_summarized"):
@@ -405,6 +423,8 @@ def _query_local(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> dict
         nl = generate_answer(result["resolved_question"], result["citations"])
         if nl:
             _apply_generated_answer(result, nl)
+    if not result.get("generated"):
+        _trim_extractive_citations(result)
     return result
 
 
@@ -828,6 +848,8 @@ def _stream_events(req: QueryRequest):
     else:  # extractive / pre-summarized / no key -> chunk the computed answer
         if result.get("pre_summarized"):
             result["generated"] = True
+        else:
+            _trim_extractive_citations(result)
         for piece in _chunk_text(result.get("answer") or ""):
             yield _sse({"type": "delta", "text": piece})
 
@@ -852,6 +874,7 @@ def query_stream(req: QueryRequest):
 # event art / jackets / logos load from same-origin. Host-allowlisted (SSRF guard)
 # + tiny in-memory cache.
 _ART_HOST = "storage.sekai.best"
+_ART_MAX_BYTES = 8 * 1024 * 1024  # event art / jackets are tiny; cap to be safe
 _art_cache: dict[str, tuple[bytes, str]] = {}
 
 
@@ -882,7 +905,11 @@ def proxy_image(u: str) -> Response:
         try:
             req = urllib.request.Request(u, headers={"User-Agent": "sekai-story-indexer"})
             with urllib.request.urlopen(req, timeout=15, context=_ART_SSL) as r:
-                cached = (r.read(), r.headers.get("Content-Type", "image/webp"))
+                # cap the body so a large asset URL can't balloon server memory
+                data = r.read(_ART_MAX_BYTES + 1)
+                if len(data) > _ART_MAX_BYTES:
+                    return Response(status_code=502)
+                cached = (data, r.headers.get("Content-Type", "image/webp"))
         except Exception:
             return Response(status_code=502)
         if len(_art_cache) > 512:
