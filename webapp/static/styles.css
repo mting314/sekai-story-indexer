@@ -85,10 +85,12 @@ main {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
-  cursor: grab;
 }
-.timeline.dragging { cursor: grabbing; user-select: none; }
-.timeline.dragging .event-card { cursor: grabbing; }
+/* Only the event timeline is drag-scrollable (JS binds to #timeline); the
+   Summaries list shares .timeline for layout but must not imply grab. */
+#timeline { cursor: grab; }
+#timeline.dragging { cursor: grabbing; user-select: none; }
+#timeline.dragging .event-card { cursor: grabbing; }
 /* cards live here so rubber-band overscroll can translate them past the edges
    without moving the sticky legend (transform driven by enableWheelInertia) */
 .tl-inner { display: flex; flex-direction: column; gap: 12px; will-change: transform; }
