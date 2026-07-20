@@ -467,6 +467,13 @@ function renderTimeline() {
     const status = e.indexed
       ? '<span class="status-dot indexed" title="Queryable in chat now"></span>'
       : '<span class="status-dot pending" title="On the timeline; chat-answerable after the next ingest"></span>';
+    // Event art on the right: the wide event-story banner (title + character)
+    // first, then the home banner, then the song jacket.
+    const art = e.story_banner_url || e.banner_url || e.jacket_url || "";
+    const artHtml = art
+      ? `<img class="event-art" loading="lazy" src="${art}" alt="" ` +
+        `onerror="this.style.display='none'">`
+      : "";
     card.innerHTML = `
       ${logo}
       <div class="meta">
@@ -474,7 +481,8 @@ function renderTimeline() {
           ${e.is_key_story ? '<span class="key-badge">key</span>' : ""}</div>
         <div class="name">${e.name}</div>
         ${focus}${song}
-      </div>`;
+      </div>
+      ${artHtml}`;
     card.onclick = () => setScope(e);
     el.appendChild(card);
   }
@@ -519,9 +527,23 @@ function addMessage(role, text) {
   return div;
 }
 
+// Animated "…" typing indicator shown while the model thinks (before the first
+// streamed token) so the bubble isn't blank during generation latency.
+function showThinking(el) {
+  el.classList.add("thinking");
+  el.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
+  document.getElementById("messages").scrollTop = 1e9;
+}
+
+function clearThinking(el) {
+  el.classList.remove("thinking");
+  el.textContent = "";
+}
+
 // Render a rich assistant answer: text runs + clickable quote blocks that open
 // the excerpt sidebar, plus a compact source list.
 function renderAssistant(container, res) {
+  container.classList.remove("thinking");
   container.textContent = "";
   const byRef = {};
   for (const c of res.citations || []) byRef[c.ref] = c;
@@ -752,7 +774,8 @@ async function streamAnswer(q, pending) {
   let buf = "";
   let text = "";
   let done = null;
-  pending.textContent = "";
+  let firstDelta = true;
+  showThinking(pending); // animated "…" until the first token arrives
   for (;;) {
     const { value, done: streamDone } = await reader.read();
     if (streamDone) break;
@@ -765,6 +788,7 @@ async function streamAnswer(q, pending) {
       let evt;
       try { evt = JSON.parse(line.slice(6)); } catch (e) { continue; }
       if (evt.type === "delta") {
+        if (firstDelta) { clearThinking(pending); firstDelta = false; }
         text += evt.text || "";
         pending.textContent = text; // progressive plain-text render
         document.getElementById("messages").scrollTop = 1e9;
@@ -785,14 +809,15 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   if (!q) return;
   input.value = "";
   addMessage("user", q);
-  const pending = addMessage("assistant", "…");
+  const pending = addMessage("assistant", "");
+  showThinking(pending);
   try {
     let res;
     try {
       res = await streamAnswer(q, pending);
     } catch (streamErr) {
       // SSE can be blocked/buffered by proxies — fall back to the JSON endpoint.
-      pending.textContent = "…";
+      showThinking(pending);
       res = await fetch("/api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

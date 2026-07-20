@@ -24,6 +24,12 @@ def event_banner_url(assetbundle_name: str, ext: str = "webp") -> str:
     return _url(f"home/banner/{assetbundle_name}/{assetbundle_name}.{ext}")
 
 
+def event_story_banner_url(assetbundle_name: str, ext: str = "webp") -> str:
+    """Wide event-story banner (title + character) shown in the story reader —
+    the richest per-event art. ``assetbundle_name`` is the eventStory bundle."""
+    return _url(f"event_story/{assetbundle_name}/screen_image/banner_event_story.{ext}")
+
+
 def event_background_url(assetbundle_name: str, ext: str = "webp") -> str:
     return _url(f"event/{assetbundle_name}/screen/bg.{ext}")
 
