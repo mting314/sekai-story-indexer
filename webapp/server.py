@@ -252,6 +252,67 @@ def unit_summaries() -> dict:
     return {u: _entry(v) for u, v in raw.items()}
 
 
+_EMPTY_HIERARCHY = {
+    "roots": [],
+    "nodes": {},
+    "summaries": {},
+    "counts": {"events": 0, "episodes": 0, "parts": 0},
+}
+
+
+def _hierarchical_cache_path() -> Path:
+    env = os.environ.get("SEKAI_SUMMARIES_CACHE")
+    candidates = (
+        [Path(env)] if env else [Path("summaries_cache.json"), HERE.parent / "summaries_cache.json"]
+    )
+    return next((p for p in candidates if p.exists()), candidates[-1])
+
+
+@app.get("/api/hierarchical-summaries")
+def hierarchical_summaries() -> dict:
+    """Tiered event -> episode -> part summaries from the hierarchical cache
+    (``summaries_cache.json``), for in-app quality review. Returns an empty tree
+    when the cache is absent/unreadable so the tab degrades gracefully.
+
+    Dependency-light: ``summary_export`` no longer pulls the generation stack."""
+    path = _hierarchical_cache_path()
+    if not path.exists():
+        return _EMPTY_HIERARCHY
+    try:
+        cache = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return _EMPTY_HIERARCHY
+
+    from sekai_story_indexer.story_order import StoryOrderConfigError, load_story_order
+    from sekai_story_indexer.summary_export import build_summary_reader_data
+
+    try:
+        # config only (no story_root) so cache arcs missing from the yaml don't
+        # raise — the reader's sort keys fall back to end-of-list for unknown arcs.
+        story_order = load_story_order()
+    except (FileNotFoundError, StoryOrderConfigError):
+        return _EMPTY_HIERARCHY
+
+    try:
+        data = build_summary_reader_data(cache, story_order=story_order)
+    except (ValueError, KeyError):
+        return _EMPTY_HIERARCHY
+
+    # Label event-tier nodes with the real event name/nickname instead of "Arc <id>".
+    events_by_arc = {e.get("arc_slug"): e for e in load_events()}
+    for node in data.get("nodes", {}).values():
+        if node.get("kind") != "event":
+            continue
+        arc = str(node.get("id", "")).removeprefix("event:")
+        ev = events_by_arc.get(arc)
+        if ev:
+            name = ev.get("name") or node.get("label")
+            nickname = ev.get("nickname")
+            node["title"] = name
+            node["label"] = f"{name} · {nickname}" if nickname else name
+    return data
+
+
 class QueryRequest(BaseModel):
     question: str
     unit: str | None = None

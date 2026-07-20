@@ -229,3 +229,39 @@ def test_trim_extractive_citations_keeps_only_quoted():
     }
     server._trim_extractive_citations(result)
     assert {c["ref"] for c in result["citations"]} == {2, 5}
+
+
+def test_hierarchical_summaries_endpoint(client, tmp_path, monkeypatch):
+    """The tiered event->episode->part tree renders from a hierarchical cache."""
+    import json
+
+    cache = {
+        "EVENT|0001-x": {
+            "summary": "Overview:\nAn event overview.\n\nContinuity Facts:\n- A durable fact.",
+            "inputs": {"level": "event"},
+        },
+        "0001-x|Event|01_ep|01_ep": {
+            "summary": "Overview:\nA part overview.",
+            "inputs": {"level": "part"},
+        },
+    }
+    cache_path = tmp_path / "summaries_cache.json"
+    cache_path.write_text(json.dumps(cache), encoding="utf-8")
+    monkeypatch.setenv("SEKAI_SUMMARIES_CACHE", str(cache_path))
+
+    data = client.get("/api/hierarchical-summaries").json()
+    assert data["counts"]["events"] == 1
+    assert data["roots"] == ["event:0001-x"]
+    event = data["nodes"]["event:0001-x"]
+    assert event["kind"] == "event"
+    assert event["summaryId"]  # has an event-tier summary
+    # the part is reachable under a (synthesized) episode node
+    episode_id = event["children"][0]
+    assert data["nodes"][episode_id]["kind"] == "episode"
+
+
+def test_hierarchical_summaries_empty_when_cache_absent(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("SEKAI_SUMMARIES_CACHE", str(tmp_path / "missing.json"))
+    data = client.get("/api/hierarchical-summaries").json()
+    assert data["roots"] == []
+    assert data["counts"] == {"events": 0, "episodes": 0, "parts": 0}
