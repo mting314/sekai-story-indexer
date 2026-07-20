@@ -531,7 +531,13 @@ def _load_event_summaries(story_root: Path) -> dict[str, str]:
     for candidate in (Path("event_summaries.json"), story_root.parent / "event_summaries.json"):
         if candidate.exists():
             try:
-                return json.loads(candidate.read_text(encoding="utf-8"))
+                raw = json.loads(candidate.read_text(encoding="utf-8"))
             except Exception:
                 return {}
+            # Values may be bare strings (old cache) or {summary, characters}
+            # (local/Ollama structured format) — normalize to text for retrieval.
+            return {
+                arc: (v if isinstance(v, str) else (v or {}).get("summary", ""))
+                for arc, v in raw.items()
+            }
     return {}

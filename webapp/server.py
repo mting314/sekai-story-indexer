@@ -142,7 +142,13 @@ def summaries() -> list[dict]:
     by_arc = json.loads(path.read_text(encoding="utf-8"))
     events_by_arc = {e.get("arc_slug"): e for e in load_events()}
     out = []
-    for arc_id, text in by_arc.items():
+    for arc_id, value in by_arc.items():
+        # value is either a bare string (old Google cache) or {summary, characters}
+        # (the local/Ollama structured format).
+        if isinstance(value, str):
+            text, characters = value, []
+        else:
+            text, characters = (value or {}).get("summary", ""), (value or {}).get("characters", [])
         e = events_by_arc.get(arc_id, {})
         out.append({
             "arc_id": arc_id,
@@ -158,6 +164,7 @@ def summaries() -> list[dict]:
             "is_key_story": e.get("is_key_story", False),
             "logo_url": e.get("logo_url", ""),
             "summary": text,
+            "characters": characters,
         })
     out.sort(key=lambda r: (r.get("started_at", 0), r["arc_id"]))
     return out

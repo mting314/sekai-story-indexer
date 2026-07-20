@@ -196,7 +196,7 @@ function summaryBody(s) {
   const text = document.createElement("div");
   text.className = "answer-text";
   text.innerHTML = renderMarkdown(s.summary);
-  decorateNames(text);
+  decorateNames(text, new Set(s.characters || []));
   frag.appendChild(text);
   return frag;
 }
@@ -235,11 +235,13 @@ function buildEntityIndex() {
   // mention "licenses" the short form. Case-sensitive, so the article "an" is
   // never matched. See decorateNames() pass 2.
   state.shortGiven = [];
-  for (const c of Object.values(state.meta.characters || {})) {
+  state.givenById = {}; // gameCharacterId -> {given, ent} for roster-licensed coloring
+  for (const [cid, c] of Object.entries(state.meta.characters || {})) {
     const ent = { kind: "char", color: c.color, icon: c.icon };
     entries.push([c.en, ent]);
     const given = c.en.split(" ")[0];
     if (given && given !== c.en) {
+      state.givenById[cid] = { given, ent };
       if (given.length >= 3) entries.push([given, ent]);
       else state.shortGiven.push({ given, full: c.en, ent });
     }
@@ -319,21 +321,29 @@ function _decoratePass(root, re) {
   }
 }
 
-function decorateNames(root) {
+function decorateNames(root, roster) {
   // Pass 1: full names, given names (>=3 chars) and unit names, case-insensitive.
   _decoratePass(root, state.entityRe);
-  // Pass 2: short given names ("An"), but ONLY when the full name is present in
-  // this summary, and matched case-sensitively so the article "an" is untouched.
-  const shorts = state.shortGiven || [];
-  if (shorts.length) {
-    const text = root.textContent || "";
-    const lower = text.toLowerCase();
-    const licensed = shorts.filter((sg) => lower.includes(sg.full.toLowerCase()));
-    if (licensed.length) {
-      const alts = licensed.map((sg) => _esc(sg.given)).join("|");
-      const re = new RegExp("(?<![A-Za-z0-9])(" + alts + ")(?![A-Za-z0-9])", "g");
-      _decoratePass(root, re);
+  // Pass 2: given names licensed for THIS summary, matched case-sensitively so the
+  // article "an" is never touched. A given name is licensed when either:
+  //   * the model tagged that character present (roster, Option 3 — authoritative), or
+  //   * the character's full name appears in the text (Option 2 fallback).
+  const text = root.textContent || "";
+  const lower = text.toLowerCase();
+  const givens = new Map(); // given -> ent (dedup)
+  for (const sg of state.shortGiven || []) {
+    if (lower.includes(sg.full.toLowerCase())) givens.set(sg.given, sg.ent);
+  }
+  if (roster && roster.size) {
+    for (const id of roster) {
+      const g = state.givenById[String(id)];
+      if (g) givens.set(g.given, g.ent);
     }
+  }
+  if (givens.size) {
+    const alts = [...givens.keys()].map(_esc).join("|");
+    const re = new RegExp("(?<![A-Za-z0-9])(" + alts + ")(?![A-Za-z0-9])", "g");
+    _decoratePass(root, re);
   }
 }
 
