@@ -187,6 +187,15 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   do they tie to the event?" Needs a lyrics source (not in the current master-DB
   ingest — song jacket/title/composer are captured, lyrics are not), then a
   retrieval/answer path that links `song_title` ↔ event ↔ lyrics.
+* **Character-persona chat mode (webapp, deferred).** Let the web-app chat answer
+  *in character* — pick a Sekai character (e.g. Miku, Kohane, Tsukasa) and have
+  answers written in their voice/speech style for more fun, in-world discussions,
+  rather than the current neutral narrator. Persona = a per-character system-prompt
+  overlay (tone, verbal tics, relationships) layered on top of the grounded-answer
+  prompt (`query/generate.py::_STYLE`), selectable via a UI chip; still quote- and
+  citation-grounded so it stays faithful to the source. Character roster + JP names
+  already exist in `source/constants.py` (`CHARACTER_ID_TO_JP`) and nicknames in
+  `source/nicknames.py`.
 * **Agentic-lite scene selection (local backend, deferred).** A scoped content
   query currently feeds the WHOLE event (budget-bounded, head+tail) to the answer
   — complete for small events, but blunt for large scopes. A better design lets
