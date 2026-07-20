@@ -208,12 +208,15 @@ function summaryBody(s) {
         `</span><span class="hero-label">focus</span></div>`
     );
   }
-  if (s.song_title) {
-    rows.push(`<div class="hero-row muted"><span class="hero-song">🎵 ${escapeHtml(s.song_title)}</span></div>`);
-  }
+
+  // Album art + song title stacked together on the left.
+  const songHtml = s.song_title
+    ? `<div class="sum-song">🎵 ${escapeHtml(s.song_title)}</div>`
+    : "";
+  const artCol = artHtml || songHtml ? `<div class="sum-artcol">${artHtml}${songHtml}</div>` : "";
 
   hero.innerHTML =
-    artHtml + `<div class="sum-info">${rows.join("")}${regionPeriods(s.regions)}</div>`;
+    artCol + `<div class="sum-info">${rows.join("")}${regionPeriods(s.regions)}</div>`;
   frag.appendChild(hero);
 
   const text = document.createElement("div");
@@ -501,6 +504,9 @@ function renderAssistant(container, res) {
     const t = document.createElement("div");
     t.className = "answer-text";
     t.innerHTML = renderMarkdown(p.text);
+    // color-code + icon character/unit names (inline {char_id} tags handled in
+    // renderMarkdown; this catches plain-text names via the roster heuristic).
+    decorateNames(t, new Set(res.characters || []));
     container.appendChild(t);
   }
 
