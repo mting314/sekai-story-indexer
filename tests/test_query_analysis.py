@@ -17,10 +17,11 @@ def test_query_analysis_extracts_temporal_episode_constraint() -> None:
     assert analysis.intent_bucket == CHRONOLOGY_INTENT
 
 
-def test_query_analysis_extracts_side_story_constraint() -> None:
-    analysis = analyze_query("What happens in the side stories?")
+def test_query_analysis_extracts_main_story_constraint() -> None:
+    # Sekai has no "side story" (linkura only); "main story" still scopes a tier.
+    analysis = analyze_query("What happens in the main stories?")
 
-    assert analysis.story_type == "Side"
+    assert analysis.story_type == "Main"
     assert analysis.intent_bucket == SUMMARY_INTENT
 
 

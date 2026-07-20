@@ -207,7 +207,7 @@ def _embedding_document_title(node: StoryNode) -> str:
 
 def _summary_tier(node: StoryNode) -> str:
     if node.summary_level == 1:
-        return "Year"
+        return "Event"
     if node.summary_level == 2:
         return "Episode"
     if node.summary_level == 3:
@@ -221,7 +221,7 @@ def _summary_location_header(node: StoryNode) -> str:
     part_name = meta.part_name if node.summary_level == 3 else "ALL_PARTS"
     return "\n".join(
         [
-            f"Year: {meta.arc_id}",
+            f"Event: {meta.arc_id}",
             f"Story type: {meta.story_type}",
             f"Episode: {episode_name}",
             f"Part: {part_name}",
@@ -256,7 +256,7 @@ def _embedding_document(
     aliases = ", ".join(_translation_aliases(node, glossary)) or "none"
     header = ctx_prefix + "\n".join(
         [
-            f"Year: {meta.arc_id}",
+            f"Event: {meta.arc_id}",
             f"Story type: {meta.story_type}",
             f"Episode: {meta.episode_name}",
             f"Part: {meta.part_name}",
@@ -725,7 +725,7 @@ def ingest(
         "--summaries",
         help="Summary strategy: 'local' (embed the FREE locally-generated "
         "episode/event/unit summaries — no generation cost), 'event' (one per "
-        "event via the API), 'hierarchical' (per-part/episode/year via the API), "
+        "event via the API), 'hierarchical' (per-part/episode/event via the API), "
         "or 'none' (embed raw scenes only).",
     ),
     only_summaries: bool = typer.Option(

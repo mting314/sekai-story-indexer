@@ -279,7 +279,7 @@
       overflow-wrap: anywhere;
     }
 
-    .chip.tier-year { border-color: rgba(47, 118, 109, 0.35); color: var(--accent-strong); }
+    .chip.tier-event { border-color: rgba(47, 118, 109, 0.35); color: var(--accent-strong); }
     .chip.tier-episode { border-color: rgba(167, 107, 37, 0.35); color: #7b511f; }
     .chip.tier-part { border-color: rgba(75, 98, 140, 0.35); color: #394d76; }
 
@@ -429,7 +429,7 @@
         <input class="search" id="search" type="search" placeholder="Search summaries and terms" autocomplete="off">
         <div class="tier-filter" id="tierFilter" aria-label="Summary tier filter">
           <button type="button" data-tier="All" class="active">All</button>
-          <button type="button" data-tier="Year">Year</button>
+          <button type="button" data-tier="Event">Event</button>
           <button type="button" data-tier="Episode">Episode</button>
           <button type="button" data-tier="Part">Part</button>
         </div>
@@ -454,7 +454,7 @@
     };
 
     const tierClass = {
-      Year: "tier-year",
+      Event: "tier-event",
       Episode: "tier-episode",
       Part: "tier-part",
     };
@@ -658,7 +658,7 @@
     function renderCounts() {
       const counts = state.data.counts || {};
       document.getElementById("counts").textContent =
-        `${counts.years || 0} years / ${counts.episodes || 0} episodes / ${counts.parts || 0} parts`;
+        `${counts.events || 0} events / ${counts.episodes || 0} episodes / ${counts.parts || 0} parts`;
     }
 
     function render() {

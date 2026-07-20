@@ -18,10 +18,10 @@ def test_packaged_prompt_resource_loads_after_working_directory_change(
 
 def test_raw_and_summary_system_policies_are_distinct() -> None:
     raw = prompts.render_system_prompt(
-        context_kind="raw", glossary="", state_ledger="", year_summaries=""
+        context_kind="raw", glossary="", state_ledger="", event_summaries=""
     )
     summary = prompts.render_system_prompt(
-        context_kind="summary", glossary="", state_ledger="", year_summaries=""
+        context_kind="summary", glossary="", state_ledger="", event_summaries=""
     )
 
     assert "raw source text" in raw
@@ -36,7 +36,7 @@ def test_raw_prompts_allow_year_overview_for_broad_synthesis() -> None:
         context_kind="raw",
         glossary="",
         state_ledger="",
-        year_summaries="## YEAR/ARC 105\nCITATION: year-label\nFull Year summary",
+        event_summaries="## YEAR/ARC 105\nCITATION: year-label\nFull Year summary",
     )
     user = prompts.render_user_prompt(
         context_kind="raw",
@@ -44,9 +44,9 @@ def test_raw_prompts_allow_year_overview_for_broad_synthesis() -> None:
         context="CITATION: raw-label\nOpening scene",
     )
 
-    assert "Year summaries in the Story Overview are also eligible evidence" in system
-    assert "Year-summary labels" in system
-    assert "you may use the generated Year summaries" in user
+    assert "event summaries in the Story Overview are also eligible evidence" in system
+    assert "event-summary labels" in system
+    assert "you may use the generated event summaries" in user
     assert "Answer based only on the raw source text below" not in user
 
 
@@ -67,31 +67,31 @@ def test_missing_resource_has_actionable_error() -> None:
         prompts.load_prompt("missing.md")
 
 
-def test_load_year_summaries_selects_only_valid_year_entries(tmp_path) -> None:
+def test_load_event_summaries_selects_only_valid_year_entries(tmp_path) -> None:
     cache = tmp_path / "summaries.json"
     cache.write_text(
         """{
-          "YEAR|104": {"summary": "Year {104} **summary**", "inputs": {"level": "year"}},
-          "YEAR|103": {"summary": "Year 103", "inputs": {"level": "year"}},
+          "EVENT|104": {"summary": "Year {104} **summary**", "inputs": {"level": "event"}},
+          "EVENT|103": {"summary": "Year 103", "inputs": {"level": "event"}},
           "EPISODE|104|Main|1": {"summary": "Episode", "inputs": {"level": "episode"}},
-          "YEAR|bad": {"summary": "Wrong level", "inputs": {"level": "episode"}}
+          "EVENT|bad": {"summary": "Wrong level", "inputs": {"level": "episode"}}
         }""",
         encoding="utf-8",
     )
 
-    assert prompts.load_year_summaries(cache) == {
+    assert prompts.load_event_summaries(cache) == {
         "104": "Year {104} **summary**",
         "103": "Year 103",
     }
 
 
-def test_load_year_summaries_allows_missing_cache(tmp_path) -> None:
-    assert prompts.load_year_summaries(tmp_path / "missing.json") == {}
+def test_load_event_summaries_allows_missing_cache(tmp_path) -> None:
+    assert prompts.load_event_summaries(tmp_path / "missing.json") == {}
 
 
-def test_load_year_summaries_rejects_malformed_cache(tmp_path) -> None:
+def test_load_event_summaries_rejects_malformed_cache(tmp_path) -> None:
     cache = tmp_path / "broken.json"
     cache.write_text("{broken", encoding="utf-8")
 
     with pytest.raises(prompts.PromptResourceError, match="Regenerate or repair"):
-        prompts.load_year_summaries(cache)
+        prompts.load_event_summaries(cache)

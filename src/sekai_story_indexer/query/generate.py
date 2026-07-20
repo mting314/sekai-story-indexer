@@ -122,7 +122,7 @@ def _build_prompts(
         context_kind="raw",
         glossary=_glossary_str(glossary if glossary is not None else _load_glossary()),
         state_ledger=_state_ledger_str(arc_ids),
-        year_summaries="None available (local retrieval mode).",
+        event_summaries="None available (local retrieval mode).",
     )
     system += _STYLE  # the original prompt has no length control; add brevity
     user = render_user_prompt(

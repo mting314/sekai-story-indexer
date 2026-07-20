@@ -39,19 +39,19 @@ def render_system_prompt(
     context_kind: Literal["raw", "summary"],
     glossary: str,
     state_ledger: str,
-    year_summaries: str,
+    event_summaries: str,
 ) -> str:
     """Render the system prompt with dynamic consistency context."""
     if context_kind == "raw":
         context_policy = (
             "The retrieved evidence in the user message is raw source text. Use it for exact "
             "events, quotations, dialogue attribution, and other fine-grained claims. For broad "
-            "Year/Arc synthesis, the generated Year summaries in the Story Overview are also "
+            "event synthesis, the generated event summaries in the Story Overview are also "
             "eligible evidence."
         )
         citation_policy = (
             "Final citations must come from retrieved raw-evidence labels or, when using the "
-            "Story Overview for broad synthesis, its Year-summary labels."
+            "Story Overview for broad synthesis, its event-summary labels."
         )
     else:
         context_policy = (
@@ -68,7 +68,7 @@ def render_system_prompt(
             "CITATION_POLICY": citation_policy,
             "GLOSSARY": glossary,
             "STATE_LEDGER": state_ledger,
-            "YEAR_SUMMARIES": year_summaries,
+            "EVENT_SUMMARIES": event_summaries,
         },
     )
 
@@ -83,8 +83,8 @@ def render_user_prompt(
     )
 
 
-def load_year_summaries(cache_file: str | Path) -> dict[str, str]:
-    """Load valid Year-level summaries from a hierarchy summary cache."""
+def load_event_summaries(cache_file: str | Path) -> dict[str, str]:
+    """Load valid event-level summaries from a hierarchy summary cache."""
     path = Path(cache_file)
     if not path.exists():
         return {}
@@ -92,21 +92,21 @@ def load_year_summaries(cache_file: str | Path) -> dict[str, str]:
         loaded = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise PromptResourceError(
-            f"Could not load Year summaries from {path}: {exc}. "
+            f"Could not load event summaries from {path}: {exc}. "
             "Regenerate or repair the summary cache."
         ) from exc
     if not isinstance(loaded, dict):
         raise PromptResourceError(
-            f"Could not load Year summaries from {path}: the cache root must be an object."
+            f"Could not load event summaries from {path}: the cache root must be an object."
         )
 
     summaries: dict[str, str] = {}
     for key, entry in loaded.items():
-        if not isinstance(key, str) or not key.startswith("YEAR|") or not isinstance(entry, dict):
+        if not isinstance(key, str) or not key.startswith("EVENT|") or not isinstance(entry, dict):
             continue
-        arc_id = key.removeprefix("YEAR|")
+        arc_id = key.removeprefix("EVENT|")
         summary = entry.get("summary")
         level = entry.get("inputs", {}).get("level")
-        if arc_id and isinstance(summary, str) and summary.strip() and level == "year":
+        if arc_id and isinstance(summary, str) and summary.strip() and level == "event":
             summaries[arc_id] = summary.strip()
     return summaries

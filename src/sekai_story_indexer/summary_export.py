@@ -230,10 +230,10 @@ def _episode_title(episode_name: str) -> str:
 
 
 def _parse_cache_key(cache_key: str) -> dict[str, str | int]:
-    if cache_key.startswith("YEAR|"):
+    if cache_key.startswith("EVENT|"):
         _, arc_id = cache_key.split("|", 1)
         return {
-            "tier": "Year",
+            "tier": "Event",
             "summaryLevel": 1,
             "arcId": arc_id,
             "storyType": "All",
@@ -271,7 +271,7 @@ def _parse_cache_key(cache_key: str) -> dict[str, str | int]:
 
 def _entry_title(metadata: dict[str, str | int]) -> str:
     tier = metadata["tier"]
-    if tier == "Year":
+    if tier == "Event":
         return f"Arc {metadata['arcId']}"
     if tier == "Episode":
         return str(metadata["episodeName"])
@@ -288,10 +288,10 @@ def _important_terms(section: str) -> list[str]:
 
 
 def _counts(entries: list[dict[str, Any]]) -> dict[str, int]:
-    counts = {"years": 0, "episodes": 0, "parts": 0}
+    counts = {"events": 0, "episodes": 0, "parts": 0}
     for entry in entries:
-        if entry["tier"] == "Year":
-            counts["years"] += 1
+        if entry["tier"] == "Event":
+            counts["events"] += 1
         elif entry["tier"] == "Episode":
             counts["episodes"] += 1
         elif entry["tier"] == "Part":
@@ -309,19 +309,19 @@ def _summary_nodes(
 
     for entry in entries:
         arc_id = entry["arcId"]
-        node_id = f"year:{arc_id}"
+        node_id = f"event:{arc_id}"
         year = by_year.setdefault(
             arc_id,
             {
                 "id": node_id,
-                "kind": "year",
+                "kind": "event",
                 "label": f"Arc {arc_id}",
                 "title": f"Arc {arc_id}",
                 "summaryId": "",
                 "children": [],
             },
         )
-        if entry["tier"] == "Year":
+        if entry["tier"] == "Event":
             year["summaryId"] = entry["id"]
             summary_node_ids[entry["id"]] = node_id
 
@@ -399,8 +399,8 @@ def _collect_nodes(node: dict[str, Any], nodes: dict[str, dict[str, Any]]) -> No
 
 
 def _entry_sort_key(entry: dict[str, Any], story_order: StoryOrder) -> tuple[Any, ...]:
-    tier_position = {"Year": 0, "Episode": 1, "Part": 2}.get(entry["tier"], 9)
-    if entry["tier"] == "Year":
+    tier_position = {"Event": 0, "Episode": 1, "Part": 2}.get(entry["tier"], 9)
+    if entry["tier"] == "Event":
         return (_year_sort_key({"label": "", "id": "", "summaryId": "", "children": [], **entry}, story_order), tier_position)
     if entry["tier"] == "Episode":
         return (
@@ -431,7 +431,7 @@ def _entry_sort_key(entry: dict[str, Any], story_order: StoryOrder) -> tuple[Any
 
 
 def _year_sort_key(year: dict[str, Any], story_order: StoryOrder) -> tuple[Any, ...]:
-    arc_id = year["arcId"] if "arcId" in year else str(year["id"]).removeprefix("year:")
+    arc_id = year["arcId"] if "arcId" in year else str(year["id"]).removeprefix("event:")
     positions = [
         position
         for (story_type, configured_arc_id), position in story_order.summary_positions.items()

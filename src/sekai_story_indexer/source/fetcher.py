@@ -33,8 +33,14 @@ from .transform import (
 
 
 def story_type_for(content_type: str) -> str:
-    """Map a Sekai content bucket onto the tier machinery's {Main, Side, Other}."""
-    return "Main" if content_type == "main" else "Side"
+    """Map a Sekai content bucket onto the tier machinery's story-type axis. Each
+    bucket reads as itself (an event story is ``Event``); Sekai has no "side story"
+    (that was linkura), so unclassified buckets fall back to ``Other``."""
+    if content_type == "main":
+        return "Main"
+    return {"event": "Event", "unit": "Unit", "card": "Card", "area": "Area"}.get(
+        content_type, "Other"
+    )
 
 
 @dataclass

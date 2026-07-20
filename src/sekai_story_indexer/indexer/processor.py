@@ -26,8 +26,17 @@ def episode_number_from_names(episode_name: str, part_name: str) -> int:
     return 0
 
 
+# The tier machinery keeps a coarse story-type axis. For Sekai we map each content
+# bucket onto its own readable value (an event story reads as "Event"). There is no
+# "side story" in Sekai — that was a linkura concept; unclassified paths fall back to
+# a neutral "Other".
+_CONTENT_STORY_TYPE = {"event": "Event", "unit": "Unit", "card": "Card", "area": "Area"}
+
+
 def _story_type_for(content_type: str) -> str:
-    return "Main" if content_type == "main" or content_type.startswith("第") else "Side"
+    if content_type == "main" or content_type.startswith("第"):
+        return "Main"
+    return _CONTENT_STORY_TYPE.get(content_type, "Other")
 
 
 class StoryProcessor:

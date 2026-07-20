@@ -27,7 +27,7 @@ from ..eval.models import (
 from ..indexer.parser import StoryParser
 from ..indexer.source_store import SourceRecordStore
 from ..lexical import LexicalIndex, expand_query_with_glossary
-from ..prompts import load_year_summaries, render_system_prompt, render_user_prompt
+from ..prompts import load_event_summaries, render_system_prompt, render_user_prompt
 from .analysis import (
     CHRONOLOGY_INTENT,
     EXACT_EVIDENCE_INTENT,
@@ -179,7 +179,7 @@ class StoryQueryEngine:
             with open(glossary_file, encoding="utf-8") as f:
                 self.glossary = json.load(f)
 
-        self.year_summaries = load_year_summaries(summary_cache_file)
+        self.event_summaries = load_event_summaries(summary_cache_file)
 
     def _expanded_question(self, question: str) -> str:
         return expand_query_with_glossary(question, self.glossary)
@@ -306,11 +306,11 @@ class StoryQueryEngine:
                 )
 
         year_summary_sections: list[str] = []
-        for arc_id, summary in sorted(getattr(self, "year_summaries", {}).items()):
+        for arc_id, summary in sorted(getattr(self, "event_summaries", {}).items()):
             citation = f"{arc_id} · Main · Episode ALL_EPISODES · Part ALL_PARTS · summary_level 1"
             year_summary_sections.extend(
                 [
-                    f"## YEAR/ARC {arc_id}",
+                    f"## EVENT {arc_id}",
                     f"CITATION: {citation}",
                     summary,
                 ]
@@ -320,8 +320,8 @@ class StoryQueryEngine:
             context_kind=context_kind,
             glossary="\n".join(glossary_sections),
             state_ledger="\n".join(ledger_sections),
-            year_summaries=(
-                "--- STORY OVERVIEW (GENERATED YEAR SUMMARIES) ---\n\n"
+            event_summaries=(
+                "--- STORY OVERVIEW (GENERATED EVENT SUMMARIES) ---\n\n"
                 + "\n\n".join(year_summary_sections)
                 if year_summary_sections
                 else ""
@@ -364,8 +364,6 @@ class StoryQueryEngine:
         episode = self._summary_episode_label(metadata)
         if episode.startswith("Episode "):
             return episode.removeprefix("Episode ")
-        if episode.startswith("Side Story "):
-            return episode.removeprefix("Side Story ")
         return episode
 
     def _summary_part_label(self, metadata: dict[str, Any]) -> str:
@@ -417,13 +415,10 @@ class StoryQueryEngine:
         }
 
     def _episode_label(self, metadata: dict[str, Any]) -> str:
-        story_type = metadata.get("story_type")
         episode_name = str(metadata.get("episode_name", "unknown"))
         match = re.search(r"第(\d+)話", episode_name)
         if match:
             return f"Episode {match.group(1)}"
-        if story_type == "Side":
-            return f"Side Story {episode_name}"
         return f"Episode {episode_name}"
 
     def _fetch_raw_text(self, metadata: dict[str, Any]) -> str:

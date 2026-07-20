@@ -12,7 +12,7 @@ import yaml
 from .indexer.processor import StoryProcessor
 from .models.story import StoryNode
 
-ALLOWED_STORY_TYPES = {"Main", "Side", "Other"}
+ALLOWED_STORY_TYPES = {"Main", "Event", "Unit", "Card", "Area", "Other"}
 DEFAULT_STORY_ORDER_PATH = Path("story_order.yaml")
 
 
@@ -40,13 +40,15 @@ def _find_position(
                 return pos
     except ValueError:
         pass
-    alt_st = "Side" if story_type == "Main" else "Main"
-    if (alt_st, arc_id) in positions:
-        return positions[(alt_st, arc_id)]
+    # Last resort: arc_id is the real identifier — match it under ANY story_type
+    # (exact, then by numeric prefix). story_type is only a coarse axis.
+    for (_st, arc), pos in positions.items():
+        if arc == arc_id:
+            return pos
     try:
         eid_prefix = f"{int(arc_id):04d}"
-        for (st, arc), pos in positions.items():
-            if st == alt_st and (arc == eid_prefix or arc.startswith(f"{eid_prefix}-")):
+        for (_st, arc), pos in positions.items():
+            if arc == eid_prefix or arc.startswith(f"{eid_prefix}-"):
                 return pos
     except ValueError:
         pass
@@ -181,7 +183,7 @@ class StoryOrder:
             group_index, arc_index = (999999, 999999)
         else:
             group_index, arc_index = pos
-        return (group_index, arc_index, 0 if story_type == "Side" else 1, natural_sort_key(episode_name))
+        return (group_index, arc_index, 1 if story_type == "Main" else 0, natural_sort_key(episode_name))
 
     def _validate_order_covers_story_pairs(
         self,

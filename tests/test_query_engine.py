@@ -69,7 +69,7 @@ def test_system_prompt_restores_raw_source_claim_and_compacts_ledger():
 
 def test_system_prompt_includes_all_year_summaries_in_arc_order():
     engine = make_engine()
-    engine.year_summaries = {
+    engine.event_summaries = {
         "105": "The {105} summary contains **Markdown**.",
         "103": "The 103 summary.",
         "104": "The 104 summary.",
@@ -77,8 +77,8 @@ def test_system_prompt_includes_all_year_summaries_in_arc_order():
 
     prompt = engine._build_system_prompt({"104"})
 
-    assert prompt.index("## YEAR/ARC 103") < prompt.index("## YEAR/ARC 104")
-    assert prompt.index("## YEAR/ARC 104") < prompt.index("## YEAR/ARC 105")
+    assert prompt.index("## EVENT 103") < prompt.index("## EVENT 104")
+    assert prompt.index("## EVENT 104") < prompt.index("## EVENT 105")
     assert "The {105} summary contains **Markdown**." in prompt
     assert (
         "CITATION: 104 · Main · Episode ALL_EPISODES · Part ALL_PARTS · summary_level 1"
@@ -526,10 +526,10 @@ def test_tiered_retrieve_dispatches_each_summary_tier_and_raw(monkeypatch):
     ]
 
 
-def test_analysis_where_applies_side_story_filters_to_specific_tiers(monkeypatch):
+def test_analysis_where_applies_main_story_filters_to_specific_tiers(monkeypatch):
     engine = make_engine()
     calls: list[dict[str, Any]] = []
-    analysis = analyze_query("What happens in the side stories?")
+    analysis = analyze_query("What happens in the main stories?")
 
     def fake_hybrid_retrieve(
         question: str,
@@ -549,15 +549,15 @@ def test_analysis_where_applies_side_story_filters_to_specific_tiers(monkeypatch
         {"n_results": 20, "where": {"summary_level": 1}},
         {
             "n_results": 20,
-            "where": {"$and": [{"summary_level": 2}, {"story_type": "Side"}]},
+            "where": {"$and": [{"summary_level": 2}, {"story_type": "Main"}]},
         },
         {
             "n_results": 20,
-            "where": {"$and": [{"summary_level": 3}, {"story_type": "Side"}]},
+            "where": {"$and": [{"summary_level": 3}, {"story_type": "Main"}]},
         },
         {
             "n_results": 40,
-            "where": {"$and": [{"summary_level": 4}, {"story_type": "Side"}]},
+            "where": {"$and": [{"summary_level": 4}, {"story_type": "Main"}]},
         },
     ]
 
