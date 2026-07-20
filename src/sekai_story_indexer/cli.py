@@ -686,6 +686,12 @@ def ingest(
         "event via the API), 'hierarchical' (per-part/episode/year via the API), "
         "or 'none' (embed raw scenes only).",
     ),
+    only_summaries: bool = typer.Option(
+        False,
+        "--only-summaries",
+        help="Skip re-embedding raw scenes; only (re)embed the summary tier onto an "
+        "existing index. Implies --no-prune (raw vectors are kept, not deleted).",
+    ),
 ):
     """Walks the story directory, summarizes, and indexes into ChromaDB."""
     initialize_ingest_settings()
@@ -781,12 +787,19 @@ def ingest(
     console.print("Upserting to Vector DB...")
     lexical_index = LexicalIndex(get_lexical_db_path())
 
-    raw_ids = _upsert_story_nodes(
-        retrieval_chunks,
-        progress_label="[green]Embedding raw retrieval chunks...",
-        glossary=glossary,
-        lexical_index=lexical_index,
-    )
+    if only_summaries:
+        raw_ids: set[str] = set()
+        console.print(
+            "[yellow]--only-summaries: keeping existing raw-scene vectors; "
+            "embedding the summary tier only (no prune).[/yellow]"
+        )
+    else:
+        raw_ids = _upsert_story_nodes(
+            retrieval_chunks,
+            progress_label="[green]Embedding raw retrieval chunks...",
+            glossary=glossary,
+            lexical_index=lexical_index,
+        )
     summary_ids = (
         _upsert_story_nodes(
             summary_nodes,
@@ -799,7 +812,9 @@ def ingest(
     )
 
     emitted_ids = {*raw_ids, *summary_ids}
-    if prune:
+    # Never prune when only embedding summaries — the raw ids aren't re-emitted this
+    # run, so pruning would delete the whole raw tier.
+    if prune and not only_summaries:
         pruned_count = _prune_stale_records(emitted_ids=emitted_ids, lexical_index=lexical_index)
         console.print(f"Pruned {pruned_count} stale vector/lexical records.")
 
