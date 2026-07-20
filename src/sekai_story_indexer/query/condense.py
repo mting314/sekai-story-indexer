@@ -16,10 +16,20 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _PROMPT = (
-    "Rewrite the user's latest message into a single standalone question that "
-    "includes any context implied by the conversation (character, unit, event, "
-    "metric like 'dialogue lines', etc.). Keep it faithful — do not answer it. "
-    "Output only the rewritten question.\n\n"
+    "You rewrite a user's latest chat message into a STANDALONE question for a "
+    "story search system. Follow these rules exactly:\n"
+    "1. If the latest message is ALREADY self-contained — it names its own subject "
+    "and does NOT depend on earlier turns through words like 'that', 'it', 'she', "
+    "'he', 'they', 'there', 'the event', or an implied continuation — return it "
+    "EXACTLY as written, unchanged. A change of topic must pass through untouched.\n"
+    "2. Only if it depends on prior context (pronouns, references, or ellipsis), "
+    "rewrite it to name the specific character / unit / event / metric it refers to.\n"
+    "3. Never answer the question. Output only the final question, nothing else.\n\n"
+    "Examples:\n"
+    "History: user: Summarize mafu1\nLatest message: what's the conclusion of that "
+    "event\nStandalone question: what's the conclusion of mafu1\n\n"
+    "History: user: Summarize mafu1\nLatest message: when is Honami's brother "
+    "mentioned\nStandalone question: when is Honami's brother mentioned\n\n"
     "Conversation:\n{convo}\n\nLatest message: {latest}\n\nStandalone question:"
 )
 
