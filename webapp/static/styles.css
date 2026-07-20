@@ -21,7 +21,9 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--acce
 
 main {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* chat takes the remaining width; the event panel hugs the ~340px cards
+     (340 + 2×16 panel padding) instead of filling half the viewport. */
+  grid-template-columns: minmax(0, 1fr) 372px;
   gap: 16px;
   padding: 16px 24px 32px;
   align-items: start;
@@ -71,19 +73,19 @@ main {
 .chip { padding: 5px 11px; border-radius: 999px; border: 1px solid #2b2f3a; background: transparent; color: var(--muted); cursor: pointer; font-size: 12.5px; }
 .chip.active { background: var(--accent); color: #04222b; border-color: var(--accent); font-weight: 600; }
 /* Game-style event list: a vertically-scrolling stack of banner tiles with
-   snap-to-card + inertial flick (JS in app.js). Modeled on Project Sekai's
-   in-game event list, where the banner art is the visual anchor of each row. */
+   snap-to-card. Modeled on Project Sekai's in-game event list, where the banner
+   art is the visual anchor of each row. Scrolling is native — the browser/OS
+   momentum is the inertia (same approach as the SEKAI-Stories reference) — with
+   CSS scroll-snap giving the settle-on-a-card feel. */
 .timeline {
   display: flex; flex-direction: column; gap: 12px;
   max-height: 72vh; overflow-y: auto;
-  scroll-snap-type: y proximity;   /* settle on a card without trapping the wheel */
+  scroll-snap-type: y proximity;   /* settle on a card without trapping momentum */
   scroll-padding-top: 34px;        /* clear the sticky legend when snapping */
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  cursor: grab;
   scrollbar-width: thin;
 }
-.timeline.dragging, .timeline.dragging .event-card { cursor: grabbing; }
 .legend { font-size: 12px; color: var(--muted); padding: 2px 2px 8px; position: sticky; top: 0; z-index: 2; background: var(--panel); }
 .legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: middle; }
 .dot.indexed, .status-dot.indexed { background: #4ade80; box-shadow: 0 0 6px #4ade8088; }
@@ -91,17 +93,15 @@ main {
 /* banner-forward tile: art fills the card, text rides on a left-to-right scrim */
 .event-card {
   position: relative; display: block; min-height: 88px; flex-shrink: 0;
-  width: 100%; max-width: 260px; align-self: center;
+  width: 100%; max-width: 340px; align-self: center;
   background: var(--card); border-radius: 14px; overflow: hidden; cursor: pointer;
-  border: 1px solid #ffffff10; scroll-snap-align: start; user-select: none;
+  border: 1px solid #ffffff10; scroll-snap-align: start;
   transition: transform .15s ease, box-shadow .15s ease;
 }
 .event-card:hover { transform: translateY(-1px); box-shadow: 0 8px 22px #0007; }
 .event-card.key { box-shadow: inset 4px 0 0 0 var(--key); }
 .event-card.key:hover { box-shadow: inset 4px 0 0 0 var(--key), 0 8px 22px #0007; }
 .event-card.pending { opacity: 0.5; }
-.timeline.dragging .event-card:hover { transform: none; box-shadow: none; }
-.timeline.dragging .event-card.key:hover { box-shadow: inset 4px 0 0 0 var(--key); }
 .event-card .art-bg {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; object-position: center 30%;
