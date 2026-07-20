@@ -191,17 +191,16 @@ Banner+main-unit + single-unit-CC heuristic, with curated focus_overrides.json.
 | `mafu5` | 2024-06-20 | marathon | 灯を手繰りよせて |
 | `mafu6` | 2025-04-30 | marathon | そして、針は動き出す |
 
-### Ena Shinonome — Nightcord at 25:00 (id 19) — 8
+### Ena Shinonome — Nightcord at 25:00 (id 19) — 7
 | nick | date | type | event |
 |---|---|---|---|
 | `ena1` | 2021-02-18 | marathon | 満たされないペイルカラー |
-| `ena2` | 2021-05-10 | marathon | お悩み聞かせて！わくわくピクニック |
-| `ena3` | 2022-03-20 | marathon | 空白のキャンバスに描く私は |
-| `ena4` | 2022-11-20 | marathon | 願いは、いつか朝をこえて |
-| `ena5` | 2024-04-10 | marathon | Knowing the Unseen |
-| `ena6` | 2024-11-30 | marathon | 傷だらけの手で、私達は |
-| `ena7` | 2025-10-31 | marathon | Colors of Pure Sense |
-| `ena8` | 2026-07-09 | marathon | 褪せない今を、彩って |
+| `ena2` | 2022-03-20 | marathon | 空白のキャンバスに描く私は |
+| `ena3` | 2022-11-20 | marathon | 願いは、いつか朝をこえて |
+| `ena4` | 2024-04-10 | marathon | Knowing the Unseen |
+| `ena5` | 2024-11-30 | marathon | 傷だらけの手で、私達は |
+| `ena6` | 2025-10-31 | marathon | Colors of Pure Sense |
+| `ena7` | 2026-07-09 | marathon | 褪せない今を、彩って |
 
 ### Mizuki Akiyama — Nightcord at 25:00 (id 20) — 6
 | nick | date | type | event |
