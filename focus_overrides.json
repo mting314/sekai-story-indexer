@@ -1,5 +1,4 @@
 {
-  "_comment": "event_id -> focus character id (0 = force-exclude). For events whose story protagonist differs from the master-DB banner artwork char, or mixed events the heuristic wrongly counts. See docs/nickname_events_review.md.",
-  "97": 10,
-  "22": 0
+  "_comment": "event_id -> focus character id (0 = force-exclude). Only for events where the banner ARTWORK character differs from the story protagonist (the commissioned-song rule already excludes mixed/collab events, so those don't need entries). See docs/focus_event_heuristic.md.",
+  "97": 10
 }

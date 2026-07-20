@@ -111,17 +111,20 @@ def build_catalog(
     """Full enriched, chronologically-sorted catalog with nicknames assigned.
 
     A *focus event* (which counts toward a character's kasa5-style nickname number)
-    is a ``marathon`` or ``cheerful_carnival`` event whose **banner focus
-    character** (``eventStories.bannerGameCharacterUnitId``) is a member of the
-    event story's single **main unit**. Using the story's main unit — not the 4★
-    card units — correctly includes modern cross-unit-*guest* spotlights (e.g.
-    "アイドル・花里みのり", a MORE MORE JUMP! story with VBS/WxS guest cards) while
-    excluding group/seasonal events (New Year, group CC, collabs) that resolve to
-    ``mixed``, Virtual Singers, World Link, and crossover/anniversary events (no
-    banner). Non-focus events carry no focus/nickname.
+    is a ``marathon`` or ``cheerful_carnival`` event that
+      1. has a **banner focus character** (``eventStories.bannerGameCharacterUnitId``)
+         who belongs to the event story's **main unit** (excludes Virtual Singers,
+         World Link, and crossover/anniversary events with no banner char); and
+      2. **debuts a commissioned song** — a dedicated character event always does;
+         mixed / collab / seasonal events (New Year, group Cheerful Carnivals,
+         Valentine, …) do not, which is exactly what separates them from a focus.
 
-    ``event_card_ids``/``cards_by_id`` are accepted for API stability but no longer
-    used for focus detection.
+    The one exception to (2) is a **single-unit story** (the event story involves
+    only the focus character's own unit): those are inherently dedicated events, and
+    a few early ones simply have no recorded song (e.g. カーテンコールに惜別を), so they
+    count regardless. Non-focus events carry no focus/nickname.
+
+    ``event_card_ids``/``cards_by_id`` are accepted for API stability but not used.
     """
     banner_char_by_event = banner_char_by_event or {}
     records: list[dict] = []
@@ -147,18 +150,14 @@ def build_catalog(
         banner_in_main_unit = banner != 0 and CHARACTER_ID_TO_UNIT.get(banner) == rec["unit"]
         single_unit = len(distinct_story_units) == 1
         has_song = bool(rec.get("song_title"))
-        # A multi-unit event must have a commissioned song to be a solo focus —
-        # a songless multi-unit event is a collab (夏祭り, 響くトワイライトパレード). A
-        # single-unit event is a focus regardless (some genuinely have no song, e.g.
-        # カーテンコールに惜別を).
-        qualifies = banner_in_main_unit and (single_unit or has_song)
-        if rec["event_type"] == "marathon":
-            rec["is_focus_event"] = qualifies
-        elif rec["event_type"] == "cheerful_carnival":
-            # ...and a CC caps at 2 units (3+ = seasonal collab: Valentine/New Year).
-            rec["is_focus_event"] = qualifies and len(distinct_story_units) <= 2
-        else:
-            rec["is_focus_event"] = False
+        # A dedicated focus event debuts a commissioned song; mixed/collab/seasonal
+        # events don't. Single-unit stories are inherently dedicated, so they count
+        # even without a recorded song (legacy events like カーテンコールに惜別を).
+        rec["is_focus_event"] = (
+            rec["event_type"] in ("marathon", "cheerful_carnival")
+            and banner_in_main_unit
+            and (has_song or single_unit)
+        )
         if not rec["is_focus_event"]:  # not a solo focus -> no focus attribution
             rec["focus_character_id"] = 0
             rec["focus_character"] = ""

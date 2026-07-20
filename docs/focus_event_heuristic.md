@@ -37,27 +37,30 @@ An event is a solo focus event when **all** of these hold:
    (`bannerGameCharacterUnitId`) belongs to that unit. This drops Virtual Singers
    (they headline some events but never get a solo focus) and crossover/anniversary
    events (no banner character).
-3. **Multi-unit events must have a commissioned song.** A single-unit event (its
-   story involves only the focus unit) counts regardless — a few early ones have no
-   song (e.g. カーテンコールに惜別を). But a *multi-unit* event (focus unit + guest units)
-   only counts if it has a commissioned song; a songless multi-unit event is a
-   collab, not a solo focus (e.g. 響くトワイライトパレード, 夏祭り、鳴り響く音は).
-4. **Cheerful Carnivals cap at 2 units.** A CC with the focus unit + at most one
-   guest unit is a solo focus (e.g. ボクのあしあと キミのゆくさき — Mizuki + a VBS guest);
-   a CC spanning 3+ units is a seasonal collab (Valentine / White Day / New Year).
+3. **It debuts a commissioned song.** A dedicated character event always commissions
+   a new song; mixed / collab / seasonal events (New Year, group Cheerful Carnivals,
+   Valentine, White Day, …) do not — and that is exactly what distinguishes them
+   from a focus event. **Exception:** a **single-unit story** (only the focus
+   character's own unit appears in `eventStoryUnits`) is inherently a dedicated
+   event, so it counts even without a recorded song — a few early ones simply have
+   none (e.g. カーテンコールに惜別を).
 
-Marathons and CCs that pass are numbered per character in release order.
+That's the whole rule. Note it does *not* care how many *guest* units appear in a
+dedicated event's story (荊棘の道は何処へ is Mizuki's focus even though VBS/WxS
+characters cameo) — the commissioned song, not the guest list, is the signal.
+Passing marathons/CCs are numbered per character in release order.
 
 ## Curated overrides — `focus_overrides.json`
 
-For the handful of events the master DB can't disambiguate, a curated file maps
-`event_id → focus character id`, or `0` to force-exclude. Applied on top of the
-rule (before numbering), so it survives re-fetches. Current entries:
+The song rule handles mixed/collab exclusion on its own. The remaining thing the
+master DB can't express is when the banner **artwork** character differs from the
+story **protagonist** — for those, a curated file maps `event_id → focus character
+id` (or `0` to force-exclude). Applied on top of the rule, so it survives
+re-fetches. Current entries:
 
 | event | override | why |
 |---|---|---|
 | `97` Light Up the Fire | → An (10) | banner artwork is Kohane, but the story is An's |
-| `22` お悩み聞かせて！わくわくピクニック | → excluded | a mixed event the rule would otherwise count |
 
 To fix a future mistake: add one line to `focus_overrides.json` and re-run
 `indexer fetch` (or regenerate `events_index.json`).

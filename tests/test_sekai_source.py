@@ -390,8 +390,8 @@ def test_virtual_singer_banner_is_not_a_focus_event():
 
 
 def test_multi_unit_cheerful_carnival_is_not_a_focus_event():
-    # a seasonal collab CC with guest sub-units is not a solo focus (unlike a
-    # single-unit CC). Regression for airi3 (Valentine) / Tsukasa White Day.
+    # a songless multi-unit CC is a seasonal collab, not a solo focus (Valentine /
+    # White Day / New Year all lack a commissioned song).
     from sekai_story_indexer.source.catalog import build_catalog
 
     events = [{"id": 60, "name": "Valentine CC", "startAt": 1000, "eventType": "cheerful_carnival"}]
