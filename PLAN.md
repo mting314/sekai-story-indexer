@@ -164,6 +164,13 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   substitution inside JP sentences isn't genuinely useful without the LLM.
 
 ## 5. Known follow-ups / accuracy notes
+* **Continuous daily ingestion + incremental re-embed (deferred).** The game ships
+  a new event ~every 15 days; stand up a scheduled job that fetches new events
+  (`indexer fetch --skip-existing`), ingests + embeds only the deltas (the
+  inherited `IngestionManifest` content-hashing already supports idempotent
+  incremental ingest), and refreshes the index — so chat/RAG stays current without
+  a full re-embed. Mirror the original repo's always-fresh RAG loop; pair with the
+  timeline's live master-DB read so timeline and chat never drift.
 * **Game-style event timeline scrolling (webapp, deferred).** Rework the event
   timeline scroll to feel like Project Sekai's in-game event list — smooth
   momentum/inertia scrolling, snap-to-card, and the banner art (now on each row)
@@ -180,6 +187,15 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   do they tie to the event?" Needs a lyrics source (not in the current master-DB
   ingest — song jacket/title/composer are captured, lyrics are not), then a
   retrieval/answer path that links `song_title` ↔ event ↔ lyrics.
+* **Character-persona chat mode (webapp, deferred).** Let the web-app chat answer
+  *in character* — pick a Sekai character (e.g. Miku, Kohane, Tsukasa) and have
+  answers written in their voice/speech style for more fun, in-world discussions,
+  rather than the current neutral narrator. Persona = a per-character system-prompt
+  overlay (tone, verbal tics, relationships) layered on top of the grounded-answer
+  prompt (`query/generate.py::_STYLE`), selectable via a UI chip; still quote- and
+  citation-grounded so it stays faithful to the source. Character roster + JP names
+  already exist in `source/constants.py` (`CHARACTER_ID_TO_JP`) and nicknames in
+  `source/nicknames.py`.
 * **Agentic-lite scene selection (local backend, deferred).** A scoped content
   query currently feeds the WHOLE event (budget-bounded, head+tail) to the answer
   — complete for small events, but blunt for large scopes. A better design lets

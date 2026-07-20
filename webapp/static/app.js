@@ -458,6 +458,13 @@ function renderTimeline() {
     `&nbsp;·&nbsp; <span class="dot pending"></span> on timeline, indexing pending (${rows.length - nIndexed})`;
   el.appendChild(legend);
 
+  // Cards live in an inner wrapper so the rubber-band overscroll (see
+  // enableWheelInertia) can translate them past the edges without moving the
+  // sticky legend.
+  const inner = document.createElement("div");
+  inner.className = "tl-inner";
+  el.appendChild(inner);
+
   for (const e of rows) {
     const card = document.createElement("div");
     card.className =
@@ -473,26 +480,251 @@ function renderTimeline() {
     const status = e.indexed
       ? '<span class="status-dot indexed" title="Queryable in chat now"></span>'
       : '<span class="status-dot pending" title="On the timeline; chat-answerable after the next ingest"></span>';
-    // Event art on the right: the wide event-story banner (title + character)
-    // first, then the home banner, then the song jacket.
+    // Banner art fills the card as the visual anchor (Sekai in-game style): the
+    // wide event-story banner (title + character) first, then the home banner,
+    // then the song jacket. A left-to-right scrim keeps the text legible.
     const art = e.story_banner_url || e.banner_url || e.jacket_url || "";
     const artHtml = art
-      ? `<img class="event-art" loading="lazy" src="${proxied(art)}" alt="" ` +
-        `onerror="this.style.display='none'">`
+      ? `<img class="art-bg" loading="lazy" src="${proxied(art)}" alt="" ` +
+        `onerror="this.closest('.event-card').classList.add('no-art'); this.remove()">` +
+        `<div class="scrim"></div>`
       : "";
     card.innerHTML = `
-      ${logo}
-      <div class="meta">
-        <div class="top">${status}<span class="date">${fmtDate(e.started_at)}</span>${nick}
-          ${e.is_key_story ? '<span class="key-badge">key</span>' : ""}</div>
-        <div class="name">${e.name}</div>
-        ${focus}${song}
-      </div>
-      ${artHtml}`;
+      ${artHtml}
+      <div class="card-content">
+        ${logo}
+        <div class="meta">
+          <div class="top">${status}<span class="date">${fmtDate(e.started_at)}</span>${nick}
+            ${e.is_key_story ? '<span class="key-badge">key</span>' : ""}</div>
+          <div class="name">${e.name}</div>
+          ${focus}${song}
+        </div>
+      </div>`;
     card.onclick = () => setScope(e);
-    el.appendChild(card);
+    inner.appendChild(card);
   }
   if (!rows.length) el.innerHTML = '<p class="empty">No events for this filter.</p>';
+  enableWheelInertia(el);
+  if (el._resetOverscroll) el._resetOverscroll();
+}
+
+// Extra momentum for wheel + trackpad scrolling (more inertia / less friction
+// than the browser's native scroll) plus iOS-style rubber-band overscroll at the
+// top/bottom. Wheel-only on purpose — no pointer capture — so card clicks are
+// untouched.
+//
+// Two states, both driven by one rAF loop:
+//   • in-bounds: each wheel tick is an impulse into `velocity` (px/frame) that a
+//     loop integrates and decays by FRICTION, so the list keeps gliding after
+//     input stops.
+//   • past an edge: momentum/push spills into `over` (px past the edge) with
+//     diminishing resistance, and the `.tl-inner` wrapper is translated by it so
+//     you see the content pull past the edge. A spring pulls `over` back to 0
+//     with a force proportional to the distance pushed — the snap-back.
+//
+// Tuning knobs: FRICTION (↑ = longer glide), WHEEL_GAIN (↑ = stronger push),
+// RUBBER (↑ = looser/further overscroll), SPRING (↑ = snappier snap-back).
+function enableWheelInertia(el) {
+  if (el._wheelInertia) return;
+  el._wheelInertia = true;
+
+  const reduce =
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce) {
+    el._resetOverscroll = () => {};
+    return; // let native scroll handle it
+  }
+
+  const FRICTION = 0.96; // per-frame velocity decay — higher = more inertia
+  const WHEEL_GAIN = 0.14; // fraction of a wheel delta added to velocity
+  const MAX_V = 90; // cap so a hard flick can't teleport
+  const RUBBER = 0.35; // resistance converting wheel motion into overscroll
+  const DRAG_RUBBER = 0.5; // resistance when click-dragging past an edge
+  const SPRING = 0.16; // per-frame spring-back of the overscroll offset
+  const MAX_OVER = 140; // hard cap on how far you can push past an edge
+  const DRAG_THRESHOLD = 4; // px before a press becomes a drag (vs a click)
+  const maxScroll = () => Math.max(0, el.scrollHeight - el.clientHeight);
+
+  let velocity = 0;
+  let over = 0; // signed px past an edge: >0 past bottom, <0 past top
+  let inner = null;
+  let raf = 0;
+
+  function applyTransform() {
+    if (inner) inner.style.transform = over ? `translateY(${(-over).toFixed(2)}px)` : "";
+  }
+
+  function frame() {
+    if (over !== 0) {
+      // Overscrolled: spring `over` back toward 0 (restoring force ∝ distance)
+      // and let any leftover momentum bleed off.
+      over *= 1 - SPRING;
+      if (Math.abs(over) < 0.3) over = 0;
+      velocity *= 0.8;
+      applyTransform();
+      raf = over !== 0 ? requestAnimationFrame(frame) : 0;
+      return;
+    }
+    velocity *= FRICTION;
+    const next = el.scrollTop + velocity;
+    const max = maxScroll();
+    if (next < 0) {
+      over = Math.max(-MAX_OVER, over + next * RUBBER); // spill past the top
+      el.scrollTop = 0;
+      velocity = 0;
+      applyTransform();
+    } else if (next > max) {
+      over = Math.min(MAX_OVER, over + (next - max) * RUBBER); // spill past bottom
+      el.scrollTop = max;
+      velocity = 0;
+      applyTransform();
+    } else {
+      el.scrollTop = next;
+    }
+    if (Math.abs(velocity) > 0.4 || over !== 0) raf = requestAnimationFrame(frame);
+    else {
+      velocity = 0;
+      raf = 0;
+    }
+  }
+
+  el.addEventListener(
+    "wheel",
+    (e) => {
+      if (e.ctrlKey) return; // let pinch-zoom through
+      e.preventDefault();
+      let d = e.deltaY;
+      if (e.deltaMode === 1) d *= 16; // lines → px
+      else if (e.deltaMode === 2) d *= el.clientHeight; // pages → px
+      const max = maxScroll();
+      const atTop = el.scrollTop <= 0;
+      const atBottom = el.scrollTop >= max - 1;
+      if (over !== 0 || (atTop && d < 0) || (atBottom && d > 0)) {
+        // Push directly into overscroll, with resistance that stiffens the
+        // further you go, so it feels harder to push the more you push.
+        const resist = RUBBER / (1 + Math.abs(over) / 80);
+        over = Math.max(-MAX_OVER, Math.min(MAX_OVER, over + d * resist));
+        velocity = 0;
+        applyTransform();
+      } else {
+        velocity = Math.max(-MAX_V, Math.min(MAX_V, velocity + d * WHEEL_GAIN));
+      }
+      if (!raf) raf = requestAnimationFrame(frame);
+    },
+    { passive: false }
+  );
+
+  // ---- click-and-drag to scroll (mouse) ----
+  // Capture is deferred until the press actually moves past DRAG_THRESHOLD, so a
+  // plain click still reaches the card's onclick (setScope). Dragging past an
+  // edge feeds the same resisted-overscroll + spring-back as the wheel; a flick
+  // on release hands its velocity to the momentum loop.
+  let dragArmed = false;
+  let dragging = false;
+  let moved = false;
+  let startY = 0;
+  let startScroll = 0;
+  let samples = []; // recent {t, y} for release-velocity estimation
+
+  el.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "mouse" || e.button !== 0) return; // touch keeps native
+    dragArmed = true;
+    dragging = false;
+    moved = false;
+    startY = e.clientY;
+    startScroll = el.scrollTop;
+    samples = [{ t: e.timeStamp, y: e.clientY }];
+    // Stop any in-flight momentum/spring so the grab feels immediate.
+    if (raf) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
+    velocity = 0;
+    over = 0;
+    applyTransform();
+  });
+
+  el.addEventListener("pointermove", (e) => {
+    if (!dragArmed) return;
+    const totalDy = e.clientY - startY;
+    if (!dragging) {
+      if (Math.abs(totalDy) <= DRAG_THRESHOLD) return; // still might be a click
+      dragging = true;
+      moved = true;
+      el.classList.add("dragging");
+      try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    }
+    const rawPos = startScroll - totalDy; // unclamped desired scroll offset
+    const max = maxScroll();
+    if (rawPos < 0) {
+      over = Math.max(-MAX_OVER, rawPos * DRAG_RUBBER); // resisted pull past top
+      el.scrollTop = 0;
+    } else if (rawPos > max) {
+      over = Math.min(MAX_OVER, (rawPos - max) * DRAG_RUBBER); // past bottom
+      el.scrollTop = max;
+    } else {
+      over = 0;
+      el.scrollTop = rawPos;
+    }
+    applyTransform();
+    samples.push({ t: e.timeStamp, y: e.clientY });
+    while (samples.length > 6) samples.shift();
+  });
+
+  function endDrag(e) {
+    if (!dragArmed) return;
+    dragArmed = false;
+    if (!dragging) return; // was a click — leave it for card.onclick
+    dragging = false;
+    el.classList.remove("dragging");
+    try { el.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    // Fling velocity from the last ~90ms of movement (scrollTop moves opposite
+    // to the pointer, hence the negative sign).
+    const end = samples[samples.length - 1];
+    let first = samples[0];
+    for (const s of samples) {
+      if (end.t - s.t <= 90) { first = s; break; }
+    }
+    const dt = end.t - first.t;
+    const resting = e.timeStamp - end.t > 90;
+    const vpf = dt > 0 && !resting ? (-(end.y - first.y) / dt) * 16 : 0;
+    velocity = Math.max(-MAX_V, Math.min(MAX_V, vpf));
+    if (!raf) raf = requestAnimationFrame(frame); // momentum + spring-back
+  }
+  el.addEventListener("pointerup", endDrag);
+  el.addEventListener("pointercancel", endDrag);
+
+  // Swallow the click that ends a real drag so it doesn't also open a scope.
+  el.addEventListener(
+    "click",
+    (e) => {
+      if (moved) {
+        e.stopPropagation();
+        e.preventDefault();
+        moved = false;
+      }
+    },
+    true
+  );
+
+  // Called after each render: re-capture the fresh inner wrapper and clear state
+  // (innerHTML was rebuilt, so any prior transform/offset is gone).
+  function reset() {
+    velocity = 0;
+    over = 0;
+    dragArmed = false;
+    dragging = false;
+    moved = false;
+    el.classList.remove("dragging");
+    if (raf) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
+    inner = el.querySelector(".tl-inner");
+    if (inner) inner.style.transform = "";
+  }
+  el._resetOverscroll = reset;
+  reset();
 }
 
 function setScope(e) {
