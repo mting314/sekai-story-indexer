@@ -396,8 +396,10 @@ def test_multi_unit_cheerful_carnival_is_not_a_focus_event():
 
     events = [{"id": 60, "name": "Valentine CC", "startAt": 1000, "eventType": "cheerful_carnival"}]
     stories = {60: {"id": 160, "eventId": 60, "assetbundleName": "ab", "eventStoryEpisodes": []}}
+    # 3+ units -> seasonal collab, not a solo focus (a 2-unit CC would count)
     su = {160: [{"unit": "idol", "eventStoryUnitRelation": "main"},
-                {"unit": "light_sound", "eventStoryUnitRelation": "sub"}]}
+                {"unit": "light_sound", "eventStoryUnitRelation": "sub"},
+                {"unit": "theme_park", "eventStoryUnitRelation": "sub"}]}
     banner = {60: 7}  # Airi (MMJ) on banner, but it's a multi-unit collab
     cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
                         music_by_event={}, banner_char_by_event=banner)

@@ -148,7 +148,9 @@ def build_catalog(
         if rec["event_type"] == "marathon":
             rec["is_focus_event"] = banner_in_main_unit
         elif rec["event_type"] == "cheerful_carnival":
-            rec["is_focus_event"] = banner_in_main_unit and len(distinct_story_units) == 1
+            # a unit CC (focus unit + at most one guest unit) is a solo focus; a
+            # 3+-unit CC is a seasonal collab (Valentine/White Day/New Year).
+            rec["is_focus_event"] = banner_in_main_unit and len(distinct_story_units) <= 2
         else:
             rec["is_focus_event"] = False
         if not rec["is_focus_event"]:  # not a solo focus -> no focus attribution

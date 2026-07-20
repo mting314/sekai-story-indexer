@@ -1,6 +1,6 @@
 # Event → nickname, by character
 
-Banner+main-unit + single-unit-CC heuristic, with curated focus_overrides.json.
+Banner+main-unit; CC counts at <=2 units; curated focus_overrides.json.
 
 ### Ichika Hoshino — Leo/need (id 1) — 6
 | nick | date | type | event |
@@ -181,15 +181,16 @@ Banner+main-unit + single-unit-CC heuristic, with curated focus_overrides.json.
 | `kana5` | 2025-03-20 | marathon | Unreliable Notes |
 | `kana6` | 2026-01-11 | marathon | 覚めない幻想をノックして |
 
-### Mafuyu Asahina — Nightcord at 25:00 (id 18) — 6
+### Mafuyu Asahina — Nightcord at 25:00 (id 18) — 7
 | nick | date | type | event |
 |---|---|---|---|
 | `mafu1` | 2020-10-20 | marathon | 囚われのマリオネット |
 | `mafu2` | 2021-09-21 | marathon | 灯のミラージュ |
-| `mafu3` | 2022-06-10 | marathon | 迷い子の手を引く、そのさきは |
-| `mafu4` | 2023-07-11 | marathon | 仮面の私にさよならを |
-| `mafu5` | 2024-06-20 | marathon | 灯を手繰りよせて |
-| `mafu6` | 2025-04-30 | marathon | そして、針は動き出す |
+| `mafu3` | 2021-11-30 | cheerful_carnival | 交わる旋律 灯るぬくもり |
+| `mafu4` | 2022-06-10 | marathon | 迷い子の手を引く、そのさきは |
+| `mafu5` | 2023-07-11 | marathon | 仮面の私にさよならを |
+| `mafu6` | 2024-06-20 | marathon | 灯を手繰りよせて |
+| `mafu7` | 2025-04-30 | marathon | そして、針は動き出す |
 
 ### Ena Shinonome — Nightcord at 25:00 (id 19) — 7
 | nick | date | type | event |
@@ -202,15 +203,16 @@ Banner+main-unit + single-unit-CC heuristic, with curated focus_overrides.json.
 | `ena6` | 2025-10-31 | marathon | Colors of Pure Sense |
 | `ena7` | 2026-07-09 | marathon | 褪せない今を、彩って |
 
-### Mizuki Akiyama — Nightcord at 25:00 (id 20) — 6
+### Mizuki Akiyama — Nightcord at 25:00 (id 20) — 7
 | nick | date | type | event |
 |---|---|---|---|
 | `mizu1` | 2021-04-11 | marathon | シークレット・ディスタンス |
-| `mizu2` | 2022-08-20 | marathon | そしていま、リボンを結んで |
-| `mizu3` | 2023-04-30 | cheerful_carnival | ボク達の生存逃走 |
-| `mizu4` | 2024-10-12 | marathon | 荊棘の道は何処へ |
-| `mizu5` | 2025-08-22 | marathon | ほどけぬ明日に手を伸ばして |
-| `mizu6` | 2026-03-20 | marathon | Amid the Wavering Light |
+| `mizu2` | 2021-10-31 | cheerful_carnival | ボクのあしあと キミのゆくさき |
+| `mizu3` | 2022-08-20 | marathon | そしていま、リボンを結んで |
+| `mizu4` | 2023-04-30 | cheerful_carnival | ボク達の生存逃走 |
+| `mizu5` | 2024-10-12 | marathon | 荊棘の道は何処へ |
+| `mizu6` | 2025-08-22 | marathon | ほどけぬ明日に手を伸ばして |
+| `mizu7` | 2026-03-20 | marathon | Amid the Wavering Light |
 
 ### Hatsune Miku — Virtual Singer (id 21) — 0
 _(none)_
