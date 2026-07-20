@@ -316,3 +316,21 @@ def test_backfill_story_tree(tmp_path: Path):
     assert (
         story_root / "leo_need" / "event" / "0001-ameagari-no-suteppu" / "01_ameagari-no-suteppu.md"
     ).exists()
+
+
+def test_remap_summary_cache_keys(tmp_path):
+    """Backfill remaps arc_slug-keyed summary caches so they survive a rename."""
+    import json
+
+    from sekai_story_indexer.source.backfill_slugs import _remap_cache_keys
+
+    p = tmp_path / "event_summaries.json"
+    p.write_text(
+        json.dumps({"0097": {"summary": "x"}, "0100-keep": {"summary": "y"}}),
+        encoding="utf-8",
+    )
+    changed = _remap_cache_keys(p, {"0097": "0097-hashire"}, log=lambda m: None)
+    assert changed == 1
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert "0097-hashire" in data and "0097" not in data      # renamed
+    assert data["0100-keep"] == {"summary": "y"}              # unmapped key preserved

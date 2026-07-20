@@ -62,7 +62,8 @@ def backfill_slugs_command(
     stats = backfill_story_tree(story_root, events_index, story_order)
     typer.echo(
         f"Backfill complete: {stats['events_updated']} event slugs updated in index, "
-        f"{stats['dirs_renamed']} directories renamed, {stats['files_renamed']} files renamed."
+        f"{stats['dirs_renamed']} directories renamed, {stats['files_renamed']} files renamed, "
+        f"{stats['summaries_remapped']} summary-cache keys remapped."
     )
 
 

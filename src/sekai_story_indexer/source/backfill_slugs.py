@@ -16,14 +16,42 @@ from .transform import arc_slug, episode_filename
 _H1_TITLE_RE = re.compile(r"^#\s*(\d+)\.\s*(.*)$")
 
 
+def _remap_cache_keys(path: Path, slug_map: dict[str, str], log: Callable[[str], None]) -> int:
+    """Remap the top-level arc_slug keys of a summary cache ({arc_slug: value}) via
+    slug_map, so caches survive a slug rename. Returns the number of keys changed."""
+    if not path.exists():
+        return 0
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return 0
+    if not isinstance(data, dict):
+        return 0
+    changed = 0
+    remapped: dict = {}
+    for key, value in data.items():
+        new_key = slug_map.get(key, key)
+        if new_key != key:
+            changed += 1
+        remapped[new_key] = value
+    if changed:
+        path.write_text(json.dumps(remapped, ensure_ascii=False, indent=2), encoding="utf-8")
+        log(f"Remapped {changed} keys in {path}")
+    return changed
+
+
 def backfill_story_tree(
     story_root: Path = Path("story"),
     events_index_path: Path = Path("events_index.json"),
     story_order_path: Path = Path("story_order.yaml"),
+    summary_cache_paths: tuple[Path, ...] = (
+        Path("event_summaries.json"),
+        Path("episode_summaries.json"),
+    ),
     log: Callable[[str], None] = print,
 ) -> dict[str, int]:
     """Scans events_index.json and story_root, renames directories and episode files
-    using the current slugify() implementation, and updates index/order files.
+    using the current slugify() implementation, and updates index/order/summary files.
     """
     story_root = Path(story_root)
     events_index_path = Path(events_index_path)
@@ -33,6 +61,7 @@ def backfill_story_tree(
         "events_updated": 0,
         "dirs_renamed": 0,
         "files_renamed": 0,
+        "summaries_remapped": 0,
     }
 
     # 1. Update events_index.json
@@ -124,5 +153,11 @@ def backfill_story_tree(
                 encoding="utf-8",
             )
             log(f"Updated {story_order_path}")
+
+    # 4. Remap arc_slug-keyed summary caches (event/episode). unit_summaries.json is
+    #    keyed by unit, which doesn't change, so it's intentionally excluded.
+    if slug_map:
+        for cache_path in summary_cache_paths:
+            stats["summaries_remapped"] += _remap_cache_keys(Path(cache_path), slug_map, log)
 
     return stats
