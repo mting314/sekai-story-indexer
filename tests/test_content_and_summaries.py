@@ -66,3 +66,44 @@ def test_summarize_events_one_per_event(monkeypatch):
     assert out[0].metadata.arc_id == "0001"
     assert "0001" in out[0].text
     assert len(calls) == 1                      # exactly one LLM call for the event
+
+
+def test_load_local_summary_nodes(tmp_path):
+    """Local *_summaries.json caches -> embeddable StoryNodes at 3 tiers."""
+    import json
+
+    from sekai_story_indexer.indexer.local_summary_nodes import load_local_summary_nodes
+
+    (tmp_path / "story" / "vivid_bad_squad" / "event" / "0097-x").mkdir(parents=True)
+    (tmp_path / "story" / "vivid_bad_squad" / "event" / "0097-x" / "01.md").write_text("# e", encoding="utf-8")
+    (tmp_path / "events_index.json").write_text(
+        json.dumps([{"arc_slug": "0097-x", "unit": "vivid_bad_squad", "event_id": 97, "started_at": 1}]),
+        encoding="utf-8",
+    )
+    (tmp_path / "episode_summaries.json").write_text(
+        json.dumps({"0097-x": {"01": {"summary": "## Overview\nKohane{char_id=13} sings.", "characters": [13]}}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "event_summaries.json").write_text(
+        json.dumps({"0097-x": {"summary": "## Overview\nKohane{char_id=13} performs.", "characters": [13]}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "unit_summaries.json").write_text(
+        json.dumps({"vivid_bad_squad": {"summary": "## Overview\nVBS forms.", "characters": [13]}}),
+        encoding="utf-8",
+    )
+
+    import os
+    cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        nodes = load_local_summary_nodes(tmp_path / "story")
+    finally:
+        os.chdir(cwd)
+
+    by_level = {n.summary_level: n for n in nodes}
+    assert set(by_level) == {1, 2, 3}                       # unit, event, episode
+    assert all(n.metadata.unit == "vivid_bad_squad" for n in nodes)
+    assert all("char_id" not in n.text for n in nodes)      # inline tags stripped
+    assert by_level[2].metadata.arc_id == "0097-x"
+    assert by_level[3].metadata.parent_part_id == "0097-x:01"

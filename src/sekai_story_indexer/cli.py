@@ -681,8 +681,9 @@ def ingest(
     summaries: str = typer.Option(
         "event",
         "--summaries",
-        help="Summary strategy: 'event' (one per event story, recommended), "
-        "'hierarchical' (per-part/episode/year — expensive, mostly redundant here), "
+        help="Summary strategy: 'local' (embed the FREE locally-generated "
+        "episode/event/unit summaries — no generation cost), 'event' (one per "
+        "event via the API), 'hierarchical' (per-part/episode/year via the API), "
         "or 'none' (embed raw scenes only).",
     ),
 ):
@@ -745,6 +746,19 @@ def ingest(
     if mode == "none":
         summary_nodes = []
         console.print("[yellow]--summaries none: embedding raw scenes only.[/yellow]")
+    elif mode == "local":
+        from .indexer.local_summary_nodes import load_local_summary_nodes
+
+        summary_nodes = load_local_summary_nodes(story_path)
+        console.print(
+            f"Loaded {len(summary_nodes)} local summary nodes (episode+event+unit) "
+            "from *_summaries.json — embedding them, no generation cost."
+        )
+        if not summary_nodes:
+            console.print(
+                "[yellow]No local summaries found. Run scripts/summarize_ollama.py first "
+                "and copy episode_/event_/unit_summaries.json here.[/yellow]"
+            )
     elif mode == "event":
         from .indexer.event_summarizer import summarize_events
 
