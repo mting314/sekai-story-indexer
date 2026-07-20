@@ -402,3 +402,22 @@ def test_multi_unit_cheerful_carnival_is_not_a_focus_event():
     cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
                         music_by_event={}, banner_char_by_event=banner)
     assert cat[0]["is_focus_event"] is False
+
+
+def test_focus_override_forces_and_excludes():
+    # curated overrides: force a focus char (banner!=story lead), or force-exclude.
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    events = [{"id": 97, "name": "Light Up the Fire", "startAt": 1000, "eventType": "marathon"},
+              {"id": 98, "name": "Excluded", "startAt": 2000, "eventType": "marathon"}]
+    stories = {97: {"id": 197, "eventId": 97, "assetbundleName": "a", "eventStoryEpisodes": []},
+               98: {"id": 198, "eventId": 98, "assetbundleName": "b", "eventStoryEpisodes": []}}
+    su = {197: [{"unit": "street", "eventStoryUnitRelation": "main"}],
+          198: [{"unit": "street", "eventStoryUnitRelation": "main"}]}
+    banner = {97: 9, 98: 9}  # master DB banner = Kohane for both
+    cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
+                        music_by_event={}, banner_char_by_event=banner,
+                        focus_overrides={97: 10, 98: 0})
+    by = {r["event_id"]: r for r in cat}
+    assert by[97]["focus_character_id"] == 10 and by[97]["nickname"] == "an1"  # forced -> An
+    assert by[98]["is_focus_event"] is False and by[98]["focus_character_id"] == 0  # excluded

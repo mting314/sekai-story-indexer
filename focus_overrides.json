@@ -1,0 +1,4 @@
+{
+  "_comment": "event_id -> focus character id (0 = force-exclude). For events whose story protagonist differs from the master-DB banner artwork character. See docs/nickname_events_review.md.",
+  "97": 10
+}

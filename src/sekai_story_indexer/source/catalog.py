@@ -77,6 +77,25 @@ def event_record(
     }
 
 
+def load_focus_overrides(path: str = "focus_overrides.json") -> dict[int, int]:
+    """Curated ``event_id -> focus character id`` overrides (``0`` = force-exclude),
+    for events whose story protagonist differs from the master-DB banner artwork
+    character (which no single field distinguishes). Best-effort; missing/unreadable
+    file -> ``{}``."""
+    import json
+    from pathlib import Path
+
+    for candidate in (Path(path), Path(__file__).resolve().parents[3] / path):
+        if candidate.exists():
+            try:
+                data = json.loads(candidate.read_text(encoding="utf-8"))
+                # skip non-numeric keys (e.g. a "_comment") so docs don't break it
+                return {int(k): int(v) for k, v in data.items() if str(k).lstrip("-").isdigit()}
+            except Exception:
+                return {}
+    return {}
+
+
 def build_catalog(
     events: list[dict],
     *,
@@ -86,6 +105,7 @@ def build_catalog(
     banner_char_by_event: dict[int, int] | None = None,
     event_card_ids: dict[int, list[int]] | None = None,
     cards_by_id: dict[int, dict] | None = None,
+    focus_overrides: dict[int, int] | None = None,
     **_ignored: object,
 ) -> list[dict]:
     """Full enriched, chronologically-sorted catalog with nicknames assigned.
@@ -134,6 +154,15 @@ def build_catalog(
         if not rec["is_focus_event"]:  # not a solo focus -> no focus attribution
             rec["focus_character_id"] = 0
             rec["focus_character"] = ""
+        # Curated override for events the master DB can't disambiguate (the banner
+        # artwork char differs from the story protagonist — e.g. "Light Up the Fire"
+        # is An's story with Kohane banner art). event_id -> focus char id, or 0 to
+        # force-exclude. Applied before nickname numbering.
+        if focus_overrides and event["id"] in focus_overrides:
+            forced = focus_overrides[event["id"]]
+            rec["is_focus_event"] = forced != 0
+            rec["focus_character_id"] = forced if forced != 0 else 0
+            rec["focus_character"] = CHARACTER_ID_TO_JP.get(forced, "") if forced != 0 else ""
         records.append(rec)
 
     nicknames = assign_focus_nicknames(

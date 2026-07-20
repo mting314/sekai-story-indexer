@@ -68,10 +68,14 @@ def load_events() -> list[dict]:
 
     try:
         from sekai_story_indexer.source import client
-        from sekai_story_indexer.source.catalog import build_catalog
+        from sekai_story_indexer.source.catalog import build_catalog, load_focus_overrides
 
         tables = client.load_catalog_tables()
-        rows = build_catalog(tables["events"], **{k: tables[k] for k in tables if k != "events"})
+        rows = build_catalog(
+            tables["events"],
+            focus_overrides=load_focus_overrides(),
+            **{k: tables[k] for k in tables if k != "events"},
+        )
         indexed = _indexed_event_ids()
         for r in rows:
             r["indexed"] = r["event_id"] in indexed

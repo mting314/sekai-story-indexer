@@ -1,6 +1,6 @@
 # Event → nickname, by character
 
-Rule: marathon (banner in single main unit) + single-unit Cheerful Carnivals.
+Banner+main-unit + single-unit-CC heuristic, with curated focus_overrides.json.
 
 ### Ichika Hoshino — Leo/need (id 1) — 6
 | nick | date | type | event |
@@ -86,27 +86,27 @@ Rule: marathon (banner in single main unit) + single-unit Cheerful Carnivals.
 | `shizu5` | 2024-12-11 | marathon | Grow glorious glow |
 | `shizu6` | 2025-10-21 | marathon | 交わる色はあの日のままに |
 
-### Kohane Azusawa — Vivid BAD SQUAD (id 9) — 8
+### Kohane Azusawa — Vivid BAD SQUAD (id 9) — 7
 | nick | date | type | event |
 |---|---|---|---|
 | `koha1` | 2021-07-09 | marathon | Awakening Beat |
 | `koha2` | 2022-02-09 | marathon | Legend still vivid |
 | `koha3` | 2023-02-19 | marathon | Kick it up a notch |
-| `koha4` | 2023-06-10 | marathon | Light Up the Fire |
-| `koha5` | 2023-08-10 | marathon | On Your Feet |
-| `koha6` | 2024-06-30 | marathon | OVER RAD SQUAD!! |
-| `koha7` | 2025-05-31 | marathon | Aim higher and higher！ |
-| `koha8` | 2026-05-08 | marathon | Stay solid, No fold |
+| `koha4` | 2023-08-10 | marathon | On Your Feet |
+| `koha5` | 2024-06-30 | marathon | OVER RAD SQUAD!! |
+| `koha6` | 2025-05-31 | marathon | Aim higher and higher！ |
+| `koha7` | 2026-05-08 | marathon | Stay solid, No fold |
 
-### An Shiraishi — Vivid BAD SQUAD (id 10) — 6
+### An Shiraishi — Vivid BAD SQUAD (id 10) — 7
 | nick | date | type | event |
 |---|---|---|---|
 | `an1` | 2020-11-30 | marathon | いつか、背中あわせのリリックを |
 | `an2` | 2021-10-11 | marathon | Bout for Beside You |
 | `an3` | 2022-07-11 | marathon | The Vivid Old Tale |
-| `an4` | 2024-04-30 | marathon | Whip the wimp girl!! |
-| `an5` | 2025-07-31 | marathon | Competitive fire！ |
-| `an6` | 2026-04-09 | marathon | Show 'em what's up！ |
+| `an4` | 2023-06-10 | marathon | Light Up the Fire |
+| `an5` | 2024-04-30 | marathon | Whip the wimp girl!! |
+| `an6` | 2025-07-31 | marathon | Competitive fire！ |
+| `an7` | 2026-04-09 | marathon | Show 'em what's up！ |
 
 ### Akito Shinonome — Vivid BAD SQUAD (id 11) — 7
 | nick | date | type | event |
