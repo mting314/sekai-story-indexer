@@ -43,6 +43,7 @@ def _summarize_text(name: str, unit: str, body: str, model: str) -> str:
 
     rec = _EVENT_META.get(name, {})
     prompt = summary_prompt.build_prompt(
+        "event_raw",
         unit,
         body[:200_000],
         focus_id=rec.get("focus_character_id"),

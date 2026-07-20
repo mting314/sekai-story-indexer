@@ -1,19 +1,25 @@
-"""Shared event-summary prompt — one source of truth for every backend.
+"""Shared hierarchical summary prompt — one source of truth for every backend.
 
-Both the Google path (``indexer/event_summarizer.py``) and the standalone local
-scripts summarize with the SAME instructions: pin English output, give the model
-ground-truth group rosters so it never guesses membership, and inject per-event
-context (unit + focus character + song). Rosters are derived from the same
-``webapp/static/meta.json`` the web app uses, so names stay consistent.
+Mirrors the original linkura summarizer (``ahuei123456/linkura-story-indexer``,
+``indexer/summarizer.py``): tier-specific prompts (Episode -> Event -> Unit),
+each synthesizing the tier below, with a rolling PREVIOUS CONTEXT block for
+continuity, an OFFICIAL GLOSSARY of mandatory JP->EN translations, and an
+English-pinned system message.
+
+Our additions over linkura:
+  * ground-truth group ROSTERS (with ids), so the model never guesses membership;
+  * inline character tags ``Name{char_id=ID}`` on every mention, so the reader
+    colors names by exact span + id instead of guessing.
 
 NOTE: ``scripts/summarize_ollama.py`` keeps a self-contained copy of these
-strings (it must run on a machine without this package installed). Keep the two
-in sync — the wording here is canonical.
+strings (it must run without this package installed). This module is canonical —
+keep the two in sync.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 _META_CANDIDATES = (
@@ -36,6 +42,22 @@ _meta = _load_meta()
 ID_TO_EN: dict[int, str] = {int(cid): c["en"] for cid, c in _meta.get("characters", {}).items()}
 NAME_TO_ID: dict[str, int] = {c["en"]: int(cid) for cid, c in _meta.get("characters", {}).items()}
 UNIT_NAMES: dict[str, str] = {slug: u["name"] for slug, u in _meta.get("units", {}).items()}
+VALID_IDS: set[int] = set(ID_TO_EN)
+
+_UNIT_ORDER = [
+    "leo_need", "more_more_jump", "vivid_bad_squad",
+    "wonderlands_showtime", "nightcord", "virtual_singer",
+]
+_roster: dict[str, list[tuple[int, str]]] = {}
+for _cid, _c in _meta.get("characters", {}).items():
+    _roster.setdefault(_c.get("unit", "other"), []).append((int(_cid), _c["en"]))
+# Roster doubles as the id table AND a worked example of the tag format.
+ROSTER_TEXT = "\n".join(
+    f"- {UNIT_NAMES.get(slug, slug)}: "
+    + ", ".join(f"{en}{{char_id={cid}}}" for cid, en in _roster[slug])
+    for slug in _UNIT_ORDER
+    if slug in _roster
+) or "(rosters unavailable)"
 
 
 def _load_glossary() -> dict:
@@ -49,7 +71,6 @@ def _load_glossary() -> dict:
 
 
 def _glossary_text(g: dict) -> str:
-    """linkura-style 'JP -> EN' mandatory-translation block, by category."""
     lines: list[str] = []
     for cat, terms in g.items():
         if isinstance(terms, dict) and terms:
@@ -60,25 +81,17 @@ def _glossary_text(g: dict) -> str:
 
 GLOSSARY_TEXT = _glossary_text(_load_glossary())
 
-_UNIT_ORDER = [
-    "leo_need", "more_more_jump", "vivid_bad_squad",
-    "wonderlands_showtime", "nightcord", "virtual_singer",
-]
-_roster: dict[str, list[str]] = {}
-for _cid, _c in _meta.get("characters", {}).items():
-    _roster.setdefault(_c.get("unit", "other"), []).append(_c["en"])
-ROSTER_TEXT = "\n".join(
-    f"- {UNIT_NAMES.get(slug, slug)}: {', '.join(_roster[slug])}"
-    for slug in _UNIT_ORDER
-    if slug in _roster
-) or "(rosters unavailable)"
-
 SYSTEM = (
     "You are an expert archivist and translator indexing Japanese Project Sekai "
     "(Hatsune Miku: Colorful Stage!) event stories. You write all summaries in "
     "clear, concise ENGLISH — never Japanese. You use only the character names and "
     "group memberships given to you; you never invent characters or move a "
-    "character to a different group."
+    "character to a different group.\n\n"
+    "CHARACTER TAGGING (REQUIRED): every time you mention a character, write their "
+    "exact English name immediately followed by their id tag, e.g. "
+    "`Kohane Azusawa{char_id=13}` (and `Kohane{char_id=13}` for later short "
+    "references). Tag EVERY mention, in prose and bullets alike, using the ids from "
+    "the roster. Never tag a character with another character's id."
 )
 if GLOSSARY_TEXT:
     SYSTEM += (
@@ -87,51 +100,136 @@ if GLOSSARY_TEXT:
         "English equivalents:\n" + GLOSSARY_TEXT
     )
 
-PROMPT = """Character groups (ground truth — use these EXACT English names and do NOT reassign anyone to a different group):
-{roster}
+_GLOBAL_RULES = (
+    "Global formatting rules:\n"
+    "- Write in clear, concise English.\n"
+    "- Use exactly the required `## ` section headings for the tier, and emit every one.\n"
+    "- If a bullet-list section has no entries, write exactly `- None`.\n"
+    "- Tag every character mention as Name{char_id=ID}.\n"
+    "- Do not add extra sections, tables, or bold text."
+)
 
-{context}
+# Tier-specific required formats (markdown). Kept intentionally lighter than
+# linkura's (we want concise), but same structured spirit + our inline tags.
+_FORMATS = {
+    "episode": (
+        "Required Episode summary format:\n\n"
+        "## Overview\n"
+        "[2-4 sentences of concrete scene progression for THIS episode, inline-tagged.]\n\n"
+        "## Key Events\n"
+        "- [chronological beat, inline-tagged]\n\n"
+        "## Character Developments\n"
+        "- Name{char_id=ID}: [concrete emotional/relational/goal change]"
+    ),
+    "event": (
+        "Required Event summary format:\n\n"
+        "## Overview\n"
+        "[1-2 short paragraphs synthesizing the whole event arc, inline-tagged. "
+        "Do not copy the episode sections verbatim.]\n\n"
+        "## Key Events\n"
+        "- [major beat across the event, inline-tagged]\n\n"
+        "## Character Developments\n"
+        "- Name{char_id=ID}: [change across the event]"
+    ),
+    "unit": (
+        "Required Unit summary format:\n\n"
+        "## Overview\n"
+        "[1-2 short paragraphs on this group's overall story so far, inline-tagged.]\n\n"
+        "## Arc Progression\n"
+        "- [event name]: [one line of what it advances, inline-tagged]\n\n"
+        "## Character Arcs\n"
+        "- Name{char_id=ID}: [their through-line across events]"
+    ),
+}
 
-Summarize the Japanese event story below in 1-2 short paragraphs of clear ENGLISH prose. Focus on plot progression and character development. Do not invent anything that is not in the text. Write the summary in English only.
-
-Write clean prose only: no headings, numbered steps, bullet points, outlines, draft notes, or labels like "Paragraph 1" or "Refine". Do not describe your process.
-
-After the summary, list which of the characters above actually appear in this story (exact English names).
-
-Return ONLY a JSON object and nothing else:
-{{"summary": "<the English summary>", "characters": ["<name>", "<name>"]}}
-
-Story (Japanese):
-{body}"""
+# "event_raw" = summarize a whole event directly from raw text in one pass (the
+# Google single-shot path); it reuses the event output format.
+_FORMATS["event_raw"] = _FORMATS["event"]
+_INPUT_LABEL = {
+    "episode": "CURRENT EPISODE TEXT (RAW JAPANESE STORY)",
+    "event": "CURRENT EVENT INPUT (THIS EVENT'S EPISODE SUMMARIES)",
+    "event_raw": "CURRENT EVENT TEXT (RAW JAPANESE STORY)",
+    "unit": "CURRENT UNIT INPUT (THIS UNIT'S EVENT SUMMARIES)",
+}
+_INPUT_INSTR = {
+    "episode": "Summarize only this episode's source text; use previous context only to resolve references.",
+    "event": "Synthesize across the child episode summaries into one event-level summary. Do not concatenate or copy child sections verbatim.",
+    "event_raw": "Summarize the entire event story in one pass.",
+    "unit": "Synthesize across the event summaries into a unit-level through-line. Do not concatenate or copy child sections verbatim.",
+}
 
 
 def build_context(unit: str, focus_id: int | None = None, song: str | None = None) -> str:
-    """One-line ground-truth context: unit, focus character, featured song."""
     bits = [f"This is a {UNIT_NAMES.get(unit, unit)} event story."]
     if focus_id and int(focus_id) in ID_TO_EN:
-        bits.append(f"Its focus character is {ID_TO_EN[int(focus_id)]}.")
+        bits.append(f"Its focus character is {ID_TO_EN[int(focus_id)]}{{char_id={int(focus_id)}}}.")
     if song:
         bits.append(f'The featured song is "{song}".')
     return " ".join(bits)
 
 
-def build_prompt(unit: str, body: str, *, focus_id: int | None = None, song: str | None = None) -> str:
-    return PROMPT.format(roster=ROSTER_TEXT, context=build_context(unit, focus_id, song), body=body)
+def build_prompt(
+    tier: str,
+    unit: str,
+    current_text: str,
+    *,
+    prev_summary: str | None = None,
+    focus_id: int | None = None,
+    song: str | None = None,
+) -> str:
+    """Assemble a tier prompt. ``current_text`` is raw story text (episode tier) or
+    concatenated child summaries (event/unit tiers)."""
+    parts = [
+        "Character groups (ground truth — use these EXACT names and ids; do NOT reassign anyone):",
+        ROSTER_TEXT,
+        build_context(unit, focus_id, song),
+    ]
+    if prev_summary:
+        parts += [
+            "--- PREVIOUS CONTEXT (for continuity only) ---",
+            prev_summary.strip(),
+            "Use previous context only to resolve references, pronouns, chronology, and "
+            "ongoing situations. Do not re-summarize prior events or copy prior sections.",
+        ]
+    parts += [
+        f"--- {_INPUT_LABEL.get(tier, tier.upper())} ---",
+        current_text,
+        _INPUT_INSTR.get(tier, ""),
+        _GLOBAL_RULES,
+        _FORMATS[tier],
+        f"Write the {tier} summary now using exactly the required format, in English, with inline character tags.",
+    ]
+    return "\n\n".join(p for p in parts if p)
+
+
+_TAG_RE = re.compile(r"\{char_id=(\d+)\}")
+
+
+def extract_char_ids(markdown: str) -> list[int]:
+    """The inline tags ARE the character roster — derive validated ids from them."""
+    ids = {int(m) for m in _TAG_RE.findall(markdown or "")}
+    return sorted(i for i in ids if i in VALID_IDS)
+
+
+def clean_markdown(markdown: str) -> str:
+    """Drop any invalid {char_id=N} tags (unknown id) but keep the name text."""
+    return _TAG_RE.sub(lambda m: "" if int(m.group(1)) not in VALID_IDS else m.group(0), markdown or "")
 
 
 def parse_summary(out: str) -> dict:
-    """Extract {summary, characters:[ids]} from a model's JSON reply; fall back to
-    treating the whole text as the summary."""
-    import re
+    """Extract {summary(markdown), characters:[ids]} from a model reply.
 
+    Accepts a JSON envelope ``{"summary": "<markdown>"}`` or bare markdown."""
+    md = None
     m = re.search(r"\{.*\}", out or "", re.S)
     if m:
         try:
             obj = json.loads(m.group(0))
-            summ = (obj.get("summary") or "").strip()
-            chars = sorted({NAME_TO_ID[n] for n in obj.get("characters", []) if n in NAME_TO_ID})
-            if summ:
-                return {"summary": summ, "characters": chars}
+            if isinstance(obj, dict) and obj.get("summary"):
+                md = obj["summary"]
         except Exception:
-            pass
-    return {"summary": (out or "").strip(), "characters": []}
+            md = None
+    if md is None:
+        md = (out or "").strip()
+    md = clean_markdown(md).strip()
+    return {"summary": md, "characters": extract_char_ids(md)}
