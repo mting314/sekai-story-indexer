@@ -103,10 +103,11 @@ def build_catalog(
     """Full enriched, chronologically-sorted catalog with nicknames assigned.
 
     A true *focus event* (which counts toward a character's kaho5-style nickname
-    number) is a ``marathon`` event whose featured 4★ cards are all from ONE unit
-    — this excludes cross-unit collabs, Cheerful Carnival, and World Link, which
-    have a banner character but aren't anyone's solo focus event. Non-focus events
-    carry no focus/nickname.
+    number) is a ``marathon`` OR ``cheerful_carnival`` event whose featured 4★
+    cards are all from ONE unit — both have a single solo focus character and the
+    community numbers both. This still excludes cross-unit collabs and World Link
+    (multi-character banners), which aren't anyone's solo focus event. Non-focus
+    events carry no focus/nickname.
     """
     banner_char_by_event = banner_char_by_event or {}
     event_card_ids = event_card_ids or {}
@@ -125,7 +126,9 @@ def build_catalog(
             music=music_by_event.get(event["id"]),
         )
         units = _focus_units(event["id"], event_card_ids, cards_by_id)
-        rec["is_focus_event"] = rec["event_type"] == "marathon" and len(units) == 1
+        rec["is_focus_event"] = (
+            rec["event_type"] in ("marathon", "cheerful_carnival") and len(units) == 1
+        )
         if not rec["is_focus_event"]:  # not a solo focus -> no focus attribution
             rec["focus_character_id"] = 0
             rec["focus_character"] = ""

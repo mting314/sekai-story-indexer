@@ -334,3 +334,22 @@ def test_remap_summary_cache_keys(tmp_path):
     data = json.loads(p.read_text(encoding="utf-8"))
     assert "0097-hashire" in data and "0097" not in data      # renamed
     assert data["0100-keep"] == {"summary": "y"}              # unmapped key preserved
+
+
+def test_cheerful_carnival_single_unit_is_a_focus_event():
+    # Cheerful Carnival with a single-unit 4* focus counts toward nickname numbering
+    # (the community numbers CC events too) — regression for saki7-vs-saki6.
+    from sekai_story_indexer.source.catalog import build_catalog
+
+    events = [{"id": 30, "name": "CC", "startAt": 1000, "eventType": "cheerful_carnival"}]
+    stories = {30: {"id": 130, "eventId": 30, "assetbundleName": "ab", "eventStoryEpisodes": []}}
+    su = {130: [{"unit": "leo_need", "eventStoryUnitRelation": "main"}]}
+    banner = {30: 2}  # Saki
+    event_card_ids = {30: [1]}
+    cards_by_id = {1: {"id": 1, "characterId": 2, "cardRarityType": "rarity_4"}}  # Saki / Leo/need
+    cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
+                        music_by_event={}, banner_char_by_event=banner,
+                        event_card_ids=event_card_ids, cards_by_id=cards_by_id)
+    r = cat[0]
+    assert r["is_focus_event"] is True
+    assert r["focus_character_id"] == 2 and r["nickname"] == "saki1"
