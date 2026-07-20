@@ -28,19 +28,9 @@ from .transform import (
     scenario_to_lines,
     slugify,
     song_info,
+    story_type_for,
     tree_relpath,
 )
-
-
-def story_type_for(content_type: str) -> str:
-    """Map a Sekai content bucket onto the tier machinery's story-type axis. Each
-    bucket reads as itself (an event story is ``Event``); Sekai has no "side story"
-    (that was linkura), so unclassified buckets fall back to ``Other``."""
-    if content_type == "main":
-        return "Main"
-    return {"event": "Event", "unit": "Unit", "card": "Card", "area": "Area"}.get(
-        content_type, "Other"
-    )
 
 
 @dataclass

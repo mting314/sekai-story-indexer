@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 
 from ..models.story import StoryMetadata, StoryNode
+from ..source.transform import story_type_for
 from .parser import StoryParser
 
 
@@ -24,19 +25,6 @@ def episode_number_from_names(episode_name: str, part_name: str) -> int:
         if match:
             return int(match.group(1))
     return 0
-
-
-# The tier machinery keeps a coarse story-type axis. For Sekai we map each content
-# bucket onto its own readable value (an event story reads as "Event"). There is no
-# "side story" in Sekai — that was a linkura concept; unclassified paths fall back to
-# a neutral "Other".
-_CONTENT_STORY_TYPE = {"event": "Event", "unit": "Unit", "card": "Card", "area": "Area"}
-
-
-def _story_type_for(content_type: str) -> str:
-    if content_type == "main" or content_type.startswith("第"):
-        return "Main"
-    return _CONTENT_STORY_TYPE.get(content_type, "Other")
 
 
 class StoryProcessor:
@@ -70,7 +58,7 @@ class StoryProcessor:
             else:
                 raise IndexError("unsupported path depth under story")
 
-            story_type = _story_type_for(content_type)
+            story_type = story_type_for(content_type)
 
             parent_year_id, parent_episode_id, parent_part_id = _parent_ids(
                 unit, arc_id, story_type, ep_name, part_name

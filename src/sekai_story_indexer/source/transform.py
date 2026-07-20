@@ -62,6 +62,20 @@ def episode_filename(episode_no: int, title: str) -> str:
     return f"{episode_no:02d}_{tag}.md" if tag else f"{episode_no:02d}.md"
 
 
+# Canonical map from a Sekai content bucket to the tier machinery's story-type
+# axis. Sekai has no "side story" (that was a linkura Main/Side concept), so each
+# bucket reads as itself and unclassified paths fall back to a neutral "Other".
+# Shared by the fetcher (writes story_order.yaml) and the processor (reads the
+# tree) so the two never drift.
+_CONTENT_STORY_TYPE = {"event": "Event", "unit": "Unit", "card": "Card", "area": "Area"}
+
+
+def story_type_for(content_type: str) -> str:
+    if content_type == "main" or content_type.startswith("第"):
+        return "Main"
+    return _CONTENT_STORY_TYPE.get(content_type, "Other")
+
+
 def tree_relpath(unit: str, content_type: str, arc_slug_: str, episode_file: str) -> str:
     """Path under ``story/`` for one episode file."""
     return f"{unit}/{content_type}/{arc_slug_}/{episode_file}"
