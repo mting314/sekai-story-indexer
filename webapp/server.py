@@ -277,6 +277,53 @@ def episode_raw(arc: str, episode: str) -> dict:
     return {"title": title, "text": "\n".join(body_lines).strip()}
 
 
+# Live-scene fetch for the copyright-clean public deploy (derived index + live
+# quotes, see docs/derived-hosting.md): resolve a scene to its sekai.best coords
+# (scene_sources.json, written by `indexer fetch`) and fetch the transcript LIVE,
+# transiently — never stored. Lets a prose-free public host render/quote a scene
+# without rehosting the corpus. (Client-direct fetch would be even cleaner but
+# depends on sekai.best CORS; this thin proxy works regardless.)
+_scene_sources_cache: dict[str, Any] = {"map": None}
+
+
+def _scene_sources() -> dict:
+    if _scene_sources_cache["map"] is None:
+        env = os.environ.get("SEKAI_SCENE_SOURCES")
+        cands = [Path(env)] if env else [Path("scene_sources.json"), HERE.parent / "scene_sources.json"]
+        p = next((c for c in cands if c.exists()), None)
+        try:
+            _scene_sources_cache["map"] = json.loads(p.read_text(encoding="utf-8")) if p else {}
+        except Exception:
+            _scene_sources_cache["map"] = {}
+    return _scene_sources_cache["map"]  # type: ignore[return-value]
+
+
+def _fetch_scene_live(coords: dict, fetch=None) -> dict:
+    """Fetch + render one scene from sekai.best (transient). ``fetch`` injectable."""
+    from sekai_story_indexer.source import client
+    from sekai_story_indexer.source.transform import scenario_to_lines
+
+    fetch = fetch or (client.en_event_scenario if coords.get("region") == "en" else client.event_scenario)
+    try:
+        scenario = fetch(coords["bundle"], coords["scenario_id"])
+    except Exception:
+        return {"title": "", "text": ""}
+    lines = scenario_to_lines(scenario)
+    return {"title": "", "text": "\n".join(f"{sp}: {t}" if sp else t for sp, t in lines)}
+
+
+@app.get("/api/scene")
+def scene_live(arc: str, episode: str) -> dict:
+    """Transcript for a scene, fetched LIVE from sekai.best and not stored. Used by
+    the prose-free public deploy in place of /api/episode-raw."""
+    if not (_SLUG_RE.fullmatch(arc) and _SLUG_RE.fullmatch(episode)):
+        return {"title": episode, "text": ""}
+    coords = _scene_sources().get(f"{arc}/{episode}")
+    if not coords:
+        return {"title": episode, "text": ""}
+    return _fetch_scene_live(coords)
+
+
 class QueryRequest(BaseModel):
     question: str
     unit: str | None = None

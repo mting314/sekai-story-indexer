@@ -260,6 +260,10 @@ def fetch_and_write(
 
     plans: list[EventPlan] = []
     written_ids: set[int] = set()
+    # scene -> live-fetch coords for copyright-clean hosting (derived index +
+    # live quotes): "arc_slug/episode_stem" -> {bundle, scenario_id, region}. These
+    # are addressing info, not content, so they're safe to ship without the prose.
+    scene_sources: dict[str, dict] = {}
     for event in selected:
         story = stories_by_event.get(event["id"])
         if not story:
@@ -277,6 +281,9 @@ def fetch_and_write(
         en_ok = 0
         for ep in plan.episodes:
             out_path = story_root / ep.relpath
+            scene_sources[f"{plan.arc_slug}/{out_path.stem}"] = {
+                "bundle": ep.asset_bundle, "scenario_id": ep.scenario_id, "region": "jp",
+            }
             if skip_existing and out_path.exists() and out_path.stat().st_size > 0:
                 ok += 1  # already fetched — resumable
                 # Backfill the EN sidecar onto an existing corpus without
@@ -327,5 +334,12 @@ def fetch_and_write(
         json.dumps(catalog, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    log(f"wrote {order_path} and {index_path} ({len(plans)} trees / {len(catalog)} events)")
+    sources_path = story_root.parent / "scene_sources.json"
+    sources_path.write_text(
+        json.dumps(scene_sources, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    log(
+        f"wrote {order_path}, {index_path}, {sources_path} "
+        f"({len(plans)} trees / {len(catalog)} events / {len(scene_sources)} scene coords)"
+    )
     return plans

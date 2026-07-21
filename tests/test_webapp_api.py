@@ -423,3 +423,36 @@ def test_command_summarize_terse_char_number(client, tmp_path, monkeypatch):
     body = client.post("/api/command", json={"command": "/summarize minori 7"}).json()
     assert body["backend"] == "summary"
     assert "Minori's frontline" in body["answer"]
+
+
+# --- Live-scene fetch (derived-index public deploy: fetch, don't rehost) ------
+
+def test_fetch_scene_live_renders_from_injected_fetcher():
+    from webapp import server
+
+    scenario = {"TalkData": [
+        {"WindowDisplayName": "穂波", "Body": "弟もいるから"},
+        {"WindowDisplayName": "", "Body": "……"},
+    ]}
+    out = server._fetch_scene_live(
+        {"bundle": "b", "scenario_id": "s", "region": "jp"}, fetch=lambda ab, sid: scenario
+    )
+    assert out["text"] == "穂波: 弟もいるから\n……"
+
+
+def test_scene_live_endpoint_fetches_then_empty_for_unknown(client, monkeypatch):
+    from sekai_story_indexer.source import client as sclient
+    from webapp import server
+
+    monkeypatch.setattr(
+        server, "_scene_sources",
+        lambda: {"0001-x/05_y": {"bundle": "b", "scenario_id": "s", "region": "jp"}},
+    )
+    monkeypatch.setattr(
+        sclient, "event_scenario",
+        lambda ab, sid: {"TalkData": [{"WindowDisplayName": "A", "Body": "hi"}]},
+    )
+    r = client.get("/api/scene?arc=0001-x&episode=05_y")
+    assert r.status_code == 200 and "A: hi" in r.json()["text"]
+    # unknown scene -> empty (no coords, no fetch)
+    assert client.get("/api/scene?arc=9999-z&episode=00_none").json()["text"] == ""
