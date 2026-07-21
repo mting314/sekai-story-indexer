@@ -347,7 +347,14 @@ async function openTranscript(arc, episodeSlug, label, highlight) {
 // the excerpt view (e.g. event-summary citations).
 function openCitation(cite) {
   if (cite && cite.episode && cite.arc_id) {
-    openTranscript(cite.arc_id, cite.episode, cite.label || "Transcript", cite.quote || "");
+    // Prefer the exact cited line; else fall back to the retrieved scene's first
+    // content line so the transcript at least scrolls to the right region (the
+    // extractive picker can't match an English question to Japanese lines).
+    let hl = cite.quote;
+    if (!hl && cite.excerpt) {
+      hl = (cite.excerpt.split("\n").find((l) => l.trim() && !l.trim().startsWith("#")) || "").trim();
+    }
+    openTranscript(cite.arc_id, cite.episode, cite.label || "Transcript", hl || "");
   } else {
     openExcerpt(cite);
   }
