@@ -310,7 +310,7 @@ function eventHero(ev, node) {
 }
 
 // Open the right sidebar with an episode's raw transcript (fetched on demand).
-async function openTranscript(arc, episodeSlug, label) {
+async function openTranscript(arc, episodeSlug, label, highlight) {
   const sb = document.getElementById("sidebar");
   document.getElementById("sb-title").textContent = label;
   document.getElementById("sb-sub").textContent = "raw transcript";
@@ -325,9 +325,32 @@ async function openTranscript(arc, episodeSlug, label) {
     return;
   }
   document.getElementById("sb-title").textContent = data.title || label;
-  el.innerHTML = `<div class="answer-text">${renderMarkdown(data.text)}</div>`;
+  // Highlight a specific source line by bracketing it with sentinels BEFORE
+  // markdown-escaping, then swapping them for <mark> in the rendered HTML (so the
+  // match survives escaping and the citation's JP line matches the JP transcript).
+  let text = data.text;
+  if (highlight && text.includes(highlight)) {
+    text = text.replace(highlight, `⁦HL⁦${highlight}⁦LH⁦`);
+  }
+  let html = renderMarkdown(text)
+    .replaceAll("⁦HL⁦", "<mark>")
+    .replaceAll("⁦LH⁦", "</mark>");
+  el.innerHTML = `<div class="answer-text">${html}</div>`;
   decorateNames(el, new Set());
-  el.scrollTop = 0;
+  const mark = el.querySelector("mark");
+  if (mark) mark.scrollIntoView({ block: "center" });
+  else el.scrollTop = 0;
+}
+
+// A citation click: for a raw-scene citation (has episode slug + source line), open
+// the full episode transcript with that line highlighted; otherwise fall back to
+// the excerpt view (e.g. event-summary citations).
+function openCitation(cite) {
+  if (cite && cite.episode && cite.arc_id) {
+    openTranscript(cite.arc_id, cite.episode, cite.label || "Transcript", cite.quote || "");
+  } else {
+    openExcerpt(cite);
+  }
 }
 
 
@@ -878,7 +901,7 @@ function renderAssistant(container, res) {
       const cite = byRef[p.ref];
       if (cite) {
         q.title = `${cite.label} — click for the full scene`;
-        q.onclick = () => openExcerpt(cite);
+        q.onclick = () => openCitation(cite);
         const tag = document.createElement("span");
         tag.className = "quote-ref";
         tag.textContent = ` [${p.ref}]`;
@@ -899,7 +922,7 @@ function renderAssistant(container, res) {
       a.textContent = `[${c.ref}] ${c.label}`;
       a.onclick = (e) => {
         e.preventDefault();
-        openExcerpt(c);
+        openCitation(c);
       };
       sources.appendChild(a);
     }
@@ -911,7 +934,7 @@ function renderAssistant(container, res) {
     a.onclick = (e) => {
       e.preventDefault();
       const c = byRef[a.dataset.ref];
-      if (c) openExcerpt(c);
+      if (c) openCitation(c);
     };
   });
 }
@@ -1169,9 +1192,16 @@ function applyCommand(c) {
   input.focus();
 }
 
+// Grow the composer textarea with its content, up to the CSS max-height.
+function autoGrowInput() {
+  const el = document.getElementById("question");
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 160) + "px";
+}
+
 function wireCommandMenu() {
   const input = document.getElementById("question");
-  input.addEventListener("input", updateCommandMenu);
+  input.addEventListener("input", () => { updateCommandMenu(); autoGrowInput(); });
   input.addEventListener("keydown", (e) => {
     if (state.cmd.open) {
       const n = state.cmd.items.length;
@@ -1192,17 +1222,29 @@ function wireCommandMenu() {
       }
       return;
     }
-    // Terminal-style history recall when the menu is closed.
+    // Enter submits; Shift+Enter inserts a newline (textarea word-wraps).
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById("ask-form").requestSubmit();
+      return;
+    }
+    // Terminal-style history recall — only at the text boundaries so ↑/↓ still
+    // move the caret within multi-line input.
     const hist = state.inputHistory;
-    if (e.key === "ArrowUp" && hist.length) {
+    const atStart = input.selectionStart === 0 && input.selectionEnd === 0;
+    const atEnd =
+      input.selectionStart === input.value.length && input.selectionEnd === input.value.length;
+    if (e.key === "ArrowUp" && atStart && hist.length) {
       e.preventDefault();
       state.histIdx = Math.max(0, state.histIdx - 1);
       input.value = hist[state.histIdx];
+      autoGrowInput();
       input.setSelectionRange(input.value.length, input.value.length);
-    } else if (e.key === "ArrowDown" && state.histIdx < hist.length) {
+    } else if (e.key === "ArrowDown" && atEnd && state.histIdx < hist.length) {
       e.preventDefault();
       state.histIdx = Math.min(hist.length, state.histIdx + 1);
       input.value = state.histIdx === hist.length ? "" : hist[state.histIdx];
+      autoGrowInput();
       input.setSelectionRange(input.value.length, input.value.length);
     }
   });
@@ -1243,6 +1285,7 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   const q = input.value.trim();
   if (!q) return;
   input.value = "";
+  autoGrowInput(); // collapse the textarea back to one row
   if (state.inputHistory[state.inputHistory.length - 1] !== q) state.inputHistory.push(q);
   state.histIdx = state.inputHistory.length; // reset cursor to "current" (past end)
   addMessage("user", q);
