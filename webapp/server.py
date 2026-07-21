@@ -383,6 +383,22 @@ def _best_supporting_line(excerpt: str, answer: str) -> str:
     return best
 
 
+# Official-EN quote map (JP source line -> verbatim official English line), built
+# from the *.md.en sidecars the fetcher writes. Loaded once, lazily.
+_official_en_cache: dict[str, Any] = {"map": None}
+
+
+def _official_en_map() -> dict[str, str]:
+    if _official_en_cache["map"] is None:
+        try:
+            from sekai_story_indexer.query.official_en import load_official_en
+
+            _official_en_cache["map"] = load_official_en(_story_root())
+        except Exception:
+            _official_en_cache["map"] = {}
+    return _official_en_cache["map"]  # type: ignore[return-value]
+
+
 def _finalize_citations(
     nl: str, citations: list[dict], grounding: dict[int, str] | None = None
 ) -> tuple[str, list[dict]]:
@@ -416,6 +432,12 @@ def _finalize_citations(
             pinned = _best_supporting_line(excerpt, nl)
             if pinned:
                 c["quote"] = pinned
+        # Attach the verbatim official-EN counterpart of the pinned JP line, when
+        # that scene is localized — so the UI can show an authentic quote instead
+        # of the LLM's paraphrase (JP stays the fallback).
+        en = _official_en_map().get(c.get("quote", ""))
+        if en:
+            c["quote_en"] = en
         kept.append(c)
     if not kept:
         return nl, citations  # model didn't cite resolvably -> don't strip sources
