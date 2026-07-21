@@ -652,49 +652,39 @@ def build_local_engine(
 
 
 def _load_event_summaries(story_root: Path) -> dict[str, str]:
-    """Pre-computed event summaries (arc_id -> text) for the summarize shortcut.
+    """Pre-computed event summaries (arc_id -> text) for the summarize shortcut —
+    ONLY the current hierarchical store (``summaries_cache.json`` ``EVENT|<arc>``).
 
-    Prefer the hierarchical store (``summaries_cache.json`` ``EVENT|<arc>`` entries
-    — the current summarizer's output); fall back per-arc to the legacy flat
-    ``event_summaries.json`` for events not yet regenerated hierarchically. This is
-    what lets the local/streaming chat serve the newer hierarchical format where it
-    exists instead of only the frozen legacy file.
+    The frozen legacy ``event_summaries.json`` is no longer served: its summaries
+    were low-quality (truncated / thinking-leaks) and stale. Events without a
+    hierarchical summary intentionally have none here, so the generative backends
+    answer them by retrieving the scenes and synthesizing on the fly ("pull from
+    embedding"), rather than serving pre-baked prose.
     """
     import json
     import os
     import re
 
-    # Values may be bare strings (legacy flat cache) or {summary, characters}
-    # (structured/hierarchical) — normalize to text, stripping inline {char_id=N}
-    # tags so they don't pollute search.
-    def _text(v) -> str:
+    override = os.environ.get("SEKAI_SUMMARIES_CACHE")
+    candidates = (
+        [Path(override)] if override
+        else [Path("summaries_cache.json"), story_root.parent / "summaries_cache.json"]
+    )
+    cache: dict = {}
+    for candidate in candidates:
+        if candidate.exists():
+            try:
+                cache = json.loads(candidate.read_text(encoding="utf-8"))
+            except Exception:
+                cache = {}
+            break
+
+    def _text(v) -> str:  # normalize + strip inline {char_id=N} tags
         s = v if isinstance(v, str) else (v or {}).get("summary", "")
         return re.sub(r"\{char_id=\d+\}", "", s)
 
-    def _read(name: str, env: str | None = None) -> dict:
-        # Honor an env override (e.g. SEKAI_SUMMARIES_CACHE) so this matches the
-        # webapp's _hierarchical_cache_path — otherwise a non-default cache location
-        # is silently missed here and the chat falls back to the legacy store.
-        override = os.environ.get(env) if env else None
-        candidates = [Path(override)] if override else [Path(name), story_root.parent / name]
-        for candidate in candidates:
-            if candidate.exists():
-                try:
-                    return json.loads(candidate.read_text(encoding="utf-8"))
-                except Exception:
-                    return {}
-        return {}
-
-    # Legacy flat store: {arc: text | {summary, ...}}. (The old summarizer's
-    # truncated/leaky entries were dropped from the file once — see
-    # scripts/drop_truncated_summaries.py — so no runtime cleanup is needed here;
-    # events with no clean summary generate one on demand.)
-    merged = {arc: _text(v) for arc, v in _read("event_summaries.json").items()}
-    # Hierarchical store: {"EVENT|<arc>": {...}, "EPISODE|...": ...} — take the
-    # EVENT tier and let a non-empty hierarchical summary override the legacy one.
-    for key, v in _read("summaries_cache.json", "SEKAI_SUMMARIES_CACHE").items():
-        if key.startswith("EVENT|"):
-            text = _text(v)
-            if text.strip():
-                merged[key.split("|", 1)[1]] = text
-    return merged
+    out: dict[str, str] = {}
+    for key, v in cache.items():
+        if key.startswith("EVENT|") and _text(v).strip():
+            out[key.split("|", 1)[1]] = _text(v)
+    return out
