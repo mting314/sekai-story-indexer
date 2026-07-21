@@ -78,6 +78,36 @@ def test_glossary_bridge_enables_cross_lingual_query(tmp_path):
     assert r["citations"][0]["arc_id"] == "0002-x"
 
 
+def test_aux_query_bridges_arbitrary_vocabulary(tmp_path):
+    # A word NOT in any glossary (kinship etc.) reaches the JP scene only via the
+    # translated aux_query — proving the query-translation bridge that replaced the
+    # retired hand-maintained kinship map. Deterministic (aux_query passed directly).
+    d = tmp_path / "story" / "leo_need" / "event" / "0001-x"
+    d.mkdir(parents=True)
+    (d / "01.md").write_text("# 1\n\n穂波: 弟もいるから、慣れてるだけだよ\n", encoding="utf-8")
+    idx = [{"event_id": 1, "arc_slug": "0001-x", "indexed": True, "unit": "leo_need"}]
+    eng = build_local_engine(tmp_path / "story", idx)
+    # EN question alone -> no lexical overlap with the JP scene
+    assert not eng.query("Does she have a brother?")["citations"]
+    # with the JP translation supplied as aux_query -> the scene is retrieved
+    r = eng.query("Does she have a brother?", aux_query="弟はいますか")
+    assert r["citations"], "aux_query should bridge EN->JP retrieval"
+    assert r["citations"][0]["arc_id"] == "0001-x"
+
+
+def test_translation_disabled_falls_back_to_empty(monkeypatch):
+    from sekai_story_indexer.query import translate
+
+    # No key -> disabled -> "" so the caller stays lexical-only (evals deterministic)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    assert translate.translation_enabled() is False
+    assert translate.translate_to_japanese("Does she have a brother?") == ""
+    # Explicit opt-out flag disables it even with a key present
+    monkeypatch.setenv("GOOGLE_API_KEY", "x")
+    monkeypatch.setenv("SEKAI_TRANSLATE_QUERY", "0")
+    assert translate.translation_enabled() is False
+
+
 def test_scoped_query_falls_back_to_opening_when_no_lexical_overlap():
     eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
     # koha1 scopes to 0006-lyric (indexed); gibberish content words won't match,
