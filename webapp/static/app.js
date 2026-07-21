@@ -354,6 +354,12 @@ async function openTranscript(arc, episodeSlug, label, highlight, enQuote) {
 // the full episode transcript with that line highlighted; otherwise fall back to
 // the excerpt view (e.g. event-summary citations).
 function openCitation(cite) {
+  // Derived (prose-free public) backend: the citation carries sekai.best coords but
+  // no prose. Fetch the scene LIVE and highlight the exact line for the question.
+  if (cite && cite.source && cite.episode && cite.arc_id) {
+    openLiveScene(cite);
+    return;
+  }
   if (cite && cite.episode && cite.arc_id) {
     // Prefer the exact cited line; else fall back to the retrieved scene's first
     // content line so the transcript at least scrolls to the right region (the
@@ -366,6 +372,38 @@ function openCitation(cite) {
   } else {
     openExcerpt(cite);
   }
+}
+
+// Fetch a scene LIVE from sekai.best (prose-free public deploy) and render it in
+// the sidebar with the exact matching line highlighted. Prose is never stored here
+// — it's fetched transiently for display.
+async function openLiveScene(cite) {
+  const sb = document.getElementById("sidebar");
+  document.getElementById("sb-title").textContent = cite.label || "Scene";
+  document.getElementById("sb-sub").textContent = "fetched live from sekai.best";
+  const el = document.getElementById("sb-body");
+  el.innerHTML = '<p class="empty">Loading from sekai.best…</p>';
+  sb.classList.remove("hidden");
+  const url =
+    `/api/scene?arc=${encodeURIComponent(cite.arc_id)}&episode=${encodeURIComponent(cite.episode)}` +
+    `&q=${encodeURIComponent(state.lastQuery || "")}`;
+  const data = await fetch(url).then((r) => r.json()).catch(() => null);
+  if (!data || !data.text) {
+    el.innerHTML = '<p class="empty">Couldn\'t load this scene from sekai.best.</p>';
+    return;
+  }
+  let text = data.text;
+  if (data.quote && text.includes(data.quote)) {
+    text = text.replace(data.quote, () => `⁦HL⁦${data.quote}⁦LH⁦`);
+  }
+  el.innerHTML =
+    '<div class="answer-text">' +
+    renderMarkdown(text).replaceAll("⁦HL⁦", "<mark>").replaceAll("⁦LH⁦", "</mark>") +
+    "</div>";
+  decorateNames(el, new Set());
+  const mark = el.querySelector("mark");
+  if (mark) mark.scrollIntoView({ block: "center" });
+  else el.scrollTop = 0;
 }
 
 
@@ -1303,6 +1341,7 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   autoGrowInput(); // collapse the textarea back to one row
   if (state.inputHistory[state.inputHistory.length - 1] !== q) state.inputHistory.push(q);
   state.histIdx = state.inputHistory.length; // reset cursor to "current" (past end)
+  state.lastQuery = q; // for derived-backend live-scene line highlighting
   addMessage("user", q);
   const pending = addMessage("assistant", "");
   showThinking(pending);

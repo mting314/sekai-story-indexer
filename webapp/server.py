@@ -298,8 +298,10 @@ def _scene_sources() -> dict:
     return _scene_sources_cache["map"]  # type: ignore[return-value]
 
 
-def _fetch_scene_live(coords: dict, fetch=None) -> dict:
-    """Fetch + render one scene from sekai.best (transient). ``fetch`` injectable."""
+def _fetch_scene_live(coords: dict, q: str = "", fetch=None) -> dict:
+    """Fetch + render one scene from sekai.best (transient). When ``q`` is given,
+    also pick the exact best-matching source line as ``quote`` (over the transient
+    text — nothing stored). ``fetch`` injectable for tests."""
     from sekai_story_indexer.source import client
     from sekai_story_indexer.source.transform import scenario_to_lines
 
@@ -307,21 +309,24 @@ def _fetch_scene_live(coords: dict, fetch=None) -> dict:
     try:
         scenario = fetch(coords["bundle"], coords["scenario_id"])
     except Exception:
-        return {"title": "", "text": ""}
+        return {"title": "", "text": "", "quote": ""}
     lines = scenario_to_lines(scenario)
-    return {"title": "", "text": "\n".join(f"{sp}: {t}" if sp else t for sp, t in lines)}
+    text = "\n".join(f"{sp}: {t}" if sp else t for sp, t in lines)
+    quote = _best_supporting_line(text, q) if q else ""
+    return {"title": "", "text": text, "quote": quote}
 
 
 @app.get("/api/scene")
-def scene_live(arc: str, episode: str) -> dict:
-    """Transcript for a scene, fetched LIVE from sekai.best and not stored. Used by
-    the prose-free public deploy in place of /api/episode-raw."""
+def scene_live(arc: str, episode: str, q: str = "") -> dict:
+    """Transcript for a scene, fetched LIVE from sekai.best and not stored, plus the
+    exact matching line (``quote``) for ``q``. Used by the prose-free public deploy
+    in place of /api/episode-raw so a citation click highlights the precise line."""
     if not (_SLUG_RE.fullmatch(arc) and _SLUG_RE.fullmatch(episode)):
-        return {"title": episode, "text": ""}
+        return {"title": episode, "text": "", "quote": ""}
     coords = _scene_sources().get(f"{arc}/{episode}")
     if not coords:
-        return {"title": episode, "text": ""}
-    return _fetch_scene_live(coords)
+        return {"title": episode, "text": "", "quote": ""}
+    return _fetch_scene_live(coords, q=q)
 
 
 class QueryRequest(BaseModel):
@@ -621,6 +626,63 @@ def _query_full(req: QueryRequest, *, arc_ids: tuple[str, ...] = ()) -> dict:
                 "GOOGLE_API_KEY, or use SEKAI_QUERY_BACKEND=local."
             ),
         }
+
+
+# --- derived (prose-free public) backend -------------------------------------
+# Retrieves scene refs over the derived index (token counts, no prose) and answers
+# from OUR summaries; the exact quote is fetched LIVE on citation click via
+# /api/scene. Hosts no transcript prose. See docs/derived-hosting.md.
+_derived_cache: dict[str, Any] = {"index": None}
+
+
+def _derived_index() -> dict:
+    if _derived_cache["index"] is None:
+        from sekai_story_indexer.query.derived_index import load_derived_index
+
+        env = os.environ.get("SEKAI_DERIVED_INDEX")
+        cands = (
+            [Path(env)] if env
+            else [Path("derived_index.json.gz"), Path("derived_index.json"),
+                  HERE.parent / "derived_index.json.gz", HERE.parent / "derived_index.json"]
+        )
+        p = next((c for c in cands if c.exists()), None)
+        try:
+            _derived_cache["index"] = load_derived_index(p) if p else {"scenes": [], "idf": {}, "expansions": []}
+        except Exception:
+            _derived_cache["index"] = {"scenes": [], "idf": {}, "expansions": []}
+    return _derived_cache["index"]  # type: ignore[return-value]
+
+
+def _derived_answer(citations: list[dict]) -> str:
+    if not citations:
+        return "No matching scenes found. Try a character nickname (e.g. mafu1) or a unit."
+    path = _hierarchical_cache_path()
+    try:
+        cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except Exception:
+        cache = {}
+    entry = cache.get(f"EVENT|{citations[0]['arc_id']}")  # our summary of the top event
+    summary = (entry.get("summary") if isinstance(entry, dict) else entry) or ""
+    lead = summary.strip() + "\n\n" if summary.strip() else ""
+    scenes = "\n".join(f"[{c['ref']}] {c['label']}" for c in citations)
+    return f"{lead}Relevant scenes (open a citation to read the exact line on sekai.best):\n{scenes}"
+
+
+def _query_derived(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> dict:
+    from sekai_story_indexer.query.condense import condense
+    from sekai_story_indexer.query.derived_index import score_query
+
+    q = condense(req.question, req.history) if req.history else req.question
+    refs = score_query(_derived_index(), q, top_k=6, arc_ids=scope_arc_ids, unit=req.unit)
+    citations = [
+        {"ref": i + 1, "arc_id": r["arc_id"], "episode": r["episode"], "unit": r["unit"],
+         "label": r["label"], "nickname": r.get("nickname"), "source": r.get("source")}
+        for i, r in enumerate(refs)
+    ]
+    answer = _derived_answer(citations)
+    return {"answer": answer, "answer_parts": [{"type": "text", "text": answer}],
+            "characters": [], "citations": citations, "intent": "query",
+            "backend": "derived", "resolved_question": q, "error": None}
 
 
 def _characters_meta() -> dict:
@@ -1174,6 +1236,8 @@ def query(req: QueryRequest) -> dict:
 
     if QUERY_BACKEND == "full":
         result = _query_full(req, arc_ids=scope_arc_ids)
+    elif QUERY_BACKEND == "derived":
+        result = _query_derived(req, scope_arc_ids)
     else:
         try:
             result = _query_local(req, scope_arc_ids)
@@ -1215,6 +1279,17 @@ def _stream_events(req: QueryRequest):
         # here would need engine.stream_query wired through _structure_full_answer.
         result = _query_full(req, arc_ids=scope_arc_ids)
         yield _sse({"type": "meta", "backend": result.get("backend"), "focus": focus_d})
+        for piece in _chunk_text(result.get("answer") or ""):
+            yield _sse({"type": "delta", "text": piece})
+        _log_turn(_rag_log(log, result, scope_arc_ids, streamed=True))
+        yield _sse({"type": "done", **_with_focus(result, focus)})
+        return
+
+    if QUERY_BACKEND == "derived":
+        # Prose-free public backend: answer from summaries + scene refs (no LLM,
+        # no stored prose); the exact quote is fetched live on citation click.
+        result = _query_derived(req, scope_arc_ids)
+        yield _sse({"type": "meta", "backend": "derived", "focus": focus_d})
         for piece in _chunk_text(result.get("answer") or ""):
             yield _sse({"type": "delta", "text": piece})
         _log_turn(_rag_log(log, result, scope_arc_ids, streamed=True))

@@ -170,3 +170,22 @@ def test_budget_cover_keeps_head_and_tail():
     assert 0 in cover and 9 in cover  # opening AND finale survive
     assert cover == sorted(cover)  # reading order preserved
     assert len(cover) < 10  # middle dropped under budget
+
+
+def test_derived_index_gz_roundtrip_scope_and_coords(tmp_path):
+    from sekai_story_indexer.query.derived_index import (
+        build_derived_index,
+        load_derived_index,
+        score_query,
+        write_derived_index,
+    )
+
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    m0 = eng.nodes[0].metadata
+    coords = {f"{m0.arc_id}/{m0.episode_name}": {"bundle": "b", "scenario_id": "s", "region": "jp"}}
+    p = write_derived_index(build_derived_index(eng, coords), tmp_path / "d.json.gz")
+    idx = load_derived_index(p)  # gzip round-trip
+
+    refs = score_query(idx, "How does Kohane feel about singing?", arc_ids=("0006-lyric",))
+    assert refs and all(r["arc_id"] == "0006-lyric" for r in refs)  # scope filter honored
+    assert "source" in refs[0]  # live-fetch coords carried on refs

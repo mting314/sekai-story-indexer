@@ -50,6 +50,19 @@ def fetch_unit_stories_command(story_root: Path = typer.Option(Path("story"))):
     typer.echo(f"Wrote {n} unit-story episodes into {story_root}")
 
 
+@app.command("build-index")
+def build_index_command(
+    story_root: Path = typer.Option(Path("story")),
+    out: Path = typer.Option(Path("derived_index.json.gz"), help="Output (.gz to compress)"),
+):
+    """Build the prose-free derived index (token counts + coords, NO transcript
+    text) for copyright-clean public hosting. See docs/derived-hosting.md."""
+    from .query.derived_index import build_index_file
+
+    p = build_index_file(story_root, out_path=out)
+    typer.echo(f"wrote {p}")
+
+
 @app.command("backfill-slugs")
 def backfill_slugs_command(
     story_root: Path = typer.Option(Path("story")),

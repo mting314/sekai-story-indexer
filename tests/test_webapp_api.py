@@ -456,3 +456,24 @@ def test_scene_live_endpoint_fetches_then_empty_for_unknown(client, monkeypatch)
     assert r.status_code == 200 and "A: hi" in r.json()["text"]
     # unknown scene -> empty (no coords, no fetch)
     assert client.get("/api/scene?arc=9999-z&episode=00_none").json()["text"] == ""
+
+
+def test_query_derived_returns_scene_refs_without_prose(monkeypatch):
+    from webapp import server
+    from webapp.server import QueryRequest
+
+    idx = {
+        "scenes": [{
+            "id": 0, "arc_id": "0006-x", "episode": "01_y", "unit": "vivid_bad_squad",
+            "label": "VBS — Event [koha1] · Ep 1", "nickname": "koha1",
+            "source": {"bundle": "b", "scenario_id": "s", "region": "jp"},
+            "tf": {"kohane": 1, "sing": 1},
+        }],
+        "idf": {"kohane": 2.0, "sing": 2.0}, "expansions": [],
+    }
+    monkeypatch.setattr(server, "_derived_index", lambda: idx)
+    res = server._query_derived(QueryRequest(question="how does kohane sing"))
+    assert res["backend"] == "derived"
+    assert res["citations"] and res["citations"][0]["source"]["bundle"] == "b"
+    assert all("excerpt" not in c and "quote" not in c for c in res["citations"])  # no prose
+    assert res["answer"]  # a framing answer is produced

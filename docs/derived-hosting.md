@@ -36,9 +36,23 @@ fetched live from sekai.best when a user opens a citation.
   stored)** — a thin proxy (client-direct would be cleaner but depends on sekai.best
   CORS). Building `scene_sources.json` for real + validating the live fetch need a
   machine with sekai.best egress.
-- **Phase 3 (needs egress):** deploy artifacts ship **only** `derived_index.json`
-  + `summaries_cache.json` + `events_index.json` — **not** `story/`. Update the
-  Dockerfile accordingly. The image then contains zero transcript prose.
+- **Phase 3 (landed):** `SEKAI_QUERY_BACKEND=derived` serves retrieval over the
+  derived index (`query/derived_index.py` + `_query_derived`), answers from our
+  summaries, and citations carry sekai.best coords; the UI's `openLiveScene` fetches
+  the scene live and highlights the exact line. Build the artifact with
+  `sekai build-index` (→ `derived_index.json.gz`, no egress needed) and deploy with
+  `Dockerfile.derived`, which ships `derived_index.json.gz` + `summaries_cache.json`
+  + `events_index.json` + `scene_sources.json` + `glossary.json` — **no `story/`**,
+  zero transcript prose in the image.
+
+## Deploy (prose-free public)
+```bash
+uv run sekai build-index                       # -> derived_index.json.gz (from local corpus)
+docker build -f Dockerfile.derived -t sekai-public .
+docker run --rm -p 8000:8000 sekai-public      # SEKAI_QUERY_BACKEND=derived
+```
+The running host needs sekai.best egress (for the live-scene fetch). Answers are
+summary-grounded + scene-precise; clicking a citation reads the exact line live.
 
 ## Note on the existing Dockerfile
 The current `Dockerfile` bakes the full corpus — that's fine for **private/localhost**
