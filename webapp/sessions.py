@@ -51,15 +51,19 @@ def resolve_turn(
     referenced_arcs: tuple[str, ...],
     character_id: int | None,
     label: str | None,
-    followup: bool,
 ) -> tuple[Focus, tuple[str, ...]]:
     """Given the prior focus and what THIS turn names, return
     ``(new_focus, scope_arcs)``.
 
     * Turn names arcs -> switch focus to them (reset), scope to them.
-    * No arcs, is a follow-up, prior focus has arcs -> carry them (the win).
-    * No arcs, names a *different* character -> shift focus to that character,
-      drop the stale arc scope.
+    * Prior focus has arcs and this turn names no NEW event -> stay on it (arc
+      focus is *sticky*), even for a bare question that only names characters
+      ("when did Honami ask Kanade for help?"). The caller marks such a carried
+      scope as *soft* so retrieval falls back to a global search when the
+      question has no overlap with the remembered event — a real topic change
+      then self-heals without us having to detect it here. Update the in-focus
+      character when the turn names one, but keep the arcs.
+    * No prior arc focus, names a character -> set character focus, no scope.
     * Otherwise -> keep prior focus, apply no scope.
     """
     if referenced_arcs:
@@ -67,7 +71,9 @@ def resolve_turn(
             Focus(arcs=referenced_arcs, character_id=character_id, label=label),
             referenced_arcs,
         )
-    if followup and prev and prev.arcs:
+    if prev and prev.arcs:
+        if character_id is not None and character_id != prev.character_id:
+            return Focus(arcs=prev.arcs, character_id=character_id, label=prev.label), prev.arcs
         return prev, prev.arcs
     if character_id is not None and (prev is None or character_id != prev.character_id):
         return Focus(character_id=character_id, label=label), ()
