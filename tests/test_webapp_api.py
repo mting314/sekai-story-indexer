@@ -375,3 +375,10 @@ def test_command_scope_then_clear(client, monkeypatch):
     cleared = client.post("/api/command",
                           json={"command": "/clear", "session_id": "cmd-sess"}).json()
     assert cleared["focus"] is None
+
+
+def test_commands_catalog(client):
+    cmds = client.get("/api/commands").json()
+    names = {c["command"] for c in cmds}
+    assert {"help", "summarize", "lines", "song", "scope", "clear"} <= names
+    assert all({"command", "args", "desc"} <= set(c) for c in cmds)

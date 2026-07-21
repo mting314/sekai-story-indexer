@@ -6,6 +6,8 @@ const state = {
   view: "timeline", summaries: null, meta: { characters: {}, units: {} }, entityRe: null,
   sessionId: null,
   hier: null, // cached /api/hierarchical-summaries tree
+  commands: [], // /api/commands catalog for the slash-command menu
+  cmd: { open: false, items: [], active: 0 },
 };
 
 // Route external (sekai.best) art through the server image proxy so it loads even
@@ -36,6 +38,8 @@ async function boot() {
   state.units = units;
   state.events = events;
   state.meta = meta;
+  state.commands = await fetch("/api/commands").then((r) => r.json()).catch(() => []);
+  wireCommandMenu();
   buildEntityIndex();
   document.getElementById("tab-timeline").onclick = () => { state.view = "timeline"; renderCurrentView(); };
   document.getElementById("tab-summaries").onclick = () => { state.view = "summaries"; renderCurrentView(); };
@@ -1097,6 +1101,78 @@ async function streamAnswer(q, pending) {
     }
   }
   return done || { answer: text };
+}
+
+// --- Slash-command autocomplete menu (Claude-Code style) --------------------
+function _cmdMenu() {
+  return document.getElementById("cmd-menu");
+}
+
+function updateCommandMenu() {
+  const v = document.getElementById("question").value;
+  // Only while typing the command word: leading "/", letters, no space/args yet.
+  const m = /^\/([a-z]*)$/i.exec(v);
+  if (!m) return closeCommandMenu();
+  const prefix = m[1].toLowerCase();
+  const items = (state.commands || []).filter((c) => c.command.startsWith(prefix));
+  if (!items.length) return closeCommandMenu();
+  state.cmd = { open: true, items, active: 0 };
+  renderCommandMenu();
+}
+
+function renderCommandMenu() {
+  const el = _cmdMenu();
+  el.innerHTML = "";
+  state.cmd.items.forEach((c, i) => {
+    const row = document.createElement("div");
+    row.className = "cmd-item" + (i === state.cmd.active ? " active" : "");
+    row.setAttribute("role", "option");
+    row.innerHTML =
+      `<span class="cmd-name">/${escapeHtml(c.command)}</span>` +
+      (c.args ? ` <span class="cmd-args">${escapeHtml(c.args)}</span>` : "") +
+      `<span class="cmd-desc">${escapeHtml(c.desc)}</span>`;
+    // mousedown (not click) so the input doesn't blur before we apply.
+    row.onmousedown = (e) => { e.preventDefault(); applyCommand(c); };
+    el.appendChild(row);
+  });
+  el.classList.remove("hidden");
+}
+
+function closeCommandMenu() {
+  state.cmd = { open: false, items: [], active: 0 };
+  _cmdMenu().classList.add("hidden");
+}
+
+function applyCommand(c) {
+  const input = document.getElementById("question");
+  input.value = `/${c.command}` + (c.args ? " " : ""); // leave a space to type <event>
+  closeCommandMenu();
+  input.focus();
+}
+
+function wireCommandMenu() {
+  const input = document.getElementById("question");
+  input.addEventListener("input", updateCommandMenu);
+  input.addEventListener("keydown", (e) => {
+    if (!state.cmd.open) return;
+    const n = state.cmd.items.length;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      state.cmd.active = (state.cmd.active + 1) % n;
+      renderCommandMenu();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      state.cmd.active = (state.cmd.active - 1 + n) % n;
+      renderCommandMenu();
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault(); // complete instead of submitting
+      applyCommand(state.cmd.items[state.cmd.active]);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeCommandMenu();
+    }
+  });
+  input.addEventListener("blur", () => setTimeout(closeCommandMenu, 120));
 }
 
 // Chat slash commands (/summarize, /lines, /help, …) — posted to /api/command,

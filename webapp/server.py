@@ -824,15 +824,15 @@ class CommandRequest(BaseModel):
     unit: str | None = None
 
 
-# name -> one-line help (shown by /help; order preserved)
-_SLASH_COMMANDS: list[tuple[str, str]] = [
-    ("help", "List these commands"),
-    ("summarize <event>", "Event summary (e.g. /summarize mino7)"),
-    ("lines <event>", "Episode + dialogue-line counts for an event"),
-    ("characters <event>", "Cast (focus + speakers) of an event"),
-    ("song <event>", "The event's commissioned song + credits"),
-    ("scope <event>", "Pin the chat to an event; later questions stay scoped"),
-    ("clear", "Unpin the event focus"),
+# (name, args, one-line help) — drives /help, the /api/commands menu, and dispatch.
+_SLASH_COMMANDS: list[tuple[str, str, str]] = [
+    ("help", "", "List these commands"),
+    ("summarize", "<event>", "Event summary (e.g. /summarize mino7)"),
+    ("lines", "<event>", "Episode + dialogue-line counts for an event"),
+    ("characters", "<event>", "Cast (focus + speakers) of an event"),
+    ("song", "<event>", "The event's commissioned song + credits"),
+    ("scope", "<event>", "Pin the chat to an event; later questions stay scoped"),
+    ("clear", "", "Unpin the event focus"),
 ]
 
 
@@ -874,7 +874,9 @@ def _event_scene_files(arc: str):
 
 
 def _cmd_help(arg: str, req: CommandRequest) -> dict:
-    lines = ["**Chat commands**"] + [f"- `/{name}` — {desc}" for name, desc in _SLASH_COMMANDS]
+    lines = ["**Chat commands**"] + [
+        f"- `/{name}{(' ' + args) if args else ''}` — {desc}" for name, args, desc in _SLASH_COMMANDS
+    ]
     lines.append("\n`<event>` accepts a nickname (`mino7`) or defaults to the pinned focus.")
     return _command_response("\n".join(lines))
 
@@ -995,6 +997,12 @@ _COMMAND_DISPATCH = {
     "scope": _cmd_scope, "focus": _cmd_scope,
     "clear": _cmd_clear,
 }
+
+
+@app.get("/api/commands")
+def commands_list() -> list[dict]:
+    """Slash-command catalog for the chat autocomplete menu."""
+    return [{"command": name, "args": args, "desc": desc} for name, args, desc in _SLASH_COMMANDS]
 
 
 @app.post("/api/command")
