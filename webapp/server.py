@@ -176,84 +176,13 @@ def _summaries_path() -> Path:
     return next((p for p in candidates if p.exists()), candidates[-1])
 
 
-def _tier_path(name: str) -> Path:
-    for p in (Path(name), HERE.parent / name):
-        if p.exists():
-            return p
-    return Path(name)
-
-
 def _entry(value) -> dict:
-    """Normalize a summary cache value (bare string or {summary, characters})."""
+    """Normalize a summary cache value (bare string or {summary, characters}).
+    Still used by the live citation/metadata path (_structure_full_answer,
+    _metadata_intercept) which reads event_summaries.json."""
     if isinstance(value, str):
         return {"summary": value, "characters": []}
     return {"summary": (value or {}).get("summary", ""), "characters": (value or {}).get("characters", [])}
-
-
-@app.get("/api/summaries")
-def summaries() -> list[dict]:
-    """Browsable event summaries (from event_summaries.json), joined with the
-    events index for names/nicknames/dates, chronologically sorted."""
-    path = _summaries_path()
-    if not path.exists():
-        return []
-    by_arc = json.loads(path.read_text(encoding="utf-8"))
-    episodes_by_arc = json.loads(_tier_path("episode_summaries.json").read_text(encoding="utf-8")) \
-        if _tier_path("episode_summaries.json").exists() else {}
-    events_by_arc = {e.get("arc_slug"): e for e in load_events()}
-    out = []
-    for arc_id, value in by_arc.items():
-        ent = _entry(value)  # handles bare-string (old) or {summary, characters}
-        e = events_by_arc.get(arc_id, {})
-        out.append({
-            "arc_id": arc_id,
-            "name": e.get("name", arc_id),
-            "unit": e.get("unit", "unknown"),
-            "nickname": e.get("nickname"),
-            "started_at": e.get("started_at", 0),
-            "ended_at": e.get("ended_at", 0),
-            "regions": _regions_for(e),
-            "focus_character_id": e.get("focus_character_id", 0),
-            "song_title": e.get("song_title", ""),
-            "jacket_url": e.get("jacket_url", ""),
-            "is_key_story": e.get("is_key_story", False),
-            "logo_url": e.get("logo_url", ""),
-            "summary": ent["summary"],
-            "characters": ent["characters"],
-            "episode_count": len(episodes_by_arc.get(arc_id, {})),
-        })
-    out.sort(key=lambda r: (r.get("started_at", 0), r["arc_id"]))
-    return out
-
-
-@app.get("/api/episodes")
-def episodes(arc: str) -> list[dict]:
-    """Tier-1 episode summaries for one event, in reading order (lazy-loaded when
-    a card is expanded)."""
-    path = _tier_path("episode_summaries.json")
-    if not path.exists():
-        return []
-    eps = json.loads(path.read_text(encoding="utf-8")).get(arc, {})
-
-    def epnum(k: str) -> int:
-        m = re.match(r"(\d+)", k)
-        return int(m.group(1)) if m else 0
-
-    out = []
-    for key in sorted(eps, key=epnum):
-        ent = _entry(eps[key])
-        out.append({"episode": key, "summary": ent["summary"], "characters": ent["characters"]})
-    return out
-
-
-@app.get("/api/unit-summaries")
-def unit_summaries() -> dict:
-    """Tier-3 unit-level summaries, keyed by unit slug."""
-    path = _tier_path("unit_summaries.json")
-    if not path.exists():
-        return {}
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    return {u: _entry(v) for u, v in raw.items()}
 
 
 _EMPTY_HIERARCHY = {
