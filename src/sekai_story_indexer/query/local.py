@@ -49,13 +49,43 @@ _UNIT_KEYWORDS = {
 }
 
 
+# Common kinship vocabulary recurs across every unit but isn't in the story
+# glossary, so an EN query ("brother") never bridged to the JP forms. Map each EN
+# term to a curated set of distinctive JP search tokens — bare kanji unigrams
+# (searchable now that tokenize emits them) plus the distinctive お-prefix bigram —
+# deliberately excluding noisy honorific fragments (さん/ちゃん). Bridged both ways.
+_KINSHIP_EN_TO_JP: dict[str, list[str]] = {
+    "brother": ["兄", "弟", "お兄"],
+    "sister": ["姉", "妹", "お姉"],
+    "mother": ["母", "お母", "ママ"],
+    "mom": ["母", "お母", "ママ"],
+    "father": ["父", "お父", "パパ"],
+    "dad": ["父", "お父", "パパ"],
+    "parents": ["両親", "親"],
+    "family": ["家族"],
+    "grandmother": ["祖母"],
+    "grandma": ["祖母"],
+    "grandfather": ["祖父"],
+    "grandpa": ["祖父"],
+}
+# Reverse bridge: a JP query mentioning the bare kanji maps to the EN term.
+_KINSHIP_JP_TO_EN: dict[str, str] = {
+    "兄": "brother", "弟": "brother", "姉": "sister", "妹": "sister",
+    "母": "mother", "父": "father",
+}
+
+
 def tokenize(text: str) -> list[str]:
-    """ASCII words + CJK character bigrams — a language-agnostic lexical key set
-    that needs no tokenizer dependency (works for JP and EN)."""
+    """ASCII words + CJK unigrams AND bigrams — a language-agnostic lexical key set
+    that needs no tokenizer dependency (works for JP and EN). Unigrams let a short,
+    standalone kanji word (弟, 兄) be found even when it fuses with a following
+    particle into a bigram (弟も); bigrams keep multi-char phrase precision."""
     text = text.lower()
     tokens = _WORD_RE.findall(text)
     cjk = _CJK_RE.findall(text)
-    tokens += ["".join(pair) for pair in zip(cjk, cjk[1:])] if len(cjk) > 1 else cjk
+    tokens += cjk  # unigrams (single CJK chars)
+    if len(cjk) > 1:
+        tokens += ["".join(pair) for pair in zip(cjk, cjk[1:])]  # adjacent bigrams
     return tokens
 
 
@@ -116,6 +146,11 @@ class LocalQueryEngine:
                 if jp_toks and en_toks:
                     self._expansions.append((frozenset(en_toks), jp_toks))
                     self._expansions.append((frozenset(jp_toks), en_toks))
+        # Kinship vocabulary (brother/兄/弟 …) — not in the story glossary but common.
+        for en, jp_forms in _KINSHIP_EN_TO_JP.items():
+            self._expansions.append((frozenset({en}), jp_forms))
+        for jp_kanji, en in _KINSHIP_JP_TO_EN.items():
+            self._expansions.append((frozenset({jp_kanji}), [en]))
         # Contextual retrieval (deterministic, free): index each scene as its
         # situating context (nickname / "character X's Nth focus event" / unit /
         # song) + the raw text, so those queries match by meaning. Only the token
