@@ -36,6 +36,7 @@ from .analysis import (
     QueryAnalysis,
     analyze_query,
 )
+from .scoping import ScopeIndex
 
 if TYPE_CHECKING:
     from sekai_story_indexer.query.agent import QueryAgent
@@ -156,6 +157,7 @@ class StoryQueryEngine:
         state_file: str = "world_state.json",
         glossary_file: str = "glossary.json",
         summary_cache_file: str = "summaries_cache.json",
+        events_index_file: str = "events_index.json",
         retrieval_config: RetrievalConfig | None = None,
         query_router: "QueryRouter | None" = None,
         query_agent: "QueryAgent | None" = None,
@@ -180,6 +182,15 @@ class StoryQueryEngine:
                 self.glossary = json.load(f)
 
         self.event_summaries = load_event_summaries(summary_cache_file)
+
+        # Community-nickname / World-Link / event scope resolver, so a full-engine
+        # query like "ena7" scopes retrieval to that event's arc (same resolver the
+        # local backend uses). Metadata filter only — no re-embedding.
+        events_index: list[dict] | None = None
+        if os.path.exists(events_index_file):
+            with open(events_index_file, encoding="utf-8") as f:
+                events_index = json.load(f)
+        self.scope_index = ScopeIndex(events_index)
 
     def _expanded_question(self, question: str) -> str:
         return expand_query_with_glossary(question, self.glossary)
@@ -2309,6 +2320,19 @@ class StoryQueryEngine:
                 if analysis is None
                 else replace(analysis, arc_ids=scope_arc_ids)
             )
+        elif not (analysis and analysis.arc_ids) and getattr(self, "scope_index", None):
+            # No caller scope and the analyzer found no explicit arc — try resolving a
+            # community nickname / World-Link / event reference from the question
+            # (e.g. "ena7" -> its arc) and constrain retrieval via the same arc_ids
+            # machinery (a chroma_where metadata filter; no re-embedding).
+            scope = self.scope_index.resolve(question)
+            resolved = scope.arc_ids or ((scope.arc_id,) if scope.arc_id else ())
+            if resolved:
+                analysis = (
+                    QueryAnalysis(arc_ids=resolved)
+                    if analysis is None
+                    else replace(analysis, arc_ids=resolved)
+                )
         expanded_question = self._expanded_question(question)
         query_embedding = self._query_embedding(expanded_question)
         retrieved_nodes = self._raw_only_retrieve(
