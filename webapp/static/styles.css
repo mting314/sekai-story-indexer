@@ -239,6 +239,8 @@ a.cite:hover { text-decoration: underline; }
 .routing-step.done { opacity: .45; }
 .routing-step.active { opacity: .85; font-style: italic; }
 .routing-step.done::first-letter { color: var(--accent); }
+/* faded subtext: which backend produced the answer */
+.backend-note { margin-top: 8px; font-size: 11px; color: var(--muted); opacity: .55; letter-spacing: .02em; }
 .typing { display: inline-flex; gap: 5px; align-items: center; padding: 2px 0; }
 .typing span {
   width: 7px; height: 7px; border-radius: 50%; background: var(--accent);

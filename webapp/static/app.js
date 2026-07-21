@@ -952,6 +952,17 @@ function showRouting(el, steps) {
 
 // Render a rich assistant answer: text runs + clickable quote blocks that open
 // the excerpt sidebar, plus a compact source list.
+// Human label for the backend that produced an answer (shown as faded subtext).
+function backendLabel(res) {
+  switch (res.backend) {
+    case "derived": return "derived · summaries + live quotes (no LLM)";
+    case "full": return "full RAG · Gemini";
+    case "summary": return "pre-computed event summary";
+    case "local": return res.generated ? "local · AI-synthesized" : "local · extractive";
+    default: return res.backend || "";
+  }
+}
+
 function renderAssistant(container, res) {
   container.classList.remove("thinking");
   container.textContent = "";
@@ -1012,6 +1023,15 @@ function renderAssistant(container, res) {
       sources.appendChild(a);
     }
     container.appendChild(sources);
+  }
+
+  // Faded subtext: which backend answered (transparency about how the reply was
+  // produced — derived/local/full + whether it was AI-synthesized).
+  if (res.backend && res.backend !== "command") {
+    const note = document.createElement("div");
+    note.className = "backend-note";
+    note.textContent = `via ${backendLabel(res)}`;
+    container.appendChild(note);
   }
 
   // Wire inline [n] citations in the answer to open + highlight their excerpt.
