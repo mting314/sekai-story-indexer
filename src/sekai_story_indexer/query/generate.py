@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -44,6 +45,35 @@ _STYLE = (
     'keep it secret ("I\'ll never tell anyone how I feel") [3]. Keep quotes to one '
     "line; the citation still points to the exact source line."
 )
+
+
+# Per-citation grounding: after the prose, the model emits the exact verbatim JP
+# source line it grounded each [n] on, so the UI can highlight that line in the
+# transcript. Kept out of the visible answer (parsed off / held back from stream).
+_SOURCES_MARK = "@@SOURCES@@"
+_GROUNDING = (
+    "\n\nAfter the answer, output a line containing exactly `@@SOURCES@@`, then for "
+    "each citation number [n] you used, a line formatted `[n] <line>` where <line> is "
+    "the EXACT verbatim source line from the evidence above that you grounded that "
+    "citation on — copied character-for-character in its original Japanese (no "
+    "translation, no paraphrase, a single physical line). Skip any [n] you did not "
+    "ground on one specific line."
+)
+_GROUNDING_LINE_RE = re.compile(r"^\s*\[(\d+)\]\s*(.+?)\s*$")
+
+
+def _parse_grounding(text: str) -> tuple[str, dict[int, str]]:
+    """Split a generated answer into (visible prose, {ref -> verbatim source line})."""
+    idx = text.find(_SOURCES_MARK)
+    if idx < 0:
+        return text.strip(), {}
+    prose = text[:idx].strip()
+    grounding: dict[int, str] = {}
+    for line in text[idx + len(_SOURCES_MARK):].splitlines():
+        m = _GROUNDING_LINE_RE.match(line)
+        if m:
+            grounding.setdefault(int(m.group(1)), m.group(2).strip())
+    return prose, grounding
 
 
 def generation_available() -> bool:
@@ -128,6 +158,7 @@ def _build_prompts(
     user = render_user_prompt(
         context_kind="raw", question=question, context=_context(citations)
     )
+    user += _GROUNDING  # ask for the verbatim per-citation source lines
     return system, user
 
 
@@ -141,8 +172,9 @@ def generate_answer(
     *,
     glossary: dict | None = None,
     model: str | None = None,
-) -> str | None:
-    """Synthesize a grounded NL answer, or None to fall back to extractive."""
+) -> tuple[str, dict[int, str]] | None:
+    """Synthesize a grounded NL answer as ``(prose, {ref -> source line})``, or None
+    to fall back to extractive."""
     if not citations or not generation_available():
         return None
     try:
@@ -162,7 +194,9 @@ def generate_answer(
             ),
         )
         text = (resp.text or "").strip()
-        return text or None
+        if not text:
+            return None
+        return _parse_grounding(text)
     except Exception:
         return None  # any API/quota/network error -> caller keeps extractive answer
 
@@ -173,10 +207,13 @@ def generate_answer_stream(
     *,
     glossary: dict | None = None,
     model: str | None = None,
+    grounding_out: dict[int, str] | None = None,
 ):
-    """Yield the grounded NL answer as text deltas (real token streaming). Yields
-    nothing when generation is unavailable, so the caller falls back to chunking
-    the extractive answer."""
+    """Yield the grounded NL answer as text deltas (real token streaming), holding
+    back the trailing ``@@SOURCES@@`` grounding block so it never reaches the user;
+    the parsed ``{ref -> source line}`` map is written into ``grounding_out``. Yields
+    nothing when generation is unavailable, so the caller falls back to chunking the
+    extractive answer."""
     if not citations or not generation_available():
         return
     try:
@@ -185,6 +222,10 @@ def generate_answer_stream(
 
         system, user = _build_prompts(question, citations, glossary)
         client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+        full = ""
+        emitted = 0
+        cut: int | None = None  # index where @@SOURCES@@ begins (stop emitting there)
+        hold = len(_SOURCES_MARK) - 1  # never emit a partial marker prefix
         for chunk in client.models.generate_content_stream(
             model=_resolved_model(model),
             contents=user,
@@ -193,7 +234,21 @@ def generate_answer_stream(
             ),
         ):
             piece = getattr(chunk, "text", None)
-            if piece:
-                yield piece
+            if not piece:
+                continue
+            full += piece
+            if cut is None:
+                idx = full.find(_SOURCES_MARK)
+                if idx >= 0:
+                    cut = idx
+            limit = cut if cut is not None else max(emitted, len(full) - hold)
+            if limit > emitted:
+                yield full[emitted:limit]
+                emitted = limit
+        if cut is None and len(full) > emitted:  # no marker -> flush the held-back tail
+            yield full[emitted:]
+        _, grounding = _parse_grounding(full)
+        if grounding_out is not None:
+            grounding_out.update(grounding)
     except Exception:
         return  # caller falls back to the extractive answer

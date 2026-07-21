@@ -376,11 +376,14 @@ def _best_supporting_line(excerpt: str, answer: str) -> str:
     return best
 
 
-def _finalize_citations(nl: str, citations: list[dict]) -> tuple[str, list[dict]]:
+def _finalize_citations(
+    nl: str, citations: list[dict], grounding: dict[int, str] | None = None
+) -> tuple[str, list[dict]]:
     """Keep only the citations the answer actually references, in first-cited order,
     renumber them contiguously, rewrite the answer's [n], and pin each kept citation
-    to its most-relevant supporting line. Leaves things unchanged if the model cited
-    nothing resolvable (so we never blank the sources)."""
+    to its supporting source line. Prefers the model's verbatim grounding line (when
+    it's actually present in that cited scene), else a lexical fallback. Leaves things
+    unchanged if the model cited nothing resolvable (so we never blank the sources)."""
     refs: list[int] = []
     for m in re.findall(r"\[(\d+)\]", nl):
         r = int(m)
@@ -395,9 +398,17 @@ def _finalize_citations(nl: str, citations: list[dict]) -> tuple[str, list[dict]
             continue
         remap[old] = len(kept) + 1
         c = {**c, "ref": remap[old]}
-        pinned = _best_supporting_line(c.get("excerpt", ""), nl)
-        if pinned:
-            c["quote"] = pinned
+        excerpt = c.get("excerpt", "")
+        # The model's verbatim JP grounding line — but only if it really appears in
+        # the cited scene (guards against paraphrase/hallucination mis-highlighting);
+        # otherwise fall back to the lexical best-line.
+        line = (grounding or {}).get(old, "")
+        if line and line in excerpt:
+            c["quote"] = line
+        else:
+            pinned = _best_supporting_line(excerpt, nl)
+            if pinned:
+                c["quote"] = pinned
         kept.append(c)
     if not kept:
         return nl, citations  # model didn't cite resolvably -> don't strip sources
@@ -409,8 +420,8 @@ def _finalize_citations(nl: str, citations: list[dict]) -> tuple[str, list[dict]
     return nl2, kept
 
 
-def _apply_generated_answer(result: dict, nl: str) -> None:
-    nl, kept = _finalize_citations(nl, result.get("citations") or [])
+def _apply_generated_answer(result: dict, nl: str, grounding: dict[int, str] | None = None) -> None:
+    nl, kept = _finalize_citations(nl, result.get("citations") or [], grounding)
     result["answer"] = nl
     result["citations"] = kept
     # prose + a supporting-quote block per cited source (the exact line, [ref]).
@@ -445,9 +456,10 @@ def _query_local(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> dict
     if _can_generate_over(result):
         from sekai_story_indexer.query.generate import generate_answer
 
-        nl = generate_answer(result["resolved_question"], result["citations"])
-        if nl:
-            _apply_generated_answer(result, nl)
+        gen = generate_answer(result["resolved_question"], result["citations"])
+        if gen:
+            nl, grounding = gen
+            _apply_generated_answer(result, nl, grounding)
     if not result.get("generated"):
         _trim_extractive_citations(result)
     return result
@@ -1117,14 +1129,17 @@ def _stream_events(req: QueryRequest):
                 "scope": result.get("scope"), "focus": focus_d})
 
     streamed = ""
+    grounding: dict[int, str] = {}
     if not result.get("pre_summarized") and _can_generate_over(result):
         from sekai_story_indexer.query.generate import generate_answer_stream
 
-        for piece in generate_answer_stream(result["resolved_question"], result["citations"]):
+        for piece in generate_answer_stream(
+            result["resolved_question"], result["citations"], grounding_out=grounding
+        ):
             streamed += piece
             yield _sse({"type": "delta", "text": piece})
     if streamed:
-        _apply_generated_answer(result, streamed)
+        _apply_generated_answer(result, streamed, grounding)
     else:  # extractive / pre-summarized / no key -> chunk the computed answer
         if result.get("pre_summarized"):
             result["generated"] = True
