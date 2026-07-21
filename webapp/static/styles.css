@@ -62,6 +62,14 @@ main {
 /* verbatim official-English quote shown above a JP transcript */
 .en-quote { margin: 0 0 10px; padding: 8px 10px; border-left: 3px solid var(--accent); background: #ffffff0a; border-radius: 4px; font-size: 13.5px; line-height: 1.5; color: var(--text); }
 .en-quote-label { display: inline-block; margin-right: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+/* visual-novel transcript: one chat bubble per line, speaker-colored + icon */
+.vn { display: flex; flex-direction: column; gap: 9px; }
+.vn-line { padding: 8px 12px 9px; border-radius: 12px; background: #ffffff0a; border-left: 3px solid var(--vn-color, #3a3f4b); }
+.vn-speaker { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; margin-bottom: 3px; line-height: 1.2; }
+.vn-ic { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; background: #0006; }
+.vn-text { font-size: 14px; line-height: 1.55; color: var(--text); white-space: pre-wrap; }
+.vn-narr { align-self: center; text-align: center; font-style: italic; color: var(--muted); font-size: 12.5px; padding: 1px 10px; max-width: 90%; }
+.vn-hit { background: #ffcf3320; border-left-color: #ffcf33; box-shadow: 0 0 0 1px #ffcf3344; }
 #ask-form { display: flex; gap: 8px; position: relative; align-items: flex-end; }
 #ask-form textarea { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #2b2f3a; background: #0c0e14; color: var(--text); font: inherit; line-height: 1.4; resize: none; overflow-y: auto; max-height: 160px; white-space: pre-wrap; word-break: break-word; }
 #ask-form button { align-self: flex-end; }
