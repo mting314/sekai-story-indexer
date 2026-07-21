@@ -925,19 +925,37 @@ def _cmd_summarize(arg: str, req: CommandRequest) -> dict:
     if not ev:
         return _command_response("Couldn't resolve that event — try e.g. `/summarize mino7`.")
     arc = ev.get("arc_slug")
+    # Fast path: a pre-baked hierarchical summary, served directly.
     path = _hierarchical_cache_path()
     cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     entry = cache.get(f"EVENT|{arc}")
     summary = (entry.get("summary") if isinstance(entry, dict) else entry) or ""
-    if not summary.strip():
+    if summary.strip():
+        citations = [{
+            "ref": 1, "arc_id": arc, "label": f"{ev.get('name')} — event summary",
+            "episode_title": "Event summary", "nickname": ev.get("nickname"), "excerpt": summary,
+        }]
+        return _command_response(summary, backend="summary", citations=citations)
+    # No baked hierarchical summary -> delegate to the normal retrieval path scoped to
+    # this event: serves a legacy event_summaries.json entry (via the merged loader) or
+    # generates one on the fly from the retrieved scenes, so /summarize never falsely
+    # claims a summary is impossible for an event whose story is on disk.
+    qreq = QueryRequest(
+        question=f"summarize {ev.get('nickname') or ev.get('name') or arc}",
+        session_id=req.session_id,
+    )
+    result = _query_local(qreq, (arc,) if arc else ())
+    answer = (result.get("answer") or "").strip()
+    if not answer:
         return _command_response(
-            f"No summary generated yet for **{ev.get('name')}** ({ev.get('nickname') or arc})."
+            f"Couldn't summarize **{ev.get('name')}** ({ev.get('nickname') or arc}) "
+            "— no story on disk for it."
         )
-    citations = [{
-        "ref": 1, "arc_id": arc, "label": f"{ev.get('name')} — event summary",
-        "episode_title": "Event summary", "nickname": ev.get("nickname"), "excerpt": summary,
-    }]
-    return _command_response(summary, backend="summary", citations=citations)
+    return _command_response(
+        answer,
+        backend=result.get("backend") or "summary",
+        citations=result.get("citations") or [],
+    )
 
 
 def _cmd_lines(arg: str, req: CommandRequest) -> dict:
