@@ -95,6 +95,31 @@ def test_aux_query_bridges_arbitrary_vocabulary(tmp_path):
     assert r["citations"][0]["arc_id"] == "0001-x"
 
 
+def test_derived_index_is_prose_free_and_ranks():
+    # Phase-1 copyright-clean hosting: the derived index must rank correctly while
+    # containing NO transcript prose (see docs/derived-hosting.md).
+    from sekai_story_indexer.query.derived_index import build_derived_index, score_query
+
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    idx = json.loads(json.dumps(build_derived_index(eng), ensure_ascii=False))  # hostable JSON
+
+    # ranking parity: same top event as the full engine for a known query
+    top = score_query(idx, "How does Kohane feel about singing?")
+    assert top and top[0]["arc_id"] == "0006-lyric"
+    assert "score" in top[0]
+    assert "text" not in top[0] and "excerpt" not in top[0]  # refs only, no prose
+
+    # NO transcript prose leaked: a real dialogue line from the sample corpus must
+    # not appear anywhere in the serialized index (only derived token counts do).
+    sample_md = next(SAMPLE_STORY.rglob("0006-lyric/*.md"))
+    prose_line = next(
+        s
+        for s in (ln.strip() for ln in sample_md.read_text(encoding="utf-8").splitlines())
+        if s and s != "---" and not s.startswith("#") and len(s) > 12
+    )
+    assert prose_line not in json.dumps(idx, ensure_ascii=False)
+
+
 def test_translation_disabled_falls_back_to_empty(monkeypatch):
     from sekai_story_indexer.query import translate
 
