@@ -448,14 +448,48 @@ def test_scene_live_endpoint_fetches_then_empty_for_unknown(client, monkeypatch)
         server, "_scene_sources",
         lambda: {"0001-x/05_y": {"bundle": "b", "scenario_id": "s", "region": "jp"}},
     )
+    monkeypatch.setattr(sclient, "en_event_scenario", lambda ab, sid: {})  # not localized
     monkeypatch.setattr(
         sclient, "event_scenario",
         lambda ab, sid: {"TalkData": [{"WindowDisplayName": "A", "Body": "hi"}]},
     )
-    r = client.get("/api/scene?arc=0001-x&episode=05_y")
-    assert r.status_code == 200 and "A: hi" in r.json()["text"]
+    r = client.get("/api/scene?arc=0001-x&episode=05_y").json()
+    assert "A: hi" in r["text"] and r["region"] == "jp"  # EN absent -> JP fallback
     # unknown scene -> empty (no coords, no fetch)
     assert client.get("/api/scene?arc=9999-z&episode=00_none").json()["text"] == ""
+
+
+def test_scene_live_prefers_english(client, monkeypatch):
+    from sekai_story_indexer.source import client as sclient
+    from webapp import server
+
+    monkeypatch.setattr(
+        server, "_scene_sources",
+        lambda: {"0001-x/05_y": {"bundle": "b", "scenario_id": "s", "region": "jp"}},
+    )
+    monkeypatch.setattr(
+        sclient, "en_event_scenario",
+        lambda ab, sid: {"TalkData": [{"WindowDisplayName": "Saki", "Body": "hello"}]},
+    )
+    monkeypatch.setattr(sclient, "event_scenario", lambda ab, sid: {"TalkData": [{"Body": "JP"}]})
+    r = client.get("/api/scene?arc=0001-x&episode=05_y").json()
+    assert r["region"] == "en" and "Saki: hello" in r["text"]  # EN preferred over JP
+
+
+def test_episode_raw_prefers_en_sidecar(client, tmp_path, monkeypatch):
+    from webapp import server
+
+    d = tmp_path / "leo_need" / "event" / "0001-x"
+    d.mkdir(parents=True)
+    (d / "01_y.md").write_text("# 1. T\n\n穂波: こんにちは\n", encoding="utf-8")
+    (d / "01_y.md.en").write_text("# 1. T\n\nHonami: Hello\n", encoding="utf-8")
+    monkeypatch.setenv("SEKAI_STORY_ROOT", str(tmp_path))
+    r = server.episode_raw(arc="0001-x", episode="01_y")
+    assert r["region"] == "en" and "Honami: Hello" in r["text"]
+    # remove the EN sidecar -> falls back to JP
+    (d / "01_y.md.en").unlink()
+    r2 = server.episode_raw(arc="0001-x", episode="01_y")
+    assert r2["region"] == "jp" and "穂波: こんにちは" in r2["text"]
 
 
 def test_query_derived_returns_scene_refs_without_prose(monkeypatch):

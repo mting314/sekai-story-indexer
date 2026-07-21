@@ -189,6 +189,22 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   allowed to populate the sidecars (the restricted harness blocks those hosts).
   Follow-up: replace the *inline* answer quote (still the LLM's translation) with the
   official EN verbatim once the sidecars are present.
+* **Full multi-language support (deferred).** Make a chosen display language (EN
+  where localized, JP fallback; later TW/KR) consistent across *every* surface, not
+  just the transcript sidebar:
+  - **raw transcripts / sidebar** — done: `episode-raw` prefers the `.md.en`
+    sidecar and `/api/scene` prefers the EN CDN, with JP fallback + a language label.
+  - **quotes / citations** — partial: inline `quote_en` shows the official EN line;
+    the in-body highlight matches the shown language. Unlocalized scenes fall back to JP.
+  - **event / song names in the timeline** — partial: `_overlay_en_titles` overlays
+    official EN names (keeps `*_jp`).
+  - **model responses** — English-only today (the generator is pinned to English via
+    `answer_system.md`); real multi-language means generating in the selected locale.
+  - **summaries** — English-only (the hierarchical summarizer writes English).
+  A full impl needs a **language selector** + per-locale assets threaded through
+  fetch → index → summaries → generation → UI. The EN/TW/KR CDNs + master DBs already
+  exist (`REGION_DBS`, `EN_ASSET_CDN`), so the data is available; the work is plumbing
+  the locale everywhere and (for answers/summaries) generating per-locale.
 * **EN exact-line highlight in the derived (public) backend (deferred — has a cost).**
   `/api/scene` picks the exact quoted line lexically, which fails for pure-English
   questions (EN query tokens vs JP transcript — the same gap the local backend
