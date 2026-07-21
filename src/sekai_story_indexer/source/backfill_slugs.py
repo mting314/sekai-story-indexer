@@ -45,7 +45,6 @@ def backfill_story_tree(
     events_index_path: Path = Path("events_index.json"),
     story_order_path: Path = Path("story_order.yaml"),
     summary_cache_paths: tuple[Path, ...] = (
-        Path("event_summaries.json"),
         Path("episode_summaries.json"),
     ),
     log: Callable[[str], None] = print,

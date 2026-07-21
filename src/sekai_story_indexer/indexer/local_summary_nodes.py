@@ -66,7 +66,6 @@ def _meta(**kw) -> StoryMetadata:
 
 def load_local_summary_nodes(story_root: Path) -> list[StoryNode]:
     episodes = _load("episode_summaries.json", story_root)
-    events = _load("event_summaries.json", story_root)
     units = _load("unit_summaries.json", story_root)
     raw_index = _load("events_index.json", story_root)
     index: dict[str, Any] = (
@@ -112,23 +111,8 @@ def load_local_summary_nodes(story_root: Path) -> list[StoryNode]:
                 ),
             ))
 
-    # Tier 2 (Episode): per-event
-    for arc, val in events.items():
-        text = _text_of(val)
-        if not text:
-            continue
-        unit, rec = unit_of(arc), index.get(arc, {})
-        nodes.append(StoryNode(
-            text=text, summary_level=2,
-            metadata=_meta(
-                unit=unit, arc_id=arc, event_id=rec.get("event_id", 0),
-                started_at=rec.get("started_at", 0),
-                episode_name="(event summary)", part_name="(event summary)",
-                file_path=f"<summary:event:{arc}>",
-                parent_episode_id=arc, parent_year_id=unit,
-                story_order=order_rank.get(arc, 0), canonical_story_order=order_rank.get(arc, 0),
-            ),
-        ))
+    # (Event-tier local summaries were dropped with the retired event_summaries.json;
+    # the episode + unit tiers remain for `ingest --summaries local`.)
 
     # Tier 1 (Year): per-unit
     for unit, val in units.items():

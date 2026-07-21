@@ -477,3 +477,21 @@ def test_query_derived_returns_scene_refs_without_prose(monkeypatch):
     assert res["citations"] and res["citations"][0]["source"]["bundle"] == "b"
     assert all("excerpt" not in c and "quote" not in c for c in res["citations"])  # no prose
     assert res["answer"]  # a framing answer is produced
+
+
+def test_event_summaries_map_reads_hierarchical_not_legacy(tmp_path, monkeypatch):
+    """The full-backend/metadata excerpt map now comes from the hierarchical cache
+    (EVENT| tier), not the retired event_summaries.json."""
+    import json
+
+    from webapp import server
+
+    cache = {
+        "EVENT|0002-marionette": {"summary": "Marionette overview."},
+        "EPISODE|0002-marionette|01": {"summary": "ep — ignored"},  # non-EVENT tier skipped
+    }
+    cp = tmp_path / "summaries_cache.json"
+    cp.write_text(json.dumps(cache), encoding="utf-8")
+    monkeypatch.setenv("SEKAI_SUMMARIES_CACHE", str(cp))
+    m = server._event_summaries_map()
+    assert m == {"0002-marionette": {"summary": "Marionette overview."}}
