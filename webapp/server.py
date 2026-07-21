@@ -1083,17 +1083,33 @@ def _cmd_summarize(arg: str, req: CommandRequest) -> dict:
         session_id=req.session_id,
     )
     result = _query_local(qreq, (arc,) if arc else ())
+    # A legacy/pre-baked summary is static prose with no inline [n]. When generation
+    # is available, synthesize a fresh summary over the event's scenes so the answer
+    # carries inline citations + grounded quotes; keyless keeps the static prose.
+    from sekai_story_indexer.query.generate import generate_answer, generation_available
+
+    if result.get("pre_summarized") and generation_available() and result.get("citations"):
+        gen = generate_answer(
+            f'Summarize the event "{ev.get("name")}" in detail.', result["citations"]
+        )
+        if gen:
+            nl, grounding = gen
+            result.pop("pre_summarized", None)
+            _apply_generated_answer(result, nl, grounding)  # inline [n] + grounded quotes
     answer = (result.get("answer") or "").strip()
     if not answer:
         return _command_response(
             f"Couldn't summarize **{ev.get('name')}** ({ev.get('nickname') or arc}) "
             "— no story on disk for it."
         )
-    return _command_response(
+    resp = _command_response(
         answer,
         backend=result.get("backend") or "summary",
         citations=result.get("citations") or [],
     )
+    if result.get("generated"):
+        resp["generated"] = True  # so the backend subtext reads "AI-synthesized"
+    return resp
 
 
 def _cmd_lines(arg: str, req: CommandRequest) -> dict:

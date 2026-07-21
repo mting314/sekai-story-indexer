@@ -952,6 +952,36 @@ function showRouting(el, steps) {
 
 // Render a rich assistant answer: text runs + clickable quote blocks that open
 // the excerpt sidebar, plus a compact source list.
+// The single event an answer is about (focus/scope, or a citation set that all
+// shares one arc) — else null for a cross-event answer.
+function answerEventArc(res) {
+  const f = res.focus && res.focus.arcs && res.focus.arcs[0];
+  if (f) return f;
+  const s = res.scope && res.scope.arc_id;
+  if (s) return s;
+  const arcs = [...new Set((res.citations || []).map((c) => c.arc_id).filter(Boolean))];
+  return arcs.length === 1 ? arcs[0] : null;
+}
+
+// Header for the answer: the official English event title where localized, JP
+// otherwise (never the slug — see the no-slugs rule), with the nickname + a JP
+// subtitle when EN is shown. Returns null when the answer isn't about one event.
+function renderEventHeader(container, res) {
+  const arc = answerEventArc(res);
+  if (!arc) return;
+  const ev = (state.events || []).find((e) => e.arc_slug === arc);
+  const title = ev ? ev.name || ev.name_jp || arc
+    : ((res.citations || [])[0]?.label || "").split(" · ")[0]; // fallback: citation label
+  if (!title) return;
+  const nick = ev && ev.nickname ? ` [${ev.nickname}]` : "";
+  const jpSub = ev && ev.name_jp && ev.name_jp !== ev.name
+    ? `<div class="answer-event-jp">${escapeHtml(ev.name_jp)}</div>` : "";
+  const h = document.createElement("div");
+  h.className = "answer-event-header";
+  h.innerHTML = `<div class="answer-event-title">${escapeHtml(title + nick)}</div>${jpSub}`;
+  container.appendChild(h);
+}
+
 // Human label for the backend that produced an answer (shown as faded subtext).
 function backendLabel(res) {
   switch (res.backend) {
@@ -966,6 +996,7 @@ function backendLabel(res) {
 function renderAssistant(container, res) {
   container.classList.remove("thinking");
   container.textContent = "";
+  renderEventHeader(container, res); // event title (EN if localized) atop the answer
   const byRef = {};
   for (const c of res.citations || []) byRef[c.ref] = c;
 
