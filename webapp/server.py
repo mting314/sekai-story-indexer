@@ -341,7 +341,14 @@ def _local_retrieval(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> 
     elif intent == "summarize":
         result = engine.summarize(q, unit=req.unit, event_id=req.event_id, arc_ids=scope_arc_ids)
     else:
-        result = engine.query(q, unit=req.unit, event_id=req.event_id, arc_ids=scope_arc_ids)
+        # Cross-lingual bridge: translate the (English) question to Japanese so the
+        # lexical engine matches the JP corpus. No-op without a key -> lexical-only.
+        from sekai_story_indexer.query.translate import translate_to_japanese
+
+        result = engine.query(
+            q, unit=req.unit, event_id=req.event_id, arc_ids=scope_arc_ids,
+            aux_query=translate_to_japanese(q),
+        )
     result.setdefault("intent", intent)
     result["resolved_question"] = q
     result["error"] = None

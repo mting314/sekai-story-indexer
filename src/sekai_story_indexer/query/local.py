@@ -49,32 +49,6 @@ _UNIT_KEYWORDS = {
 }
 
 
-# Common kinship vocabulary recurs across every unit but isn't in the story
-# glossary, so an EN query ("brother") never bridged to the JP forms. Map each EN
-# term to a curated set of distinctive JP search tokens — bare kanji unigrams
-# (searchable now that tokenize emits them) plus the distinctive お-prefix bigram —
-# deliberately excluding noisy honorific fragments (さん/ちゃん). Bridged both ways.
-_KINSHIP_EN_TO_JP: dict[str, list[str]] = {
-    "brother": ["兄", "弟", "お兄"],
-    "sister": ["姉", "妹", "お姉"],
-    "mother": ["母", "お母", "ママ"],
-    "mom": ["母", "お母", "ママ"],
-    "father": ["父", "お父", "パパ"],
-    "dad": ["父", "お父", "パパ"],
-    "parents": ["両親", "親"],
-    "family": ["家族"],
-    "grandmother": ["祖母"],
-    "grandma": ["祖母"],
-    "grandfather": ["祖父"],
-    "grandpa": ["祖父"],
-}
-# Reverse bridge: a JP query mentioning the bare kanji maps to the EN term.
-_KINSHIP_JP_TO_EN: dict[str, str] = {
-    "兄": "brother", "弟": "brother", "姉": "sister", "妹": "sister",
-    "母": "mother", "父": "father",
-}
-
-
 def tokenize(text: str) -> list[str]:
     """ASCII words + CJK unigrams AND bigrams — a language-agnostic lexical key set
     that needs no tokenizer dependency (works for JP and EN). Unigrams let a short,
@@ -146,11 +120,9 @@ class LocalQueryEngine:
                 if jp_toks and en_toks:
                     self._expansions.append((frozenset(en_toks), jp_toks))
                     self._expansions.append((frozenset(jp_toks), en_toks))
-        # Kinship vocabulary (brother/兄/弟 …) — not in the story glossary but common.
-        for en, jp_forms in _KINSHIP_EN_TO_JP.items():
-            self._expansions.append((frozenset({en}), jp_forms))
-        for jp_kanji, en in _KINSHIP_JP_TO_EN.items():
-            self._expansions.append((frozenset({jp_kanji}), [en]))
+        # General EN→JP vocabulary (kinship, occupations, …) is bridged at query
+        # time by translating the whole question to Japanese (query/translate.py),
+        # so no hand-maintained per-category dictionary lives here.
         # Contextual retrieval (deterministic, free): index each scene as its
         # situating context (nickname / "character X's Nth focus event" / unit /
         # song) + the raw text, so those queries match by meaning. Only the token
@@ -243,8 +215,9 @@ class LocalQueryEngine:
         unit: str | None = None,
         arc_id: str | None = None,
         arc_ids: tuple[str, ...] = (),
+        aux_query: str = "",
     ) -> list[tuple[StoryNode, float]]:
-        q_tokens = [t for t in self._expand_tokens(tokenize(question)) if t in self._idf]
+        q_tokens = [t for t in self._expand_tokens(self._query_tokens(question, aux_query)) if t in self._idf]
         candidates = self._candidate_indices(unit, arc_id, arc_ids)
         scored: list[tuple[float, int]] = []
         for i in candidates:
@@ -282,8 +255,17 @@ class LocalQueryEngine:
         picked.sort(key=lambda t: t[0])  # restore reading order
         return [i for _, i in picked]
 
+    def _query_tokens(self, question: str, aux_query: str = "") -> list[str]:
+        """Tokens used for retrieval scoring: the question plus an optional
+        translated form (query/translate.py), so an EN query also matches the JP
+        corpus. Scoping/intent stay on the original question, not this."""
+        toks = tokenize(question)
+        if aux_query:
+            toks = toks + tokenize(aux_query)
+        return toks
+
     def _scoped_event_hits(
-        self, question: str, unit: str | None, arc_id: str
+        self, question: str, unit: str | None, arc_id: str, aux_query: str = ""
     ) -> list[tuple[StoryNode, float]]:
         """Whole scoped event in reading order (budget-bounded), each scored by
         query overlap so the extractive quote picker still highlights relevant
@@ -291,7 +273,7 @@ class LocalQueryEngine:
         idxs = self._candidate_indices(unit, arc_id)
         idxs.sort(key=lambda i: self._sort_key(self.nodes[i]))
         idxs = self._budget_cover(idxs, _SCOPED_CTX_CHARS)
-        q_tokens = [t for t in self._expand_tokens(tokenize(question)) if t in self._idf]
+        q_tokens = [t for t in self._expand_tokens(self._query_tokens(question, aux_query)) if t in self._idf]
         hits: list[tuple[StoryNode, float]] = []
         for i in idxs:
             tf = self._tf[i]
@@ -349,6 +331,7 @@ class LocalQueryEngine:
         event_id: int | None = None,
         k: int = 5,
         arc_ids: tuple[str, ...] = (),
+        aux_query: str = "",
     ) -> dict:
         scope = self._scoped(question, unit=unit, event_id=event_id, arc_ids=arc_ids)
         unit, arc_id, arc_ids = scope.unit, scope.arc_id, scope.arc_ids
@@ -359,9 +342,11 @@ class LocalQueryEngine:
         # scenes), so nothing lexically favors the finale and a top-k would return
         # the first k episodes — hiding the climax from the answer.
         if arc_id and not arc_ids:
-            hits = self._scoped_event_hits(question, unit, arc_id)
+            hits = self._scoped_event_hits(question, unit, arc_id, aux_query=aux_query)
         else:
-            hits = self.retrieve(question, k=k, unit=unit, arc_id=arc_id, arc_ids=arc_ids)
+            hits = self.retrieve(
+                question, k=k, unit=unit, arc_id=arc_id, arc_ids=arc_ids, aux_query=aux_query
+            )
         if not hits:
             candidates = (
                 self._candidate_indices(unit, arc_id, arc_ids) if (arc_id or arc_ids) else []
