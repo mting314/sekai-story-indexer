@@ -218,7 +218,8 @@ config.json
 # Story Indexer Artifacts
 chroma_db/
 Linkura Summaries.zip
-summaries_cache.json
+# summaries_cache.json is committed: our hierarchical summaries are OUR generated
+# content (not transcript prose), served by the app + baked into the Docker images.
 event_summaries.json
 world_state.json
 lexical_index.db

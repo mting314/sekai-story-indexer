@@ -423,3 +423,57 @@ def test_command_summarize_terse_char_number(client, tmp_path, monkeypatch):
     body = client.post("/api/command", json={"command": "/summarize minori 7"}).json()
     assert body["backend"] == "summary"
     assert "Minori's frontline" in body["answer"]
+
+
+# --- Live-scene fetch (derived-index public deploy: fetch, don't rehost) ------
+
+def test_fetch_scene_live_renders_from_injected_fetcher():
+    from webapp import server
+
+    scenario = {"TalkData": [
+        {"WindowDisplayName": "穂波", "Body": "弟もいるから"},
+        {"WindowDisplayName": "", "Body": "……"},
+    ]}
+    out = server._fetch_scene_live(
+        {"bundle": "b", "scenario_id": "s", "region": "jp"}, fetch=lambda ab, sid: scenario
+    )
+    assert out["text"] == "穂波: 弟もいるから\n……"
+
+
+def test_scene_live_endpoint_fetches_then_empty_for_unknown(client, monkeypatch):
+    from sekai_story_indexer.source import client as sclient
+    from webapp import server
+
+    monkeypatch.setattr(
+        server, "_scene_sources",
+        lambda: {"0001-x/05_y": {"bundle": "b", "scenario_id": "s", "region": "jp"}},
+    )
+    monkeypatch.setattr(
+        sclient, "event_scenario",
+        lambda ab, sid: {"TalkData": [{"WindowDisplayName": "A", "Body": "hi"}]},
+    )
+    r = client.get("/api/scene?arc=0001-x&episode=05_y")
+    assert r.status_code == 200 and "A: hi" in r.json()["text"]
+    # unknown scene -> empty (no coords, no fetch)
+    assert client.get("/api/scene?arc=9999-z&episode=00_none").json()["text"] == ""
+
+
+def test_query_derived_returns_scene_refs_without_prose(monkeypatch):
+    from webapp import server
+    from webapp.server import QueryRequest
+
+    idx = {
+        "scenes": [{
+            "id": 0, "arc_id": "0006-x", "episode": "01_y", "unit": "vivid_bad_squad",
+            "label": "VBS — Event [koha1] · Ep 1", "nickname": "koha1",
+            "source": {"bundle": "b", "scenario_id": "s", "region": "jp"},
+            "tf": {"kohane": 1, "sing": 1},
+        }],
+        "idf": {"kohane": 2.0, "sing": 2.0}, "expansions": [],
+    }
+    monkeypatch.setattr(server, "_derived_index", lambda: idx)
+    res = server._query_derived(QueryRequest(question="how does kohane sing"))
+    assert res["backend"] == "derived"
+    assert res["citations"] and res["citations"][0]["source"]["bundle"] == "b"
+    assert all("excerpt" not in c and "quote" not in c for c in res["citations"])  # no prose
+    assert res["answer"]  # a framing answer is produced

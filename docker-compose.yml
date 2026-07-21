@@ -1,0 +1,12 @@
+# Local / single-VM run of the keyless web app:  docker compose up --build
+# Then open http://localhost:8000
+services:
+  web:
+    build: .
+    image: sekai-story-indexer
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - SEKAI_QUERY_BACKEND=local
+    restart: unless-stopped

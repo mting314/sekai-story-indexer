@@ -354,6 +354,12 @@ async function openTranscript(arc, episodeSlug, label, highlight, enQuote) {
 // the full episode transcript with that line highlighted; otherwise fall back to
 // the excerpt view (e.g. event-summary citations).
 function openCitation(cite) {
+  // Derived (prose-free public) backend: the citation carries sekai.best coords but
+  // no prose. Fetch the scene LIVE and highlight the exact line for the question.
+  if (cite && cite.source && cite.episode && cite.arc_id) {
+    openLiveScene(cite);
+    return;
+  }
   if (cite && cite.episode && cite.arc_id) {
     // Prefer the exact cited line; else fall back to the retrieved scene's first
     // content line so the transcript at least scrolls to the right region (the
@@ -366,6 +372,38 @@ function openCitation(cite) {
   } else {
     openExcerpt(cite);
   }
+}
+
+// Fetch a scene LIVE from sekai.best (prose-free public deploy) and render it in
+// the sidebar with the exact matching line highlighted. Prose is never stored here
+// — it's fetched transiently for display.
+async function openLiveScene(cite) {
+  const sb = document.getElementById("sidebar");
+  document.getElementById("sb-title").textContent = cite.label || "Scene";
+  document.getElementById("sb-sub").textContent = "fetched live from sekai.best";
+  const el = document.getElementById("sb-body");
+  el.innerHTML = '<p class="empty">Loading from sekai.best…</p>';
+  sb.classList.remove("hidden");
+  const url =
+    `/api/scene?arc=${encodeURIComponent(cite.arc_id)}&episode=${encodeURIComponent(cite.episode)}` +
+    `&q=${encodeURIComponent(state.lastQuery || "")}`;
+  const data = await fetch(url).then((r) => r.json()).catch(() => null);
+  if (!data || !data.text) {
+    el.innerHTML = '<p class="empty">Couldn\'t load this scene from sekai.best.</p>';
+    return;
+  }
+  let text = data.text;
+  if (data.quote && text.includes(data.quote)) {
+    text = text.replace(data.quote, () => `⁦HL⁦${data.quote}⁦LH⁦`);
+  }
+  el.innerHTML =
+    '<div class="answer-text">' +
+    renderMarkdown(text).replaceAll("⁦HL⁦", "<mark>").replaceAll("⁦LH⁦", "</mark>") +
+    "</div>";
+  decorateNames(el, new Set());
+  const mark = el.querySelector("mark");
+  if (mark) mark.scrollIntoView({ block: "center" });
+  else el.scrollTop = 0;
 }
 
 
@@ -880,11 +918,85 @@ function clearThinking(el) {
   el.textContent = "";
 }
 
+// ChatGPT-style faded "thinking" trace: the routing steps the backend took, with
+// an animated ellipsis on the active (last) step. Cleared when the answer starts.
+function routingSteps(meta) {
+  const steps = ["Reading your question"];
+  const label = (meta.focus && meta.focus.label) || (meta.scope && meta.scope.label);
+  const scopeArc = meta.scope && meta.scope.arc_id;
+  if (label) steps.push(`Focusing on ${label}`);
+  else if (scopeArc) steps.push(`Focusing on ${scopeArc}`);
+  else if (state.activeUnit && state.activeUnit !== "all") {
+    steps.push(`Scoped to ${(state.meta.units[state.activeUnit] || {}).name || state.activeUnit}`);
+  }
+  const act =
+    meta.intent === "summarize" ? "Summarizing the event"
+    : meta.intent === "count" ? "Counting dialogue"
+    : "Searching the story";
+  steps.push(meta.backend === "derived" || meta.backend === "full" ? `${act}` : act);
+  if (meta.backend) steps.push("Writing the answer");
+  return steps;
+}
+
+function showRouting(el, steps) {
+  el.classList.add("thinking");
+  const dots = '<span class="typing"><span></span><span></span><span></span></span>';
+  const rows = steps.map((s, i) => {
+    const active = i === steps.length - 1;
+    return `<div class="routing-step${active ? " active" : " done"}">` +
+      `${active ? "" : "✓ "}${escapeHtml(s)}${active ? " " + dots : ""}</div>`;
+  });
+  el.innerHTML = `<div class="routing">${rows.join("")}</div>`;
+  document.getElementById("messages").scrollTop = 1e9;
+}
+
 // Render a rich assistant answer: text runs + clickable quote blocks that open
 // the excerpt sidebar, plus a compact source list.
+// The single event an answer is about (focus/scope, or a citation set that all
+// shares one arc) — else null for a cross-event answer.
+function answerEventArc(res) {
+  const f = res.focus && res.focus.arcs && res.focus.arcs[0];
+  if (f) return f;
+  const s = res.scope && res.scope.arc_id;
+  if (s) return s;
+  const arcs = [...new Set((res.citations || []).map((c) => c.arc_id).filter(Boolean))];
+  return arcs.length === 1 ? arcs[0] : null;
+}
+
+// Header for the answer: the official English event title where localized, JP
+// otherwise (never the slug — see the no-slugs rule), with the nickname + a JP
+// subtitle when EN is shown. Returns null when the answer isn't about one event.
+function renderEventHeader(container, res) {
+  const arc = answerEventArc(res);
+  if (!arc) return;
+  const ev = (state.events || []).find((e) => e.arc_slug === arc);
+  const title = ev ? ev.name || ev.name_jp || arc
+    : ((res.citations || [])[0]?.label || "").split(" · ")[0]; // fallback: citation label
+  if (!title) return;
+  const nick = ev && ev.nickname ? ` [${ev.nickname}]` : "";
+  const jpSub = ev && ev.name_jp && ev.name_jp !== ev.name
+    ? `<div class="answer-event-jp">${escapeHtml(ev.name_jp)}</div>` : "";
+  const h = document.createElement("div");
+  h.className = "answer-event-header";
+  h.innerHTML = `<div class="answer-event-title">${escapeHtml(title + nick)}</div>${jpSub}`;
+  container.appendChild(h);
+}
+
+// Human label for the backend that produced an answer (shown as faded subtext).
+function backendLabel(res) {
+  switch (res.backend) {
+    case "derived": return "derived · summaries + live quotes (no LLM)";
+    case "full": return "full RAG · Gemini";
+    case "summary": return "pre-computed event summary";
+    case "local": return res.generated ? "local · AI-synthesized" : "local · extractive";
+    default: return res.backend || "";
+  }
+}
+
 function renderAssistant(container, res) {
   container.classList.remove("thinking");
   container.textContent = "";
+  renderEventHeader(container, res); // event title (EN if localized) atop the answer
   const byRef = {};
   for (const c of res.citations || []) byRef[c.ref] = c;
 
@@ -942,6 +1054,15 @@ function renderAssistant(container, res) {
       sources.appendChild(a);
     }
     container.appendChild(sources);
+  }
+
+  // Faded subtext: which backend answered (transparency about how the reply was
+  // produced — derived/local/full + whether it was AI-synthesized).
+  if (res.backend && res.backend !== "command") {
+    const note = document.createElement("div");
+    note.className = "backend-note";
+    note.textContent = `via ${backendLabel(res)}`;
+    container.appendChild(note);
   }
 
   // Wire inline [n] citations in the answer to open + highlight their excerpt.
@@ -1152,6 +1273,7 @@ async function streamAnswer(q, pending) {
         document.getElementById("messages").scrollTop = 1e9;
       } else if (evt.type === "meta") {
         if (evt.focus) showFocusChip(evt.focus);
+        if (firstDelta) showRouting(pending, routingSteps(evt)); // faded thinking trace
       } else if (evt.type === "done") {
         done = evt;
       }
@@ -1303,6 +1425,7 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   autoGrowInput(); // collapse the textarea back to one row
   if (state.inputHistory[state.inputHistory.length - 1] !== q) state.inputHistory.push(q);
   state.histIdx = state.inputHistory.length; // reset cursor to "current" (past end)
+  state.lastQuery = q; // for derived-backend live-scene line highlighting
   addMessage("user", q);
   const pending = addMessage("assistant", "");
   showThinking(pending);
@@ -1334,6 +1457,10 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
       pending.textContent = `⚠ ${res.error}`;
     } else {
       renderAssistant(pending, res); // swap progressive text for the rich view
+      // Streaming auto-scrolled to the bottom; for a long answer that leaves the
+      // start scrolled out of view (looks "cut off"). Re-anchor so the question +
+      // the beginning of the answer are visible, and the reader scrolls DOWN.
+      (pending.previousElementSibling || pending).scrollIntoView({ block: "start" });
       if (res.focus) showFocusChip(res.focus);
       state.history.push({ role: "user", text: q });
       state.history.push({ role: "assistant", text: res.answer || "" });

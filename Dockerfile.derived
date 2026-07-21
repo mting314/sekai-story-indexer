@@ -1,0 +1,41 @@
+# Prose-free PUBLIC image — derived index + live quotes (docs/derived-hosting.md).
+# Ships ZERO transcript prose: only the derived search index (token counts), our
+# own summaries, public metadata, and scene fetch-coords. The exact quote is
+# fetched LIVE from sekai.best on citation click and never stored.
+#
+# Build the derived index first (needs the local corpus, no egress required):
+#   uv run sekai build-index        # -> derived_index.json.gz
+# then:
+#   docker build -f Dockerfile.derived -t sekai-public .
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app/src \
+    SEKAI_QUERY_BACKEND=derived \
+    SEKAI_DERIVED_INDEX=/app/derived_index.json.gz \
+    SEKAI_SUMMARIES_CACHE=/app/summaries_cache.json \
+    SEKAI_EVENTS_INDEX=/app/events_index.json \
+    SEKAI_SCENE_SOURCES=/app/scene_sources.json \
+    PORT=8000
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir \
+    "fastapi>=0.115" "uvicorn[standard]>=0.32" "pydantic>=2.13" \
+    pyyaml python-dotenv certifi
+
+COPY src/ ./src/
+COPY webapp/ ./webapp/
+# Derived + our-own + metadata ONLY — no story/ (no transcript prose in the image).
+COPY derived_index.json.gz summaries_cache.json events_index.json scene_sources.json glossary.json ./
+
+RUN useradd -m app && chown -R app /app
+USER app
+
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.getenv('PORT','8000')+'/api/units').read()" || exit 1
+
+CMD ["sh", "-c", "uvicorn webapp.server:app --host 0.0.0.0 --port ${PORT:-8000}"]
