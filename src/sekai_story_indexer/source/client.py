@@ -19,7 +19,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from .constants import ASSET_CDN, MASTER_DB
+from .constants import ASSET_CDN, EN_ASSET_CDN, MASTER_DB
 
 # Transient network faults worth retrying (incl. partial reads from the CDN).
 _RETRYABLE = (urllib.error.URLError, TimeoutError, http.client.IncompleteRead, ConnectionError, OSError)
@@ -110,6 +110,29 @@ def unit_story_scenario(chapter_asset_bundle: str, scenario_id: str) -> dict:
     """Unit-story scenario asset. Path keyed by the CHAPTER's assetbundleName."""
     url = f"{ASSET_CDN}/scenario/unitstory/{chapter_asset_bundle}/{scenario_id}.asset"
     return fetch_json(url)
+
+
+# --- official English asset CDN (best-effort; EN lags JP) --------------------
+# These return {} instead of raising when a scene isn't localized yet, so callers
+# can quietly fall back to the JP source of truth.
+
+def en_event_scenario(asset_bundle: str, scenario_id: str) -> dict:
+    """Official-EN event scenario asset (same layout as JP). Returns {} when the
+    scene isn't localized on the EN CDN yet."""
+    url = f"{EN_ASSET_CDN}/event_story/{asset_bundle}/scenario/{scenario_id}.asset"
+    try:
+        return fetch_json(url)
+    except Exception:
+        return {}
+
+
+def en_unit_story_scenario(chapter_asset_bundle: str, scenario_id: str) -> dict:
+    """Official-EN unit-story scenario asset. Returns {} when not yet localized."""
+    url = f"{EN_ASSET_CDN}/scenario/unitstory/{chapter_asset_bundle}/{scenario_id}.asset"
+    try:
+        return fetch_json(url)
+    except Exception:
+        return {}
 
 
 def game_character_units() -> list[dict]:

@@ -17,8 +17,16 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from pathlib import Path
 
 from .constants import CHARACTER_ID_TO_UNIT, DB_UNIT_TO_SLUG
+
+
+def en_sidecar_path(jp_path: Path) -> Path:
+    """Co-located official-EN sidecar for a JP episode: ``foo.md`` → ``foo.md.en``.
+    The trailing ``.en`` (not ``.en.md``) keeps it off every ``*.md`` glob, so the
+    EN text is never indexed as JP story content."""
+    return jp_path.with_name(jp_path.name + ".en")
 
 _KAKASI = None
 _SLUG_STRIP_RE = re.compile(r"[^a-z0-9]+")
@@ -202,6 +210,25 @@ def scenario_to_lines(scenario: dict) -> list[tuple[str, str]]:
         speaker = (talk.get("WindowDisplayName") or "").strip()
         lines.append((speaker, body))
     return lines
+
+
+def align_en_to_jp(
+    jp_lines: list[tuple[str, str]], en_scenario: dict
+) -> list[tuple[str, str]] | None:
+    """Align official-EN scene lines to the JP lines by ``TalkData`` index.
+
+    Both regions share the same scenario structure, so an equal line count means a
+    safe 1:1 index alignment. Returns the EN ``(speaker, text)`` list when it lines
+    up with the JP, else ``None`` (EN missing / partial / structurally different →
+    caller keeps the JP source of truth). We compare counts, not speakers, since EN
+    speaker labels are localized ("Honami" vs "穂波").
+    """
+    if not en_scenario or not jp_lines:
+        return None
+    en_lines = scenario_to_lines(en_scenario)
+    if not en_lines or len(en_lines) != len(jp_lines):
+        return None
+    return en_lines
 
 
 def render_episode_markdown(

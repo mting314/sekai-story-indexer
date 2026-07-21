@@ -176,12 +176,19 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   momentum/inertia scrolling, snap-to-card, and the banner art (now on each row)
   as the visual anchor. Currently a plain vertical list (`renderTimeline` +
   `.event-card` in `webapp/static/`).
-* **Official English story quotes (deferred).** Quotes in answers are currently
-  the LLM's English translation of the JP source line. The data source likely has
-  official EN scenario text (the EN region assets — cf. `client.en_event_names` /
-  `en_music_titles` already read the EN master DB). Ingest the EN scenario text
-  per scene and quote it verbatim (with the JP as source-of-truth fallback for
-  events not yet localized), so quotes are authentic rather than paraphrased.
+* **Official English story quotes (implemented — needs a live EN fetch to populate).**
+  Answers now attach the *verbatim* official-EN line to each citation (`quote_en`,
+  shown in the transcript sidebar) instead of only the LLM's paraphrase, with JP as
+  the source-of-truth fallback. Pipeline: `constants.EN_ASSET_CDN` +
+  `client.en_event_scenario`/`en_unit_story_scenario` (best-effort, `{}` when a scene
+  isn't localized) → `transform.align_en_to_jp` (1:1 by `TalkData` index, count-guarded)
+  → `fetcher` writes a co-located `foo.md.en` sidecar (off the `*.md` glob so it's
+  never indexed as JP; backfills onto an existing corpus under `--skip-existing`) →
+  `query/official_en.load_official_en` builds the JP→EN line map → the webapp attaches
+  `quote_en` in `_finalize_citations`. Run `indexer fetch` where EN-CDN egress is
+  allowed to populate the sidecars (the restricted harness blocks those hosts).
+  Follow-up: replace the *inline* answer quote (still the LLM's translation) with the
+  official EN verbatim once the sidecars are present.
 * **Lyrics analysis via chat (deferred).** Let the chat answer about a
   commissioned song's lyrics — e.g. "what do the lyrics of BAKENOHANA mean / how
   do they tie to the event?" Needs a lyrics source (not in the current master-DB

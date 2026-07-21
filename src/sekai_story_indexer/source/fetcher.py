@@ -18,7 +18,9 @@ from . import client
 from .catalog import build_catalog, load_focus_overrides
 from .constants import CHARACTER_ID_TO_JP, DB_UNIT_TO_SLUG
 from .transform import (
+    align_en_to_jp,
     arc_slug,
+    en_sidecar_path,
     episode_filename,
     focus_character_id,
     is_key_event_story,
@@ -144,6 +146,7 @@ def fetch_unit_stories(
     story_root: Path,
     *,
     scenario_fetch: Callable[[str, str], dict] | None = None,
+    en_scenario_fetch: Callable[[str, str], dict] | None = None,
     log: Callable[[str], None] = print,
 ) -> int:
     """Fetch the units' main (non-event) stories into
@@ -155,6 +158,7 @@ def fetch_unit_stories(
     """
     story_root = Path(story_root)
     fetch_scenario = scenario_fetch or client.unit_story_scenario
+    fetch_en = en_scenario_fetch or client.en_unit_story_scenario
     written = 0
     for us in client.unit_stories():
         unit = DB_UNIT_TO_SLUG.get((us.get("unit") or "").lower(), "mixed")
@@ -175,10 +179,51 @@ def fetch_unit_stories(
                 out = story_root / tree_relpath(unit, "unit", ch_slug, fname)
                 out.parent.mkdir(parents=True, exist_ok=True)
                 out.write_text(markdown, encoding="utf-8")
+                _write_en_sidecar(out, title, lines, fetch_en, ch_bundle, ep["scenarioId"])
                 written += 1
             log(f"wrote {unit}/unit/{ch_slug} ({len(chapter.get('episodes', []))} episodes)")
     log(f"unit stories: {written} episodes")
     return written
+
+
+def _lines_from_markdown(path: Path) -> list[tuple[str, str]]:
+    """Re-read an episode markdown into ``(speaker, text)`` turns. Used only to get
+    the JP line COUNT for aligning an EN sidecar onto an already-fetched episode
+    (so --skip-existing can backfill EN without re-downloading JP). Count is what
+    matters for alignment; the speaker split need not be perfect."""
+    lines: list[tuple[str, str]] = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        s = raw.strip()
+        if not s or s == "---" or s.startswith("#"):
+            continue
+        speaker, _, text = s.partition(": ")
+        lines.append((speaker, text) if text else ("", s))
+    return lines
+
+
+def _write_en_sidecar(
+    jp_path: Path,
+    title: str,
+    jp_lines: list[tuple[str, str]],
+    fetch_en: Callable[[str, str], dict],
+    asset_bundle: str,
+    scenario_id: str,
+) -> bool:
+    """Best-effort: fetch the official-EN scenario and, if it aligns 1:1 with the
+    JP lines, write a parallel ``<name>.en.md`` for verbatim EN quotes. Any failure
+    or mismatch leaves only the JP file (the source of truth). Returns True if an
+    EN sidecar was written."""
+    try:
+        en_scenario = fetch_en(asset_bundle, scenario_id)
+    except Exception:
+        return False
+    en_lines = align_en_to_jp(jp_lines, en_scenario)
+    if not en_lines:
+        return False
+    en_sidecar_path(jp_path).write_text(
+        render_episode_markdown(title, [en_lines]), encoding="utf-8"
+    )
+    return True
 
 
 def fetch_and_write(
@@ -187,6 +232,7 @@ def fetch_and_write(
     limit: int | None = None,
     event_ids: list[int] | None = None,
     scenario_fetch: Callable[[str, str], dict] | None = None,
+    en_scenario_fetch: Callable[[str, str], dict] | None = None,
     skip_existing: bool = False,
     log: Callable[[str], None] = print,
 ) -> list[EventPlan]:
@@ -197,6 +243,7 @@ def fetch_and_write(
     """
     story_root = Path(story_root)
     fetch_scenario = scenario_fetch or client.event_scenario
+    fetch_en = en_scenario_fetch or client.en_event_scenario
 
     tables = client.load_catalog_tables()
     events = tables["events"]
@@ -227,10 +274,19 @@ def fetch_and_write(
             music=music_by_event.get(event["id"]),
         )
         ok = 0
+        en_ok = 0
         for ep in plan.episodes:
             out_path = story_root / ep.relpath
             if skip_existing and out_path.exists() and out_path.stat().st_size > 0:
                 ok += 1  # already fetched — resumable
+                # Backfill the EN sidecar onto an existing corpus without
+                # re-downloading JP (align against the on-disk JP line count).
+                en_path = en_sidecar_path(out_path)
+                if not (en_path.exists() and en_path.stat().st_size > 0) and _write_en_sidecar(
+                    out_path, ep.title, _lines_from_markdown(out_path),
+                    fetch_en, ep.asset_bundle, ep.scenario_id,
+                ):
+                    en_ok += 1
                 continue
             try:
                 scenario = fetch_scenario(ep.asset_bundle, ep.scenario_id)
@@ -241,8 +297,10 @@ def fetch_and_write(
             markdown = render_episode_markdown(ep.title, [lines])
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_text(markdown, encoding="utf-8")
+            if _write_en_sidecar(out_path, ep.title, lines, fetch_en, ep.asset_bundle, ep.scenario_id):
+                en_ok += 1
             ok += 1
-        log(f"wrote {plan.unit}/{plan.arc_slug} ({ok}/{len(plan.episodes)} episodes)")
+        log(f"wrote {plan.unit}/{plan.arc_slug} ({ok}/{len(plan.episodes)} episodes, {en_ok} EN)")
         plans.append(plan)
         if ok:
             written_ids.add(plan.event_id)

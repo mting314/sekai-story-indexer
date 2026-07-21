@@ -1,15 +1,22 @@
 from pathlib import Path
 
 from sekai_story_indexer.indexer.processor import StoryProcessor
+from sekai_story_indexer.query.official_en import load_official_en
 from sekai_story_indexer.source.assets import event_logo_url, music_jacket_url
-from sekai_story_indexer.source.fetcher import plan_event, story_order_doc
+from sekai_story_indexer.source.fetcher import (
+    fetch_unit_stories,  # noqa: F401  (import sanity)
+    plan_event,
+    story_order_doc,
+)
 from sekai_story_indexer.source.nicknames import (
     assign_focus_nicknames,
     nickname_for,
     resolve_nickname,
 )
 from sekai_story_indexer.source.transform import (
+    align_en_to_jp,
     arc_slug,
+    en_sidecar_path,
     episode_filename,
     focus_character_id,
     is_key_event_story,
@@ -455,3 +462,74 @@ def test_single_unit_event_without_song_is_still_a_focus():
         music_by_event={}, banner_char_by_event={71: 16},  # Rui (WxS), no song
     )
     assert cat[0]["is_focus_event"] is True
+
+
+# --- Official English quotes -------------------------------------------------
+
+def _talk(*bodies):
+    return {"TalkData": [{"WindowDisplayName": "", "Body": b} for b in bodies]}
+
+
+def test_align_en_to_jp_aligns_when_counts_match():
+    jp = [("穂波", "弟もいるから"), ("一歌", "すごいな")]
+    en = _talk("I have a younger brother too", "That's amazing")
+    assert align_en_to_jp(jp, en) == [("", "I have a younger brother too"), ("", "That's amazing")]
+
+
+def test_align_en_to_jp_none_on_mismatch_or_empty():
+    jp = [("穂波", "弟もいるから"), ("一歌", "すごいな")]
+    assert align_en_to_jp(jp, _talk("only one line")) is None  # count mismatch
+    assert align_en_to_jp(jp, {}) is None  # EN not localized
+    assert align_en_to_jp([], _talk("x")) is None  # no JP
+
+
+def test_en_sidecar_path_is_off_the_md_glob():
+    p = en_sidecar_path(Path("story/leo_need/event/0001-x/05_y.md"))
+    assert p.name == "05_y.md.en"
+    assert not p.match("*.md")  # never picked up as JP story text
+
+
+def test_write_en_sidecar_only_when_aligned(tmp_path: Path):
+    from sekai_story_indexer.source.fetcher import _write_en_sidecar
+
+    jp_path = tmp_path / "05_y.md"
+    jp_path.write_text("# 5. t\n\n穂波: 弟もいるから\n一歌: すごいな", encoding="utf-8")
+    jp_lines = [("穂波", "弟もいるから"), ("一歌", "すごいな")]
+
+    # aligned EN -> sidecar written
+    ok = _write_en_sidecar(
+        jp_path, "5. t", jp_lines,
+        lambda ab, sid: _talk("I have a younger brother too", "That's amazing"),
+        "bundle", "scenario",
+    )
+    assert ok
+    en_path = en_sidecar_path(jp_path)
+    assert en_path.exists()
+    assert "I have a younger brother too" in en_path.read_text(encoding="utf-8")
+
+    # mismatched EN -> no sidecar (JP stays the fallback)
+    en_path.unlink()
+    assert not _write_en_sidecar(
+        jp_path, "5. t", jp_lines, lambda ab, sid: _talk("one line only"), "b", "s"
+    )
+    assert not en_path.exists()
+
+
+def test_load_official_en_maps_jp_lines_to_en(tmp_path: Path):
+    d = tmp_path / "leo_need" / "event" / "0001-x"
+    d.mkdir(parents=True)
+    (d / "05_y.md").write_text("# 5. t\n\n穂波: 弟もいるから\n一歌: すごいな", encoding="utf-8")
+    (d / "05_y.md.en").write_text(
+        "# 5. t\n\nHonami: I have a younger brother too\nIchika: That's amazing", encoding="utf-8"
+    )
+    mapping = load_official_en(tmp_path)
+    assert mapping["穂波: 弟もいるから"] == "Honami: I have a younger brother too"
+    assert mapping["一歌: すごいな"] == "Ichika: That's amazing"
+
+
+def test_load_official_en_skips_drifted_pairs(tmp_path: Path):
+    d = tmp_path / "u" / "event" / "0001-x"
+    d.mkdir(parents=True)
+    (d / "05_y.md").write_text("# t\n\na: 1\nb: 2", encoding="utf-8")
+    (d / "05_y.md.en").write_text("# t\n\nA: one", encoding="utf-8")  # count drift
+    assert load_official_en(tmp_path) == {}
