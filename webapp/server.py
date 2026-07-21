@@ -1074,10 +1074,10 @@ def _cmd_summarize(arg: str, req: CommandRequest) -> dict:
             "episode_title": "Event summary", "nickname": ev.get("nickname"), "excerpt": summary,
         }]
         return _command_response(summary, backend="summary", citations=citations)
-    # No baked hierarchical summary -> delegate to the normal retrieval path scoped to
-    # this event: serves a legacy event_summaries.json entry (via the merged loader) or
-    # generates one on the fly from the retrieved scenes, so /summarize never falsely
-    # claims a summary is impossible for an event whose story is on disk.
+    # No baked hierarchical summary -> delegate to the normal retrieval path scoped
+    # to this event: it generates a summary on the fly from the retrieved scenes (or
+    # returns extractive scenes when keyless), so /summarize never falsely claims a
+    # summary is impossible for an event whose story is on disk.
     qreq = QueryRequest(
         question=f"summarize {ev.get('nickname') or ev.get('name') or arc}",
         session_id=req.session_id,
