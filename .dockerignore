@@ -1,0 +1,22 @@
+# Keep the build context small + the image clean. The Dockerfile COPYs only the
+# paths it needs, but this also speeds up the build and avoids leaking local state.
+.git
+.github
+.venv
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache
+.ruff_cache
+tests/
+docs/
+scratch_*.py
+# Regenerable / backend-specific state that the keyless image never uses:
+chroma_db/
+*.db
+lexical_index.db
+source_records.db
+ingestion_manifest.json
+# Secrets / local env
+.env
+*.log
