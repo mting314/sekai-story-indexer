@@ -19,7 +19,6 @@ from sekai_story_indexer.indexer.manifest import (
     IngestionManifest,
     SummaryCacheContext,
     VectorIds,
-    hash_text,
     stable_hash,
 )
 from sekai_story_indexer.indexer.parser import PARSER_VERSION
@@ -146,11 +145,11 @@ def test_summary_cache_invalidates_when_tracked_input_changes(
     monkeypatch.setattr(HierarchicalSummarizer, "_generate_rolling_summary", fake_generate)
 
     context = _cache_context(path)
-    HierarchicalSummarizer(cache_context=context).summarize_parts(
+    HierarchicalSummarizer(cache_context=context).summarize_events(
         raw_nodes,
         cache_file=str(cache_file),
     )
-    HierarchicalSummarizer(cache_context=context).summarize_parts(
+    HierarchicalSummarizer(cache_context=context).summarize_events(
         raw_nodes,
         cache_file=str(cache_file),
     )
@@ -164,7 +163,7 @@ def test_summary_cache_invalidates_when_tracked_input_changes(
     else:
         changed_context = context.model_copy(update={field: value})
 
-    HierarchicalSummarizer(cache_context=changed_context).summarize_parts(
+    HierarchicalSummarizer(cache_context=changed_context).summarize_events(
         raw_nodes,
         cache_file=str(cache_file),
     )
@@ -282,7 +281,6 @@ def test_year_prompt_requires_stable_episode_index_labels() -> None:
     ("level_name", "input_phrase"),
     [
         ("Episode", "The current Episode input is multiple structured Part summaries."),
-        ("Event", "The current Event input is multiple structured Episode summaries."),
     ],
 )
 def test_aggregate_summary_prompts_describe_structured_child_inputs(
@@ -352,69 +350,6 @@ Important Terms:
     trimmed = trim_previous_summary_context(previous)
 
     assert trimmed == "Overview:\nEarlier overview.\n\nContinuity Facts:\n- Durable setup."
-
-
-def test_part_cache_fingerprint_uses_trimmed_previous_context(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    story_root = tmp_path / "story"
-    first_path = _write_story_file(
-        story_root,
-        "103/第1話『花咲きたい！』/1.md",
-        "花帆: こんにちは",
-    )
-    second_path = _write_story_file(
-        story_root,
-        "103/第1話『花咲きたい！』/2.md",
-        "さやか: どうしたの？",
-    )
-    raw_nodes = [
-        *StoryProcessor.process_file(first_path),
-        *StoryProcessor.process_file(second_path),
-    ]
-    cache_file = tmp_path / "summaries_cache.json"
-
-    def fake_generate(
-        self: HierarchicalSummarizer,
-        current_text: str,
-        prev_summary: str | None = None,
-        level_name: str = "Part",
-    ) -> str:
-        return f"""Overview:
-{level_name} overview for {current_text}
-
-Key Events:
-- Excluded from previous context.
-
-Character Developments:
-- None
-
-Continuity Facts:
-- Durable context for {level_name}.
-
-Important Terms:
-- Kaho
-"""
-
-    monkeypatch.setattr(HierarchicalSummarizer, "_generate_rolling_summary", fake_generate)
-
-    HierarchicalSummarizer(cache_context=_cache_context(first_path)).summarize_parts(
-        raw_nodes,
-        cache_file=str(cache_file),
-    )
-
-    cache = json.loads(cache_file.read_text(encoding="utf-8"))
-    second_entry = cache["103|Main|第1話『花咲きたい！』|2"]
-    expected_previous_context = """Overview:
-Part overview for 花帆: こんにちは
-
-Continuity Facts:
-- Durable context for Part."""
-
-    assert second_entry["inputs"]["previous_summary_hash"] == hash_text(
-        expected_previous_context
-    )
 
 
 def test_default_generation_context_preserves_legacy_summary_fingerprint_shape(

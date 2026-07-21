@@ -191,15 +191,20 @@ function hierEventCard(nodeId, data, evByArc) {
 // The redundant single "part" child is collapsed into the episode summary.
 function hierEpisode(node, data, arc) {
   const label = episodeLabel(node.episodeName);
+  // Event-only pipeline produces no per-episode summary; legacy caches might carry
+  // an episode-tier (or single part) summary — support both.
+  let summary = node.summaryId ? data.summaries[node.summaryId] : null;
+  if (!summary) {
+    const part = (node.children || [])
+      .map((id) => data.nodes[id])
+      .find((n) => n && n.kind === "part" && n.summaryId);
+    if (part) summary = data.summaries[part.summaryId];
+  }
+
   const wrap = document.createElement("div");
   wrap.className = "hier-ep";
-
   const head = document.createElement("div");
   head.className = "hier-ep-head";
-  const toggle = document.createElement("button");
-  toggle.type = "button";
-  toggle.className = "hier-ep-toggle";
-  toggle.innerHTML = `<span class="hier-chev">▸</span>${escapeHtml(label)}`;
   const link = document.createElement("a");
   link.href = "#";
   link.className = "hier-ep-transcript";
@@ -208,38 +213,37 @@ function hierEpisode(node, data, arc) {
     e.preventDefault();
     openTranscript(arc, node.episodeName, label);
   };
+
+  if (!summary) {
+    // No episode summary → just the label + transcript link (no empty expander).
+    const name = document.createElement("span");
+    name.className = "hier-ep-name";
+    name.textContent = label;
+    head.appendChild(name);
+    head.appendChild(link);
+    wrap.appendChild(head);
+    return wrap;
+  }
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "hier-ep-toggle";
+  toggle.innerHTML = `<span class="hier-chev">▸</span>${escapeHtml(label)}`;
   head.appendChild(toggle);
   head.appendChild(link);
   wrap.appendChild(head);
-
   const body = document.createElement("div");
   body.className = "hier-ep-body hidden";
   wrap.appendChild(body);
-
-  // episode-tier summary, or the single part's summary (collapse the redundant tier)
-  let summary = node.summaryId ? data.summaries[node.summaryId] : null;
-  if (!summary) {
-    const part = (node.children || [])
-      .map((id) => data.nodes[id])
-      .find((n) => n && n.kind === "part" && n.summaryId);
-    if (part) summary = data.summaries[part.summaryId];
-  }
   toggle.addEventListener("click", () => {
     const nowHidden = body.classList.toggle("hidden");
     toggle.querySelector(".hier-chev").textContent = nowHidden ? "▸" : "▾";
     if (!body.dataset.filled) {
       body.dataset.filled = "1";
-      body.appendChild(summary ? hierSummary(summary) : emptyNote("No episode summary."));
+      body.appendChild(hierSummary(summary));
     }
   });
   return wrap;
-}
-
-function emptyNote(text) {
-  const p = document.createElement("p");
-  p.className = "empty";
-  p.textContent = text;
-  return p;
 }
 
 // Summary sections: markdown + character coloring/icons (decorateNames), since the

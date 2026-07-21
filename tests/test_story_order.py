@@ -257,9 +257,10 @@ part_order_overrides:
 """,
     )
     story_order = load_story_order(config_path, story_root=story_root)
-    episode_summary = StoryProcessor.process_file(part_one_path)[0]
-    episode_summary.summary_level = 2
-    episode_summary.metadata.part_name = "ALL_PARTS"
+    raw_nodes = [
+        *StoryProcessor.process_file(part_one_path),
+        *StoryProcessor.process_file(story_root / "103" / episode_name / "幕間.md"),
+    ]
 
     summarizer = HierarchicalSummarizer(story_order=story_order)
 
@@ -273,8 +274,9 @@ part_order_overrides:
 
     monkeypatch.setattr(HierarchicalSummarizer, "_generate_rolling_summary", fake_generate)
 
-    year_summaries = summarizer.summarize_years([episode_summary], cache_file=str(tmp_path / "cache.json"))
+    # Event-only pipeline: one summary per arc, straight from the raw scenes.
+    event_summaries = summarizer.summarize_events(raw_nodes, cache_file=str(tmp_path / "cache.json"))
 
-    assert len(year_summaries) == 1
-    assert year_summaries[0].text == "Event summary"
-    assert year_summaries[0].metadata.episode_name == "ALL_EPISODES"
+    assert len(event_summaries) == 1
+    assert event_summaries[0].text == "Event summary"
+    assert event_summaries[0].metadata.episode_name == "ALL_EPISODES"
