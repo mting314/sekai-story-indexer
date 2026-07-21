@@ -685,7 +685,10 @@ def _load_event_summaries(story_root: Path) -> dict[str, str]:
                     return {}
         return {}
 
-    # Legacy flat store: {arc: text | {summary, ...}}.
+    # Legacy flat store: {arc: text | {summary, ...}}. (The old summarizer's
+    # truncated/leaky entries were dropped from the file once — see
+    # scripts/drop_truncated_summaries.py — so no runtime cleanup is needed here;
+    # events with no clean summary generate one on demand.)
     merged = {arc: _text(v) for arc, v in _read("event_summaries.json").items()}
     # Hierarchical store: {"EVENT|<arc>": {...}, "EPISODE|...": ...} — take the
     # EVENT tier and let a non-empty hierarchical summary override the legacy one.
