@@ -310,7 +310,7 @@ function eventHero(ev, node) {
 }
 
 // Open the right sidebar with an episode's raw transcript (fetched on demand).
-async function openTranscript(arc, episodeSlug, label, highlight) {
+async function openTranscript(arc, episodeSlug, label, highlight, enQuote) {
   const sb = document.getElementById("sidebar");
   document.getElementById("sb-title").textContent = label;
   document.getElementById("sb-sub").textContent = "raw transcript";
@@ -337,6 +337,14 @@ async function openTranscript(arc, episodeSlug, label, highlight) {
     .replaceAll("⁦LH⁦", "</mark>");
   el.innerHTML = `<div class="answer-text">${html}</div>`;
   decorateNames(el, new Set());
+  // Show the verbatim official English line above the JP transcript, when the
+  // scene is localized (the transcript itself stays JP, with the source highlighted).
+  if (enQuote) {
+    const banner = document.createElement("div");
+    banner.className = "en-quote";
+    banner.innerHTML = `<span class="en-quote-label">Official EN</span>${escapeHtml(enQuote)}`;
+    el.prepend(banner);
+  }
   const mark = el.querySelector("mark");
   if (mark) mark.scrollIntoView({ block: "center" });
   else el.scrollTop = 0;
@@ -354,7 +362,7 @@ function openCitation(cite) {
     if (!hl && cite.excerpt) {
       hl = (cite.excerpt.split("\n").find((l) => l.trim() && !l.trim().startsWith("#")) || "").trim();
     }
-    openTranscript(cite.arc_id, cite.episode, cite.label || "Transcript", hl || "");
+    openTranscript(cite.arc_id, cite.episode, cite.label || "Transcript", hl || "", cite.quote_en || "");
   } else {
     openExcerpt(cite);
   }

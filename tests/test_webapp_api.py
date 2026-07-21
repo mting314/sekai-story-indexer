@@ -211,6 +211,27 @@ def test_finalize_citations_noop_when_nothing_cited():
     assert nl2 == nl and kept == cits  # don't blank sources when model didn't cite
 
 
+def test_finalize_citations_attaches_official_en_quote(monkeypatch):
+    from webapp import server
+
+    jp = "穂波: 弟もいるから"
+    monkeypatch.setattr(server, "_official_en_map", lambda: {jp: "Honami: I have a younger brother too"})
+    cits = [{"ref": 1, "arc_id": "0001-x", "excerpt": f"# 5\n\n{jp}\n"}]
+    nl = "She has a younger brother [1]."
+    _nl2, kept = server._finalize_citations(nl, cits, grounding={1: jp})
+    assert kept[0]["quote"] == jp  # verbatim JP source line highlighted in transcript
+    assert kept[0]["quote_en"] == "Honami: I have a younger brother too"  # official EN attached
+
+
+def test_finalize_citations_no_en_when_unlocalized(monkeypatch):
+    from webapp import server
+
+    monkeypatch.setattr(server, "_official_en_map", lambda: {})  # nothing localized
+    cits = [{"ref": 1, "arc_id": "0001-x", "excerpt": "# 5\n\n穂波: 弟もいるから\n"}]
+    _nl2, kept = server._finalize_citations("x [1]", cits, grounding={1: "穂波: 弟もいるから"})
+    assert "quote_en" not in kept[0]  # JP-only fallback
+
+
 def test_image_proxy_rejects_non_sekai_host(client):
     # SSRF guard: only the sekai asset CDN may be proxied.
     assert client.get("/api/img", params={"u": "https://example.com/x.png"}).status_code == 400

@@ -15,6 +15,10 @@ from __future__ import annotations
 
 MASTER_DB = "https://sekai-world.github.io/sekai-master-db-diff"
 ASSET_CDN = "https://storage.sekai.best/sekai-jp-assets"
+# Official English asset CDN — same layout as the JP CDN, but lags JP and is
+# incomplete. Used only to source verbatim EN quotes for already-localized
+# scenes; JP stays the source of truth (and the fallback) everywhere else.
+EN_ASSET_CDN = "https://storage.sekai.best/sekai-en-assets"
 
 # Canonical unit slugs. These are the Tier-1 grouping for the index and the
 # value of ``--unit`` query scoping.
