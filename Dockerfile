@@ -15,7 +15,6 @@ ENV PYTHONUNBUFFERED=1 \
     SEKAI_STORY_ROOT=/app/story \
     SEKAI_EVENTS_INDEX=/app/events_index.json \
     SEKAI_SUMMARIES_CACHE=/app/summaries_cache.json \
-    SEKAI_EVENT_SUMMARIES=/app/event_summaries.json \
     PORT=8000
 
 WORKDIR /app
@@ -32,7 +31,7 @@ RUN pip install --no-cache-dir \
 COPY src/ ./src/
 COPY webapp/ ./webapp/
 COPY story/ ./story/
-COPY events_index.json story_order.yaml glossary.json summaries_cache.json event_summaries.json ./
+COPY events_index.json story_order.yaml glossary.json summaries_cache.json ./
 
 # Drop privileges.
 RUN useradd -m app && chown -R app /app

@@ -1082,20 +1082,10 @@ def _cmd_summarize(arg: str, req: CommandRequest) -> dict:
         question=f"summarize {ev.get('nickname') or ev.get('name') or arc}",
         session_id=req.session_id,
     )
+    # Non-hierarchical events have no pre-baked summary (legacy store retired), so
+    # _query_local synthesizes over the event's scenes — inline [n] + grounded
+    # quotes, and result["generated"] set. Keyless -> extractive over the scenes.
     result = _query_local(qreq, (arc,) if arc else ())
-    # A legacy/pre-baked summary is static prose with no inline [n]. When generation
-    # is available, synthesize a fresh summary over the event's scenes so the answer
-    # carries inline citations + grounded quotes; keyless keeps the static prose.
-    from sekai_story_indexer.query.generate import generate_answer, generation_available
-
-    if result.get("pre_summarized") and generation_available() and result.get("citations"):
-        gen = generate_answer(
-            f'Summarize the event "{ev.get("name")}" in detail.', result["citations"]
-        )
-        if gen:
-            nl, grounding = gen
-            result.pop("pre_summarized", None)
-            _apply_generated_answer(result, nl, grounding)  # inline [n] + grounded quotes
     answer = (result.get("answer") or "").strip()
     if not answer:
         return _command_response(
