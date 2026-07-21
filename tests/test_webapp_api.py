@@ -278,3 +278,30 @@ def test_episode_raw_endpoint(client):
 def test_episode_raw_rejects_path_traversal(client):
     data = client.get("/api/episode-raw?arc=../../etc&episode=passwd").json()
     assert data["text"] == ""
+
+
+def test_summarize_intercept_serves_hierarchical_cache(client, tmp_path, monkeypatch):
+    """'summarize <nickname>' returns the hierarchical event summary (summaries_cache.json
+    EVENT|<arc>), not the retired local event_summaries.json."""
+    import json
+
+    from webapp import server as server_module
+
+    monkeypatch.setattr(
+        server_module, "load_events",
+        lambda: [{"nickname": "test1", "arc_slug": "0999-testarc",
+                  "name": "Test Event", "unit": "leo_need", "focus_character_id": 1}],
+    )
+    monkeypatch.setattr(server_module, "_characters_meta", lambda: {})
+    cache = {"EVENT|0999-testarc": {
+        "summary": "Overview:\nHierarchical event summary.\n\nEpisode Index:\n- Episode 1: a beat.",
+        "inputs": {"level": "event"},
+    }}
+    cp = tmp_path / "summaries_cache.json"
+    cp.write_text(json.dumps(cache), encoding="utf-8")
+    monkeypatch.setenv("SEKAI_SUMMARIES_CACHE", str(cp))
+
+    body = client.post("/api/query", json={"question": "summarize test1"}).json()
+    assert body["backend"] == "summary"
+    assert "Hierarchical event summary" in body["answer"]
+    assert "Episode Index" in body["answer"]

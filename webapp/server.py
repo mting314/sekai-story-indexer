@@ -728,8 +728,9 @@ _SUMMARIZE_RE = re.compile(r"\b(summar(?:y|ize|ise)|recap|overview|tl;?dr|synops
 
 def _summarize_intercept(question: str) -> dict | None:
     """'Summarize <event>' where the event resolves (nickname/focus) and has a
-    pre-computed summary -> return that summary directly, instead of letting the
-    RAG re-summarize raw scenes (which tends to dump the whole cast)."""
+    pre-computed **hierarchical** event summary (``summaries_cache.json`` →
+    ``EVENT|<arc>``) -> return that directly, instead of letting RAG re-summarize
+    raw scenes. Events without a hierarchical summary fall through to normal RAG."""
     if not _SUMMARIZE_RE.search(question):
         return None
     try:
@@ -738,20 +739,22 @@ def _summarize_intercept(question: str) -> dict | None:
         ev = resolve_focus_reference(question, load_events(), _characters_meta())
         if not ev:
             return None
-        path = _summaries_path()
-        sums = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-        ent = _entry(sums.get(ev.get("arc_slug"), ""))
-        if not ent["summary"]:
+        arc = ev.get("arc_slug")
+        path = _hierarchical_cache_path()
+        cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        entry = cache.get(f"EVENT|{arc}")
+        summary = (entry.get("summary") if isinstance(entry, dict) else entry) or ""
+        if not summary.strip():
             return None
         return {
-            "answer": ent["summary"],
-            "answer_parts": [{"type": "text", "text": ent["summary"]}],
-            "characters": ent["characters"],
+            "answer": summary,
+            "answer_parts": [{"type": "text", "text": summary}],
+            "characters": [],  # hierarchical summaries carry no inline char tags
             "citations": [{
-                "ref": 1, "arc_id": ev.get("arc_slug"),
+                "ref": 1, "arc_id": arc,
                 "label": f"{ev.get('name')} — event summary",
                 "episode_title": "Event summary",
-                "nickname": ev.get("nickname"), "excerpt": ent["summary"],
+                "nickname": ev.get("nickname"), "excerpt": summary,
             }],
             "intent": "summarize", "backend": "summary", "error": None,
         }
