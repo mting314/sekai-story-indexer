@@ -641,6 +641,7 @@ def _load_event_summaries(story_root: Path) -> dict[str, str]:
     exists instead of only the frozen legacy file.
     """
     import json
+    import os
     import re
 
     # Values may be bare strings (legacy flat cache) or {summary, characters}
@@ -650,8 +651,13 @@ def _load_event_summaries(story_root: Path) -> dict[str, str]:
         s = v if isinstance(v, str) else (v or {}).get("summary", "")
         return re.sub(r"\{char_id=\d+\}", "", s)
 
-    def _read(name: str) -> dict:
-        for candidate in (Path(name), story_root.parent / name):
+    def _read(name: str, env: str | None = None) -> dict:
+        # Honor an env override (e.g. SEKAI_SUMMARIES_CACHE) so this matches the
+        # webapp's _hierarchical_cache_path — otherwise a non-default cache location
+        # is silently missed here and the chat falls back to the legacy store.
+        override = os.environ.get(env) if env else None
+        candidates = [Path(override)] if override else [Path(name), story_root.parent / name]
+        for candidate in candidates:
             if candidate.exists():
                 try:
                     return json.loads(candidate.read_text(encoding="utf-8"))
@@ -663,7 +669,7 @@ def _load_event_summaries(story_root: Path) -> dict[str, str]:
     merged = {arc: _text(v) for arc, v in _read("event_summaries.json").items()}
     # Hierarchical store: {"EVENT|<arc>": {...}, "EPISODE|...": ...} — take the
     # EVENT tier and let a non-empty hierarchical summary override the legacy one.
-    for key, v in _read("summaries_cache.json").items():
+    for key, v in _read("summaries_cache.json", "SEKAI_SUMMARIES_CACHE").items():
         if key.startswith("EVENT|"):
             text = _text(v)
             if text.strip():

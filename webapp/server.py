@@ -1066,16 +1066,25 @@ def commands_list() -> list[dict]:
 def command(req: CommandRequest) -> dict:
     """Handle a chat slash command (`/summarize mino7`, `/lines`, `/help`, …)."""
     line = req.command.strip().lstrip("/").strip()
-    if not line:
-        return _cmd_help("", req)
     head, _, rest = line.partition(" ")
-    handler = _COMMAND_DISPATCH.get(head.lower())
-    if handler is None:
-        return _command_response(f"Unknown command `/{head}`. Type `/help` for the list.")
-    try:
-        return handler(rest.strip(), req)
-    except Exception as exc:  # noqa: BLE001 - never 500 a chat command
-        return _command_response(f"Command failed: {exc}")
+    head = head.lower()
+    if not line:
+        result = _cmd_help("", req)
+    elif (handler := _COMMAND_DISPATCH.get(head)) is None:
+        result = _command_response(f"Unknown command `/{head}`. Type `/help` for the list.")
+    else:
+        try:
+            result = handler(rest.strip(), req)
+        except Exception as exc:  # noqa: BLE001 - never 500 a chat command
+            result = _command_response(f"Command failed: {exc}")
+    # Log command turns too, so /summarize (which can spend a generation call) is
+    # visible in the per-turn chat log like /api/query and the streaming path.
+    _log_turn({
+        "question": req.command, "route": "command", "command": head or "help",
+        "backend": result.get("backend"), "citations": len(result.get("citations") or []),
+        "session_id": req.session_id, "error": result.get("error"),
+    })
+    return result
 
 
 @app.post("/api/query")

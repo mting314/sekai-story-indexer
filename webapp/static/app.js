@@ -330,7 +330,7 @@ async function openTranscript(arc, episodeSlug, label, highlight) {
   // match survives escaping and the citation's JP line matches the JP transcript).
   let text = data.text;
   if (highlight && text.includes(highlight)) {
-    text = text.replace(highlight, `⁦HL⁦${highlight}⁦LH⁦`);
+    text = text.replace(highlight, () => `⁦HL⁦${highlight}⁦LH⁦`); // fn replacer: no $-pattern interpretation
   }
   let html = renderMarkdown(text)
     .replaceAll("⁦HL⁦", "<mark>")

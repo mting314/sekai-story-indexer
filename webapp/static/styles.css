@@ -71,7 +71,6 @@ main {
 .cmd-name { color: var(--accent); font-weight: 600; }
 .cmd-args { color: var(--muted); font-size: 11px; }
 .cmd-desc { color: var(--muted); margin-left: auto; font-size: 11px; text-align: right; }
-#ask-form input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #2b2f3a; background: #0c0e14; color: var(--text); }
 #ask-form button { padding: 10px 16px; border: 0; border-radius: 8px; background: var(--accent); color: #04222b; font-weight: 600; cursor: pointer; }
 /* scope indicator styled like a messaging-app reply/quote card, above the input */
 .scope-hint { display: flex; align-items: center; gap: 10px; margin: 2px 0 8px; padding: 7px 10px 7px 12px; background: #0c0e14; border-radius: 10px; border-left: 3px solid var(--scope-color, var(--accent)); }
