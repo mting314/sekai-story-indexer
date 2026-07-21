@@ -13,6 +13,7 @@ from .manifest import (
     hash_text,
     stable_hash,
 )
+from .processor import episode_number_from_names
 
 # Section constants + the pure extractor live in a dependency-free module so the
 # reader/web app can parse summaries without the generation stack; re-exported
@@ -65,7 +66,7 @@ def _summary_input_label(level_name: str) -> str:
     if level_name == "Episode":
         return "CURRENT EPISODE INPUT (STRUCTURED PART SUMMARIES)"
     if level_name == "Event":
-        return "CURRENT EVENT INPUT (STRUCTURED EPISODE SUMMARIES)"
+        return "CURRENT EVENT TEXT (RAW STORY SCENES, ONE PER EPISODE)"
     return f"CURRENT {level_name.upper()} INPUT"
 
 
@@ -83,9 +84,9 @@ def _summary_input_instructions(level_name: str) -> str:
         )
     if level_name == "Event":
         return (
-            "The current Event input is multiple structured Episode summaries. Synthesize across "
-            "the child Episode summaries into an event-level episode routing index and status "
-            "summary. Do not concatenate, copy, or preserve child section structures verbatim."
+            "The current Event input is the event's raw story scenes in reading order, each "
+            "marked '## Episode N'. Summarize the whole event into an event-level narrative "
+            "plus a per-episode index. Do not copy scene text verbatim."
         )
     return f"The current input is a {level_name}."
 
@@ -359,279 +360,74 @@ class HierarchicalSummarizer:
                 hashes[file_path] = hash_text("\n\n---\n\n".join(texts))
         return hashes
 
-    def _part_cache_inputs(
-        self,
-        *,
-        scenes: list[StoryNode],
-        part_text: str,
-        prev_summary: str | None,
-    ) -> dict[str, Any]:
-        return {
-            **self._base_fingerprint_inputs("part"),
-            "source_file_hashes": self._source_file_hashes_for_nodes(scenes),
-            "source_text_hash": hash_text(part_text),
-            "previous_summary_hash": hash_text(prev_summary) if prev_summary else "",
-        }
-
-    def _aggregate_cache_inputs(
+    def _raw_cache_inputs(
         self,
         *,
         level: str,
-        child_nodes: list[StoryNode],
-        combined_text: str,
+        scenes: list[StoryNode],
+        text: str,
         prev_summary: str | None,
     ) -> dict[str, Any]:
+        """Fingerprint for a summary generated directly from raw scenes (tracks the
+        source files so a story edit invalidates the cached summary)."""
         return {
             **self._base_fingerprint_inputs(level),
-            "child_summary_hashes": [hash_text(node.text) for node in child_nodes],
-            "combined_text_hash": hash_text(combined_text),
+            "source_file_hashes": self._source_file_hashes_for_nodes(scenes),
+            "source_text_hash": hash_text(text),
             "previous_summary_hash": hash_text(prev_summary) if prev_summary else "",
         }
 
     def summarize_hierarchy(self, raw_nodes: list[StoryNode], cache_file: str = "summaries_cache.json") -> list[StoryNode]:
-        """
-        Builds the full Tier 1-3 hierarchy.
-        Returns a flat list of all generated Summary Nodes (Part, Episode, and Event levels)
-        so they can all be embedded into the Vector DB.
-        """
-        all_summaries = []
-
-        # 1. Generate Tier 3 (Part) Summaries
-        safe_print("\n--- Generating Tier 3 (Part) Summaries ---")
-        part_summaries = self.summarize_parts(raw_nodes, cache_file)
-        all_summaries.extend(part_summaries)
-
-        # 2. Generate Tier 2 (Episode) Summaries
-        safe_print("\n--- Generating Tier 2 (Episode) Summaries ---")
-        episode_summaries = self.summarize_episodes(part_summaries, cache_file)
-        all_summaries.extend(episode_summaries)
-
-        # 3. Generate Tier 1 (Event) Summaries
+        """Build the event-tier summaries. Sekai stores one scene per episode, so the
+        Part/Episode sub-tiers are redundant — each event is summarized once, directly
+        from its raw scenes. Returns the Tier-1 (Event) summary nodes."""
         safe_print("\n--- Generating Tier 1 (Event) Summaries ---")
-        year_summaries = self.summarize_years(episode_summaries, cache_file)
-        all_summaries.extend(year_summaries)
+        return self.summarize_events(raw_nodes, cache_file)
 
-        return all_summaries
-
-    def summarize_parts(self, raw_nodes: list[StoryNode], cache_file: str = "summaries_cache.json") -> list[StoryNode]:
-        """
-        Groups raw scenes by Episode -> Part, concatenates them, and generates
-        Tier 3 (Part) summaries using a rolling context window.
-        Uses a local cache file to resume if processing fails halfway.
-        """
+    def summarize_events(self, raw_nodes: list[StoryNode], cache_file: str = "summaries_cache.json") -> list[StoryNode]:
+        """One Tier-1 (Event) summary per event, generated in a single call from the
+        event's raw scenes in reading order. Scenes are grouped by arc and labelled
+        '## Episode N' so the model can still emit a per-episode index. A rolling
+        previous-event summary is threaded for cross-event continuity."""
         cache = _load_cache(cache_file)
 
-        # Group by (arc_id, story_type, episode_name)
-        episodes: dict[tuple, dict[str, list[StoryNode]]] = defaultdict(lambda: defaultdict(list))
-        
+        events: dict[str, list[StoryNode]] = defaultdict(list)
         for node in raw_nodes:
-            meta = node.metadata
-            ep_key = (meta.arc_id, meta.story_type, meta.episode_name)
-            episodes[ep_key][meta.part_name].append(node)
+            events[node.metadata.arc_id].append(node)
 
-        summary_nodes = []
-
-        # Process each episode sequentially, globally sorted
-        sorted_ep_keys = sorted(episodes.keys(), key=lambda ep_key: self.story_order.summary_episode_key(*ep_key))
-        
-        prev_summary = None
-        
-        for ep_key in sorted_ep_keys:
-            arc_id, story_type, episode_name = ep_key
-            parts = episodes[ep_key]
-            
-            # Sort parts naturally
-            sorted_part_names = sorted(
-                parts.keys(),
-                key=lambda part_name: self.story_order.part_key(
-                    arc_id,
-                    story_type,
-                    episode_name,
-                    part_name,
-                ),
-            )
-            
-            for part_name in sorted_part_names:
-                cache_key = f"{arc_id}|{story_type}|{episode_name}|{part_name}"
-                
-                # Sort scenes within the part by their parsed index
-                scenes = sorted(parts[part_name], key=lambda n: n.metadata.scene_index)
-                
-                # We use the metadata of the first scene as a base, but mark it as a summary
-                base_meta = scenes[0].metadata.model_copy(deep=True)
-                base_meta.scene_index = -1 # Indicates it covers the whole part
-
-                # Gemini 3 has a massive context window, so we can concatenate the whole part
-                part_text = "\n\n---\n\n".join([n.text for n in scenes])
-                prev_context = trim_previous_summary_context(prev_summary)
-                cache_inputs = self._part_cache_inputs(
-                    scenes=scenes,
-                    part_text=part_text,
-                    prev_summary=prev_context,
-                )
-                fingerprint = stable_hash(cache_inputs)
-                cached = _cached_summary(cache, cache_key, fingerprint)
-
-                if cached is not None:
-                    safe_print(f"Loading cached summary for {cache_key}...")
-                    current_summary = cached
-                else:
-                    safe_print(f"Summarizing {cache_key}...")
-                    
-                    # Generate summary with rolling context
-                    current_summary = self._generate_rolling_summary(
-                        current_text=part_text, 
-                        prev_summary=prev_context,
-                        level_name="Part"
-                    )
-                    
-                    # Save to cache
-                    _store_cached_summary(
-                        cache,
-                        cache_key,
-                        summary=current_summary,
-                        fingerprint=fingerprint,
-                        inputs=cache_inputs,
-                    )
-                    _save_cache(cache_file, cache)
-
-                summary_node = StoryNode(
-                    text=current_summary,
-                    metadata=base_meta,
-                    summary_level=3
-                )
-                summary_nodes.append(summary_node)
-                
-                # Chain the context for the next part
-                prev_summary = current_summary
-
-        return summary_nodes
-
-    def summarize_episodes(self, part_nodes: list[StoryNode], cache_file: str = "summaries_cache.json") -> list[StoryNode]:
-        """Aggregates Tier 3 Part Summaries into Tier 2 Episode Summaries."""
-        cache = _load_cache(cache_file)
-
-        # Group by (arc_id, story_type, episode_name)
-        episodes: dict[tuple, list[StoryNode]] = defaultdict(list)
-        for node in part_nodes:
-            meta = node.metadata
-            ep_key = (meta.arc_id, meta.story_type, meta.episode_name)
-            episodes[ep_key].append(node)
-
-        summary_nodes = []
-        
-        sorted_ep_keys = sorted(episodes.keys(), key=lambda ep_key: self.story_order.summary_episode_key(*ep_key))
-        
-        prev_summary = None
-        for ep_key in sorted_ep_keys:
-            arc_id, story_type, episode_name = ep_key
-            cache_key = f"EPISODE|{arc_id}|{story_type}|{episode_name}"
-            parts = episodes[ep_key]
-
-            # Sort parts to maintain narrative order
-            parts = sorted(
-                parts,
-                key=lambda n: self.story_order.part_key(
-                    n.metadata.arc_id,
-                    n.metadata.story_type,
-                    n.metadata.episode_name,
-                    n.metadata.part_name,
-                ),
-            )
-            
-            base_meta = parts[0].metadata.model_copy(deep=True)
-            base_meta.part_name = "ALL_PARTS" # Represents the whole episode
-
-            combined_text = "\n\n---\n\n".join([f"Part: {n.metadata.part_name}\n{n.text}" for n in parts])
-            prev_context = trim_previous_summary_context(prev_summary)
-            cache_inputs = self._aggregate_cache_inputs(
-                level="episode",
-                child_nodes=parts,
-                combined_text=combined_text,
-                prev_summary=prev_context,
-            )
-            fingerprint = stable_hash(cache_inputs)
-            cached = _cached_summary(cache, cache_key, fingerprint)
-
-            if cached is not None:
-                safe_print(f"Loading cached episode summary for {cache_key}...")
-                current_summary = cached
-            else:
-                safe_print(f"Summarizing Episode: {cache_key}...")
-                
-                current_summary = self._generate_rolling_summary(
-                    current_text=combined_text, 
-                    prev_summary=prev_context,
-                    level_name="Episode"
-                )
-                
-                _store_cached_summary(
-                    cache,
-                    cache_key,
-                    summary=current_summary,
-                    fingerprint=fingerprint,
-                    inputs=cache_inputs,
-                )
-                _save_cache(cache_file, cache)
-
-            summary_nodes.append(StoryNode(
-                text=current_summary,
-                metadata=base_meta,
-                summary_level=2
-            ))
-            
-            prev_summary = current_summary
-
-        return summary_nodes
-
-    def summarize_years(self, episode_nodes: list[StoryNode], cache_file: str = "summaries_cache.json") -> list[StoryNode]:
-        """Aggregates Tier 2 Episode Summaries into Tier 1 Event Summaries."""
-        cache = _load_cache(cache_file)
-
-        # Group by arc_id (Event)
-        years: dict[str, list[StoryNode]] = defaultdict(list)
-        for node in episode_nodes:
-            years[node.metadata.arc_id].append(node)
-
-        summary_nodes = []
-        
-        sorted_years = sorted(
-            years.keys(),
+        summary_nodes: list[StoryNode] = []
+        sorted_arcs = sorted(
+            events.keys(),
             key=lambda arc_id: min(
-                self.story_order.summary_episode_key(
-                    node.metadata.arc_id,
-                    node.metadata.story_type,
-                    node.metadata.episode_name,
-                )
-                for node in years[arc_id]
+                self.story_order.chronological_node_key(node) for node in events[arc_id]
             ),
         )
-        
+
         prev_summary = None
-        for arc_id in sorted_years:
+        for arc_id in sorted_arcs:
             cache_key = f"EVENT|{arc_id}"
-            episodes = years[arc_id]
-            
-            # Sort episodes inside the year
-            episodes = sorted(
-                episodes,
-                key=lambda n: self.story_order.summary_episode_key(
-                    n.metadata.arc_id,
-                    n.metadata.story_type,
-                    n.metadata.episode_name,
-                ),
-            )
-            
-            base_meta = episodes[0].metadata.model_copy(deep=True)
+            scenes = sorted(events[arc_id], key=self.story_order.chronological_node_key)
+
+            base_meta = scenes[0].metadata.model_copy(deep=True)
             base_meta.episode_name = "ALL_EPISODES"
             base_meta.part_name = "ALL_PARTS"
+            base_meta.scene_index = -1
 
-            combined_text = "\n\n---\n\n".join([f"Episode: {n.metadata.episode_name}\n{n.text}" for n in episodes])
+            # Numbered episode markers (never the raw slug) so the single event call
+            # can still emit a per-episode index.
+            blocks = []
+            for node in scenes:
+                num = episode_number_from_names(
+                    node.metadata.episode_name, node.metadata.part_name
+                )
+                blocks.append(f"## Episode {num}\n{node.text}" if num else node.text)
+            combined_text = "\n\n---\n\n".join(blocks)
+
             prev_context = trim_previous_summary_context(prev_summary)
-            cache_inputs = self._aggregate_cache_inputs(
+            cache_inputs = self._raw_cache_inputs(
                 level="event",
-                child_nodes=episodes,
-                combined_text=combined_text,
+                scenes=scenes,
+                text=combined_text,
                 prev_summary=prev_context,
             )
             fingerprint = stable_hash(cache_inputs)
@@ -642,13 +438,11 @@ class HierarchicalSummarizer:
                 current_summary = cached
             else:
                 safe_print(f"Summarizing Event: {cache_key}...")
-                
                 current_summary = self._generate_rolling_summary(
-                    current_text=combined_text, 
+                    current_text=combined_text,
                     prev_summary=prev_context,
-                    level_name="Event"
+                    level_name="Event",
                 )
-                
                 _store_cached_summary(
                     cache,
                     cache_key,
@@ -658,12 +452,9 @@ class HierarchicalSummarizer:
                 )
                 _save_cache(cache_file, cache)
 
-            summary_nodes.append(StoryNode(
-                text=current_summary,
-                metadata=base_meta,
-                summary_level=1
-            ))
-            
+            summary_nodes.append(
+                StoryNode(text=current_summary, metadata=base_meta, summary_level=1)
+            )
             prev_summary = current_summary
 
         return summary_nodes
