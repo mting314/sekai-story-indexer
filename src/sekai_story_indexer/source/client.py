@@ -50,6 +50,14 @@ def fetch_json(url: str, *, retries: int = 3, backoff: float = 1.5) -> Any:
             req = urllib.request.Request(url, headers=_UA)
             with urllib.request.urlopen(req, timeout=30, context=_SSL_CONTEXT) as resp:
                 return json.loads(resp.read())
+        except urllib.error.HTTPError as exc:  # pragma: no cover - network
+            # 4xx is permanent (e.g. 404 for an unlocalized EN asset) — retrying
+            # only wastes backoff; fail fast. 5xx may be transient -> fall through.
+            if 400 <= exc.code < 500:
+                raise RuntimeError(f"failed to fetch {url}: {exc}") from exc
+            last_exc = exc
+            if attempt < retries - 1:
+                time.sleep(backoff ** attempt)
         except _RETRYABLE as exc:  # pragma: no cover - network
             last_exc = exc
             if attempt < retries - 1:
