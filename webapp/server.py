@@ -278,14 +278,19 @@ _SLUG_RE = re.compile(r"[A-Za-z0-9_-]+")
 def episode_raw(arc: str, episode: str) -> dict:
     """Raw episode transcript (H1 title + scene text) for the sidebar, read from the
     story tree. ``arc``/``episode`` are slugs; anything else is rejected (no path
-    traversal). Returns {title, text}; empty text when the file isn't found."""
+    traversal). Prefers the official-English sidecar (``<episode>.md.en``) where the
+    event is localized, falling back to the JP ``.md``. Returns {title, text, region}
+    (region ``en``|``jp``); empty text when the file isn't found."""
     if not (_SLUG_RE.fullmatch(arc) and _SLUG_RE.fullmatch(episode)):
-        return {"title": episode, "text": ""}
+        return {"title": episode, "text": "", "region": None}
     root = Path(os.environ.get("SEKAI_STORY_ROOT", "story"))
     matches = list(root.glob(f"*/*/{arc}/{episode}.md"))
     if not matches:
-        return {"title": episode, "text": ""}
-    lines = matches[0].read_text(encoding="utf-8").splitlines()
+        return {"title": episode, "text": "", "region": None}
+    jp = matches[0]
+    en = jp.with_name(jp.name + ".en")  # co-located official-EN sidecar
+    src, region = (en, "en") if en.exists() else (jp, "jp")
+    lines = src.read_text(encoding="utf-8").splitlines()
     title = episode
     # Pull the H1 out as the title and drop it from the body so the sidebar doesn't
     # render the title twice (header + heading).
@@ -295,7 +300,7 @@ def episode_raw(arc: str, episode: str) -> dict:
             title = line[2:].strip()
             continue
         body_lines.append(line)
-    return {"title": title, "text": "\n".join(body_lines).strip()}
+    return {"title": title, "text": "\n".join(body_lines).strip(), "region": region}
 
 
 # Live-scene fetch for the copyright-clean public deploy (derived index + live
@@ -320,21 +325,33 @@ def _scene_sources() -> dict:
 
 
 def _fetch_scene_live(coords: dict, q: str = "", fetch=None) -> dict:
-    """Fetch + render one scene from sekai.best (transient). When ``q`` is given,
-    also pick the exact best-matching source line as ``quote`` (over the transient
-    text — nothing stored). ``fetch`` injectable for tests."""
+    """Fetch + render one scene from sekai.best (transient). Prefers the official-EN
+    CDN, falling back to JP when the scene isn't localized. When ``q`` is given, also
+    pick the exact best-matching source line as ``quote`` (over the transient text —
+    nothing stored). ``fetch`` injectable for tests (used verbatim, region = coords)."""
     from sekai_story_indexer.source import client
     from sekai_story_indexer.source.transform import scenario_to_lines
 
-    fetch = fetch or (client.en_event_scenario if coords.get("region") == "en" else client.event_scenario)
-    try:
-        scenario = fetch(coords["bundle"], coords["scenario_id"])
-    except Exception:
-        return {"title": "", "text": "", "quote": ""}
+    bundle, sid = coords.get("bundle"), coords.get("scenario_id")
+    if fetch is not None:  # test injection
+        try:
+            scenario, region = fetch(bundle, sid), coords.get("region")
+        except Exception:
+            scenario, region = {}, None
+    else:  # official EN first, JP fallback
+        scenario = client.en_event_scenario(bundle, sid)  # {} when not localized
+        region = "en" if scenario else None
+        if not scenario:
+            try:
+                scenario, region = client.event_scenario(bundle, sid), "jp"
+            except Exception:
+                scenario, region = {}, None
+    if not scenario:
+        return {"title": "", "text": "", "quote": "", "region": None}
     lines = scenario_to_lines(scenario)
     text = "\n".join(f"{sp}: {t}" if sp else t for sp, t in lines)
     quote = _best_supporting_line(text, q) if q else ""
-    return {"title": "", "text": text, "quote": quote}
+    return {"title": "", "text": text, "quote": quote, "region": region}
 
 
 @app.get("/api/scene")

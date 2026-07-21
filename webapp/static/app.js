@@ -310,6 +310,13 @@ function eventHero(ev, node) {
 }
 
 // Open the right sidebar with an episode's raw transcript (fetched on demand).
+// Sidebar subtitle for the transcript's language (official EN where localized).
+function _regionLabel(region) {
+  return region === "en" ? "English (official)"
+    : region === "jp" ? "Japanese (source)"
+    : "transcript";
+}
+
 async function openTranscript(arc, episodeSlug, label, highlight, enQuote) {
   const sb = document.getElementById("sidebar");
   document.getElementById("sb-title").textContent = label;
@@ -325,21 +332,23 @@ async function openTranscript(arc, episodeSlug, label, highlight, enQuote) {
     return;
   }
   document.getElementById("sb-title").textContent = data.title || label;
-  // Highlight a specific source line by bracketing it with sentinels BEFORE
-  // markdown-escaping, then swapping them for <mark> in the rendered HTML (so the
-  // match survives escaping and the citation's JP line matches the JP transcript).
+  document.getElementById("sb-sub").textContent = _regionLabel(data.region);
+  // Highlight the line that matches the shown language: the official-EN line in an
+  // EN transcript, else the JP source line in a JP one. Sentinels survive the
+  // markdown escape, then become <mark>.
   let text = data.text;
-  if (highlight && text.includes(highlight)) {
-    text = text.replace(highlight, () => `⁦HL⁦${highlight}⁦LH⁦`); // fn replacer: no $-pattern interpretation
+  const hl = data.region === "en" && enQuote ? enQuote : highlight;
+  if (hl && text.includes(hl)) {
+    text = text.replace(hl, () => `⁦HL⁦${hl}⁦LH⁦`); // fn replacer: no $-pattern interpretation
   }
   let html = renderMarkdown(text)
     .replaceAll("⁦HL⁦", "<mark>")
     .replaceAll("⁦LH⁦", "</mark>");
   el.innerHTML = `<div class="answer-text">${html}</div>`;
   decorateNames(el, new Set());
-  // Show the verbatim official English line above the JP transcript, when the
-  // scene is localized (the transcript itself stays JP, with the source highlighted).
-  if (enQuote) {
+  // JP transcript + a localized quote -> show the official-EN line as a banner
+  // above it (redundant when the body itself is already English).
+  if (enQuote && data.region !== "en") {
     const banner = document.createElement("div");
     banner.className = "en-quote";
     banner.innerHTML = `<span class="en-quote-label">Official EN</span>${escapeHtml(enQuote)}`;
@@ -392,6 +401,7 @@ async function openLiveScene(cite) {
     el.innerHTML = '<p class="empty">Couldn\'t load this scene from sekai.best.</p>';
     return;
   }
+  document.getElementById("sb-sub").textContent = `${_regionLabel(data.region)} · live from sekai.best`;
   let text = data.text;
   if (data.quote && text.includes(data.quote)) {
     text = text.replace(data.quote, () => `⁦HL⁦${data.quote}⁦LH⁦`);
