@@ -325,7 +325,7 @@ async function openTranscript(arc, episodeSlug, label) {
     return;
   }
   document.getElementById("sb-title").textContent = data.title || label;
-  el.innerHTML = renderMarkdown(data.text);
+  el.innerHTML = `<div class="answer-text">${renderMarkdown(data.text)}</div>`;
   decorateNames(el, new Set());
   el.scrollTop = 0;
 }
@@ -1005,19 +1005,24 @@ function openExcerpt(cite) {
   if (cite.plot_weight && cite.plot_weight !== "unrated") bits.push(cite.plot_weight);
   if (cite.scene_index != null) bits.push(`scene ${cite.scene_index}`);
   document.getElementById("sb-sub").textContent = bits.join(" · ");
-  // Highlight the quoted line within the full excerpt.
   const esc = (s) =>
     (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  let body = esc(cite.excerpt || cite.quote || "");
+  const el = document.getElementById("sb-body");
   if (cite.quote) {
+    // Raw-scene excerpt: escape + highlight the quoted line (kept pre-wrap).
+    let body = esc(cite.excerpt || cite.quote || "");
     const q = esc(cite.quote);
     body = body.split(q).join(`<mark>${q}</mark>`);
+    el.innerHTML = body;
+    sb.classList.remove("hidden");
+    const m = el.querySelector("mark");
+    if (m) m.scrollIntoView({ block: "center" });
+    return;
   }
-  const el = document.getElementById("sb-body");
-  el.innerHTML = body;
+  // Summary / prose excerpt: render markdown with the same styling as the chat.
+  el.innerHTML = `<div class="answer-text">${renderMarkdown(cite.excerpt || "")}</div>`;
+  decorateNames(el, new Set());
   sb.classList.remove("hidden");
-  const m = el.querySelector("mark");
-  if (m) m.scrollIntoView({ block: "center" });
 }
 
 function closeExcerpt() {
@@ -1222,9 +1227,11 @@ async function runSlashCommand(q, pending) {
       if (res.focus) showFocusChip(res.focus);
       else document.getElementById("scope-hint").classList.add("hidden");
     }
-    // Slash commands are meta actions, not dialogue — keep them out of the NL
-    // history so they don't skew follow-up condensation. Cross-turn scoping is
-    // handled server-side via /scope's focus state.
+    // Keep command turns in the conversation history so follow-ups have context
+    // (e.g. asking about a line from a /summarize). The command line reads fine as
+    // a user turn; the response is the assistant turn.
+    state.history.push({ role: "user", text: q });
+    state.history.push({ role: "assistant", text: res.answer || "" });
   } catch (err) {
     pending.textContent = `⚠ ${err}`;
   }

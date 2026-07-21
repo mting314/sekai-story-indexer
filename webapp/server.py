@@ -881,7 +881,12 @@ def _resolve_command_event(arg: str, req: CommandRequest) -> dict | None:
     fall back to the session's pinned focus when no arg is given."""
     events = load_events()
     if arg:
-        return _resolve_event_ref(arg, events, _characters_meta())
+        ev = _resolve_event_ref(arg, events, _characters_meta())
+        # Pin the resolved event as the session focus so plain follow-up questions
+        # ("when does this happen?") stay scoped to it, like /scope does.
+        if ev and ev.get("arc_slug"):
+            _remember_focus(req.session_id, Focus(arcs=(ev["arc_slug"],), label=ev.get("name")))
+        return ev
     focus = _SESSIONS.get(req.session_id)
     if focus and focus.arcs:
         return next((e for e in events if e.get("arc_slug") == focus.arcs[0]), None)

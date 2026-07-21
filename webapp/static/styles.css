@@ -56,6 +56,9 @@ main {
 .sb-close { background: transparent; border: 0; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; }
 .sb-close:hover { color: var(--text); }
 .sb-body { white-space: pre-wrap; font-family: inherit; font-size: 13.5px; line-height: 1.55; color: var(--text); margin: 0; }
+/* markdown-rendered sidebar content (transcript / summary excerpt) lays out as
+   normal blocks, not pre-wrapped; raw-scene excerpts keep the pre-wrap above. */
+.sb-body .answer-text { white-space: normal; }
 #ask-form { display: flex; gap: 8px; position: relative; }
 
 /* Slash-command autocomplete menu (pops above the input) */
