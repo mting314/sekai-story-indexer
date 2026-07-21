@@ -495,3 +495,27 @@ def test_event_summaries_map_reads_hierarchical_not_legacy(tmp_path, monkeypatch
     monkeypatch.setenv("SEKAI_SUMMARIES_CACHE", str(cp))
     m = server._event_summaries_map()
     assert m == {"0002-marionette": {"summary": "Marionette overview."}}
+
+
+def test_event_summaries_map_cached_then_invalidated_on_mtime(tmp_path, monkeypatch):
+    """Cached per query (same object on re-call), but a re-ingest (new mtime) is
+    picked up without a restart."""
+    import json
+    import os
+
+    from webapp import server
+
+    cp = tmp_path / "summaries_cache.json"
+    cp.write_text(json.dumps({"EVENT|0001-x": {"summary": "v1"}}), encoding="utf-8")
+    monkeypatch.setenv("SEKAI_SUMMARIES_CACHE", str(cp))
+    monkeypatch.setattr(server, "_event_summaries_cache", {"key": object(), "map": {}})
+
+    m1 = server._event_summaries_map()
+    assert m1 == {"0001-x": {"summary": "v1"}}
+    assert server._event_summaries_map() is m1  # cache hit: same object, no re-parse
+
+    # re-ingest: new content + bumped mtime -> invalidated, picks up v2
+    cp.write_text(json.dumps({"EVENT|0001-x": {"summary": "v2"}}), encoding="utf-8")
+    st = cp.stat()
+    os.utime(cp, (st.st_atime, st.st_mtime + 10))
+    assert server._event_summaries_map() == {"0001-x": {"summary": "v2"}}
