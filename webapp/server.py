@@ -193,16 +193,33 @@ def _hierarchical_cache_path() -> Path:
     return next((p for p in candidates if p.exists()), candidates[-1])
 
 
+_event_summaries_cache: dict[str, Any] = {"key": object(), "map": {}}
+
+
 def _event_summaries_map() -> dict:
     """``{arc -> summary entry}`` from the hierarchical cache (``EVENT|<arc>`` tier),
-    used by the full-backend citation excerpts + metadata answers. Replaces the
-    retired flat ``event_summaries.json``; returns {} when the cache is absent."""
+    used by the full-backend citation excerpts + metadata answers (replaces the
+    retired flat ``event_summaries.json``); {} when the cache is absent.
+
+    Cached, invalidated on the file's (path, mtime): _metadata_intercept calls this
+    per query, so we avoid re-parsing the ~380KB cache each time; a re-ingest bumps
+    the mtime and is picked up without a restart (and a test pointing at a fresh
+    cache file gets a distinct key, so no stale map)."""
     path = _hierarchical_cache_path()
     try:
-        cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    except Exception:
-        return {}
-    return {k.split("|", 1)[1]: v for k, v in cache.items() if k.startswith("EVENT|")}
+        key = (str(path), path.stat().st_mtime)
+    except OSError:
+        key = (str(path), None)
+    if _event_summaries_cache["key"] != key:
+        try:
+            cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        except Exception:
+            cache = {}
+        _event_summaries_cache["map"] = {
+            k.split("|", 1)[1]: v for k, v in cache.items() if k.startswith("EVENT|")
+        }
+        _event_summaries_cache["key"] = key
+    return _event_summaries_cache["map"]  # type: ignore[return-value]
 
 
 @app.get("/api/hierarchical-summaries")
