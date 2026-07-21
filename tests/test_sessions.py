@@ -15,32 +15,45 @@ def test_is_followup_detects_pronouns_and_connectives():
 def test_resolve_turn_switches_on_named_arcs():
     prev = Focus(arcs=("0005-x",), character_id=7)
     focus, scope = resolve_turn(
-        prev, referenced_arcs=("0002-y",), character_id=18, label="E", followup=False
+        prev, referenced_arcs=("0002-y",), character_id=18, label="E"
     )
     assert focus.arcs == ("0002-y",) and scope == ("0002-y",)  # reset to the new topic
 
 
-def test_resolve_turn_carries_focus_on_followup():
+def test_resolve_turn_carries_focus_on_pronoun_followup():
     prev = Focus(arcs=("0005-x",), character_id=7)
     focus, scope = resolve_turn(
-        prev, referenced_arcs=(), character_id=None, label=None, followup=True
+        prev, referenced_arcs=(), character_id=None, label=None
     )
-    assert scope == ("0005-x",)  # pronoun follow-up stays on the remembered event
+    assert scope == ("0005-x",)  # follow-up stays on the remembered event
     assert focus is prev
 
 
-def test_resolve_turn_no_carry_without_followup():
-    prev = Focus(arcs=("0005-x",))
+def test_resolve_turn_arc_focus_is_sticky_for_bare_question():
+    # "When did Honami ask Kanade for help?" right after summarizing an event names
+    # no new event -> it must stay scoped to that event, not go global.
+    prev = Focus(arcs=("0076-echo-my-melody",))
     focus, scope = resolve_turn(
-        prev, referenced_arcs=(), character_id=None, label=None, followup=False
+        prev, referenced_arcs=(), character_id=None, label=None
     )
-    assert scope == ()  # a fresh open question does not inherit prior scope
+    assert scope == ("0076-echo-my-melody",)  # sticky: soft-scope fallback guards it
 
 
-def test_resolve_turn_shifts_to_new_character():
+def test_resolve_turn_naming_a_character_keeps_the_event():
+    # Naming a character while focused on an event updates the in-focus character
+    # but stays scoped to the event (the soft-scope fallback handles the case where
+    # that character isn't actually in it).
     prev = Focus(arcs=("0005-x",), character_id=7)
     focus, scope = resolve_turn(
-        prev, referenced_arcs=(), character_id=9, label="Kohane", followup=False
+        prev, referenced_arcs=(), character_id=9, label="Kohane"
+    )
+    assert focus.character_id == 9 and focus.arcs == ("0005-x",) and scope == ("0005-x",)
+
+
+def test_resolve_turn_character_focus_without_prior_event():
+    # With no arc focus yet, a named character just sets character focus (no scope).
+    focus, scope = resolve_turn(
+        Focus(), referenced_arcs=(), character_id=9, label="Kohane"
     )
     assert focus.character_id == 9 and focus.arcs == () and scope == ()
 

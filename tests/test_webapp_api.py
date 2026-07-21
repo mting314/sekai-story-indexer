@@ -519,3 +519,124 @@ def test_event_summaries_map_cached_then_invalidated_on_mtime(tmp_path, monkeypa
     st = cp.stat()
     os.utime(cp, (st.st_atime, st.st_mtime + 10))
     assert server._event_summaries_map() == {"0001-x": {"summary": "v2"}}
+
+
+def test_no_lexical_overlap_helper():
+    from webapp import server
+
+    # only zero-score citations -> the scoped event shares nothing with the query
+    assert server._no_lexical_overlap({"citations": [{"score": 0.0}, {"score": 0}]})
+    assert server._no_lexical_overlap({"citations": []})
+    assert server._no_lexical_overlap({})
+    # any positive score means real overlap
+    assert not server._no_lexical_overlap({"citations": [{"score": 0.0}, {"score": 1.2}]})
+
+
+def test_soft_scope_falls_back_when_named_character_absent(monkeypatch):
+    """A carried (soft) focus must not trap a topic change: if the question names a
+    character who isn't in the remembered event, re-query globally. An explicitly-
+    named (hard) scope never falls back."""
+    from webapp import server
+
+    class _FakeEngine:
+        def query(self, q, *, unit=None, event_id=None, arc_ids=(), aux_query=""):
+            if arc_ids:  # scoped: generic words still overlap, so score>0 ...
+                return {"answer": "scoped", "citations": [{"ref": 1, "score": 2.0,
+                        "arc_id": arc_ids[0]}], "scope": {}, "backend": "local"}
+            return {"answer": "global", "citations": [{"ref": 1, "score": 5.0,
+                    "arc_id": "0021-stray"}], "scope": {}, "backend": "local"}
+
+        def names_absent_character(self, q, arc_ids):
+            return True  # ... but the named character isn't in the scoped event
+
+    monkeypatch.setattr(server, "_get_local_engine", lambda: _FakeEngine())
+    req = server.QueryRequest(question="how does Kohane feel about singing")
+
+    soft = server._local_retrieval(req, ("0076-echo-my-melody",), soft_scope=True)
+    assert soft.get("soft_scope_fell_back") is True
+    assert soft["citations"][0]["arc_id"] == "0021-stray"  # answered globally
+
+    hard = server._local_retrieval(req, ("0076-echo-my-melody",), soft_scope=False)
+    assert hard.get("soft_scope_fell_back") is None  # explicit scope is respected
+    assert hard["answer"] == "scoped"
+
+
+def test_soft_scope_keeps_scope_when_named_character_present(monkeypatch):
+    """A named character who IS in the carried event keeps the scope, even though
+    generic words also overlap ("when did Honami ask Kanade for help?")."""
+    from webapp import server
+
+    class _FakeEngine:
+        def query(self, q, *, unit=None, event_id=None, arc_ids=(), aux_query=""):
+            return {"answer": "scoped", "citations": [{"ref": 1, "score": 3.1,
+                    "arc_id": arc_ids[0] if arc_ids else "global"}],
+                    "scope": {}, "backend": "local"}
+
+        def names_absent_character(self, q, arc_ids):
+            return False  # Honami + Kanade are both in the scoped event
+
+    monkeypatch.setattr(server, "_get_local_engine", lambda: _FakeEngine())
+    req = server.QueryRequest(question="when did Honami ask Kanade for help")
+    res = server._local_retrieval(req, ("0076-echo-my-melody",), soft_scope=True)
+    assert res.get("soft_scope_fell_back") is None
+    assert res["citations"][0]["arc_id"] == "0076-echo-my-melody"
+
+
+def test_soft_scope_falls_back_on_no_overlap_without_named_character(monkeypatch):
+    """No character named + zero lexical overlap with the carried event -> global."""
+    from webapp import server
+
+    class _FakeEngine:
+        def query(self, q, *, unit=None, event_id=None, arc_ids=(), aux_query=""):
+            if arc_ids:
+                return {"answer": "scoped", "citations": [{"ref": 1, "score": 0.0,
+                        "arc_id": arc_ids[0]}], "scope": {}, "backend": "local"}
+            return {"answer": "global", "citations": [{"ref": 1, "score": 4.0,
+                    "arc_id": "0021-stray"}], "scope": {}, "backend": "local"}
+
+        def names_absent_character(self, q, arc_ids):
+            return None  # no character named
+
+    monkeypatch.setattr(server, "_get_local_engine", lambda: _FakeEngine())
+    req = server.QueryRequest(question="what happens at the concert")
+    res = server._local_retrieval(req, ("0076-echo-my-melody",), soft_scope=True)
+    assert res.get("soft_scope_fell_back") is True
+    assert res["citations"][0]["arc_id"] == "0021-stray"
+
+
+def test_overlay_attaches_en_episode_titles(monkeypatch):
+    from webapp import server
+
+    monkeypatch.setattr(
+        server, "_en_maps",
+        lambda: ({76: "Echo My Melody"}, {}, {76: {1: "Melody EN", 2: "Savior EN"}}),
+    )
+    rows = [{"event_id": 76, "name": "エコー", "song_id": None, "song_title": None}]
+    server._overlay_en_titles(rows)
+    assert rows[0]["name"] == "Echo My Melody" and rows[0]["name_jp"] == "エコー"
+    assert rows[0]["episode_titles_en"] == {1: "Melody EN", 2: "Savior EN"}
+
+
+def test_derived_soft_scope_falls_back_to_global(monkeypatch):
+    """Derived backend: a carried (soft) focus that finds nothing in the scoped arc
+    re-queries globally; an explicit (hard) scope does not."""
+    import sekai_story_indexer.query.derived_index as di
+    from webapp import server
+
+    def fake_score_query(index, q, *, top_k=5, aux_query="", arc_ids=(), unit=None):
+        if arc_ids:  # scoped -> no evidence in the carried event
+            return []
+        return [{"arc_id": "0021-stray", "episode": "e", "unit": "vivid_bad_squad",
+                 "label": "L", "nickname": None, "source": None}]
+
+    monkeypatch.setattr(di, "score_query", fake_score_query)
+    monkeypatch.setattr(server, "_derived_index", lambda: {})
+    req = server.QueryRequest(question="what happens at the concert")
+
+    soft = server._query_derived(req, ("0006-lyric",), soft_scope=True)
+    assert soft.get("soft_scope_fell_back") is True
+    assert soft["citations"][0]["arc_id"] == "0021-stray"
+
+    hard = server._query_derived(req, ("0006-lyric",), soft_scope=False)
+    assert hard.get("soft_scope_fell_back") is None
+    assert hard["citations"] == []  # explicit scope respected, no global bleed

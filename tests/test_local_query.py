@@ -189,3 +189,53 @@ def test_derived_index_gz_roundtrip_scope_and_coords(tmp_path):
     refs = score_query(idx, "How does Kohane feel about singing?", arc_ids=("0006-lyric",))
     assert refs and all(r["arc_id"] == "0006-lyric" for r in refs)  # scope filter honored
     assert "source" in refs[0]  # live-fetch coords carried on refs
+
+
+def test_names_absent_character_detects_stale_focus():
+    """The signal that drives soft-scope fallback: is a named character actually in
+    the scoped event? Precise (speaker-based), so generic word overlap can't fool it."""
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    # Kohane speaks in 0006-lyric -> present -> keep scope
+    assert eng.names_absent_character("How does Kohane feel about singing?", ("0006-lyric",)) is False
+    # Mafuyu (Nightcord) is not in the vivid_bad_squad event -> stale focus -> go global
+    assert eng.names_absent_character("How does Mafuyu feel?", ("0006-lyric",)) is True
+    # ...but she IS in her own event
+    assert eng.names_absent_character("How does Mafuyu feel?", ("0002-marionette",)) is False
+    # no character named -> None (caller uses the lexical-overlap signal instead)
+    assert eng.names_absent_character("what happens at the concert", ("0006-lyric",)) is None
+    # no scope -> None
+    assert eng.names_absent_character("How does Kohane feel?", ()) is None
+
+
+def test_episode_title_prefers_english_overlay():
+    """When the event row carries an official-English episode-title overlay, the
+    engine composes English citation labels; otherwise it falls back to the JP H1."""
+    import copy
+
+    idx = copy.deepcopy(SAMPLE_INDEX)
+    row = next(r for r in idx if r.get("arc_slug") == "0006-lyric")
+    row["episode_titles_en"] = {1: "Back-to-Back Lyrics (EN)"}
+    eng = build_local_engine(SAMPLE_STORY, idx)
+
+    ep1 = next(n for n in eng.nodes
+               if n.metadata.arc_id == "0006-lyric" and n.metadata.episode_number == 1)
+    assert eng._episode_title(ep1) == "1. Back-to-Back Lyrics (EN)"
+
+    # an episode with no EN overlay keeps the JP H1
+    other = next((n for n in eng.nodes
+                  if n.metadata.arc_id == "0006-lyric" and n.metadata.episode_number != 1), None)
+    if other is not None:
+        assert not eng._episode_title(other).endswith("(EN)")
+
+
+def test_episode_title_overlay_tolerates_string_keys():
+    """A JSON-loaded overlay has string episode keys; the engine still matches."""
+    import copy
+
+    idx = copy.deepcopy(SAMPLE_INDEX)
+    row = next(r for r in idx if r.get("arc_slug") == "0006-lyric")
+    row["episode_titles_en"] = {"1": "Stringy Title (EN)"}
+    eng = build_local_engine(SAMPLE_STORY, idx)
+    ep1 = next(n for n in eng.nodes
+               if n.metadata.arc_id == "0006-lyric" and n.metadata.episode_number == 1)
+    assert eng._episode_title(ep1) == "1. Stringy Title (EN)"

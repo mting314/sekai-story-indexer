@@ -166,6 +166,34 @@ def _resolved_model(model: str | None) -> str:
     return model or os.getenv("SEKAI_CHAT_MODEL") or "gemini-flash-latest"
 
 
+# Flash "thinking" models bill internal reasoning as output tokens, and left
+# unbounded a detailed summary spent ~3.8k tokens *thinking* — both slow and the
+# dominant cost. `thinking_level="low"` cuts that to ~0.7k with no loss in answer
+# quality (grounded synthesis over supplied citations needs little deliberation),
+# and — unlike `thinking_budget`, which this model overshoots — it's actually
+# honored. `max_output_tokens` is a generous ceiling (only *emitted* tokens bill,
+# so a high cap costs nothing) that keeps the answer from truncating mid-sentence.
+_MAX_OUTPUT_TOKENS = 8192
+_THINKING_LEVEL = "low"
+
+
+def _generation_config(types, system: str, *, thinking: bool = True):
+    """Shared GenerateContentConfig for the batch + streaming answer calls. Pass
+    ``thinking=False`` to omit ``thinking_config`` (retry path for models that
+    reject ``thinking_level``)."""
+    kwargs = dict(
+        system_instruction=system, temperature=0.2, max_output_tokens=_MAX_OUTPUT_TOKENS
+    )
+    # thinking_config is newer; degrade gracefully on older google-genai builds.
+    tc = getattr(types, "ThinkingConfig", None)
+    if thinking and tc is not None:
+        try:
+            kwargs["thinking_config"] = tc(thinking_level=_THINKING_LEVEL)
+        except Exception:
+            pass
+    return types.GenerateContentConfig(**kwargs)
+
+
 def generate_answer(
     question: str,
     citations: list[dict],
@@ -183,16 +211,19 @@ def generate_answer(
 
         system, user = _build_prompts(question, citations, glossary)
         client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-        # Gemini-3 flash models spend output tokens on internal "thinking", so a
-        # small max_output_tokens truncates the visible answer mid-sentence. Give
-        # ample budget so thinking + answer both fit.
-        resp = client.models.generate_content(
-            model=_resolved_model(model),
-            contents=user,
-            config=types.GenerateContentConfig(
-                system_instruction=system, temperature=0.2, max_output_tokens=4096
-            ),
-        )
+        try:
+            resp = client.models.generate_content(
+                model=_resolved_model(model),
+                contents=user,
+                config=_generation_config(types, system),
+            )
+        except Exception:
+            # a model that rejects thinking_level still generates without it
+            resp = client.models.generate_content(
+                model=_resolved_model(model),
+                contents=user,
+                config=_generation_config(types, system, thinking=False),
+            )
         text = (resp.text or "").strip()
         if not text:
             return None
@@ -226,25 +257,33 @@ def generate_answer_stream(
         emitted = 0
         cut: int | None = None  # index where @@SOURCES@@ begins (stop emitting there)
         hold = len(_SOURCES_MARK) - 1  # never emit a partial marker prefix
-        for chunk in client.models.generate_content_stream(
-            model=_resolved_model(model),
-            contents=user,
-            config=types.GenerateContentConfig(
-                system_instruction=system, temperature=0.2, max_output_tokens=4096
-            ),
-        ):
-            piece = getattr(chunk, "text", None)
-            if not piece:
-                continue
-            full += piece
-            if cut is None:
-                idx = full.find(_SOURCES_MARK)
-                if idx >= 0:
-                    cut = idx
-            limit = cut if cut is not None else max(emitted, len(full) - hold)
-            if limit > emitted:
-                yield full[emitted:limit]
-                emitted = limit
+        # Try with thinking; if a model rejects thinking_level it fails before any
+        # token, so retry once without it (only while nothing has been emitted).
+        for with_thinking in (True, False):
+            try:
+                for chunk in client.models.generate_content_stream(
+                    model=_resolved_model(model),
+                    contents=user,
+                    config=_generation_config(types, system, thinking=with_thinking),
+                ):
+                    piece = getattr(chunk, "text", None)
+                    if not piece:
+                        continue
+                    full += piece
+                    if cut is None:
+                        idx = full.find(_SOURCES_MARK)
+                        if idx >= 0:
+                            cut = idx
+                    limit = cut if cut is not None else max(emitted, len(full) - hold)
+                    if limit > emitted:
+                        yield full[emitted:limit]
+                        emitted = limit
+                break  # stream completed
+            except Exception:
+                if with_thinking and emitted == 0:
+                    full, cut = "", None  # nothing streamed yet -> safe to retry
+                    continue
+                raise  # mid-stream failure or retry also failed
         if cut is None and len(full) > emitted:  # no marker -> flush the held-back tail
             yield full[emitted:]
         _, grounding = _parse_grounding(full)

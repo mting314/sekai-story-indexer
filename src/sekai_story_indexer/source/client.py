@@ -169,6 +169,29 @@ def en_event_names() -> dict[int, str]:
     return {e["id"]: e.get("name", "") for e in rows if e.get("id") and e.get("name")}
 
 
+def en_episode_titles() -> dict[int, dict[int, str]]:
+    """Official English event-story episode titles from the EN master DB, keyed by
+    event id then ``episodeNo`` (e.g. ``{76: {1: "Melody...", 2: "..."}}``). Only
+    events localized so far are present (EN lags JP); unreachable -> ``{}``."""
+    try:
+        rows = fetch_json(f"{REGION_DBS['en']}/eventStories.json")
+    except Exception:
+        return {}
+    out: dict[int, dict[int, str]] = {}
+    for st in rows:
+        eid = st.get("eventId")
+        if eid is None:
+            continue
+        titles = {
+            ep["episodeNo"]: ep["title"]
+            for ep in st.get("eventStoryEpisodes", [])
+            if ep.get("episodeNo") is not None and ep.get("title")
+        }
+        if titles:
+            out[eid] = titles
+    return out
+
+
 def en_music_titles() -> dict[int, str]:
     """Official English song titles from the EN master DB, keyed by music id."""
     try:

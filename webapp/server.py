@@ -91,28 +91,33 @@ def load_events() -> list[dict]:
 # Official English titles (event names + song titles) from the EN master DB, so
 # the UI/citations show English instead of Japanese where localized. Cached a day.
 _EN_TTL_SECONDS = int(os.environ.get("SEKAI_EN_TTL", "86400"))
-_en_cache: dict[str, object] = {"at": 0.0, "names": None, "songs": None}
+_en_cache: dict[str, object] = {"at": 0.0, "names": None, "songs": None, "episodes": None}
 
 
-def _en_maps() -> tuple[dict, dict]:
+def _en_maps() -> tuple[dict, dict, dict]:
+    """Official-English overlays from the EN master DB: ``(event names, song titles,
+    episode titles)``. ``episode titles`` is ``{event_id: {episodeNo: title}}``.
+    Cached a day; every source unreachable -> empty maps (keep Japanese)."""
     now = time.time()
     if _en_cache["names"] is not None and now - float(str(_en_cache["at"])) < _EN_TTL_SECONDS:
-        return _en_cache["names"], _en_cache["songs"]  # type: ignore[return-value]
+        return _en_cache["names"], _en_cache["songs"], _en_cache["episodes"]  # type: ignore[return-value]
     try:
         from sekai_story_indexer.source import client
 
         names, songs = client.en_event_names(), client.en_music_titles()
+        episodes = client.en_episode_titles()
     except Exception:
-        names, songs = {}, {}
-    _en_cache.update(at=now, names=names, songs=songs)
-    return names, songs
+        names, songs, episodes = {}, {}, {}
+    _en_cache.update(at=now, names=names, songs=songs, episodes=episodes)
+    return names, songs, episodes
 
 
 def _overlay_en_titles(rows: list[dict]) -> None:
     """Replace event name + song title with official English, keeping JP as
-    *_jp fallbacks. Events/songs not yet localized keep their Japanese."""
-    names, songs = _en_maps()
-    if not names and not songs:
+    *_jp fallbacks, and attach ``episode_titles_en`` ({episodeNo: title}) for the
+    engine's citation labels. Events/songs not yet localized keep their Japanese."""
+    names, songs, episodes = _en_maps()
+    if not names and not songs and not episodes:
         return
     for r in rows:
         en = names.get(r.get("event_id"))
@@ -123,6 +128,9 @@ def _overlay_en_titles(rows: list[dict]) -> None:
         if es and es != r.get("song_title"):
             r["song_title_jp"] = r.get("song_title")
             r["song_title"] = es
+        ep_en = episodes.get(r.get("event_id"))
+        if ep_en:
+            r["episode_titles_en"] = ep_en
 
 
 app = FastAPI(title="Sekai Story Indexer")
@@ -388,7 +396,15 @@ def _get_local_engine():
     if _local_engine["engine"] is None:
         from sekai_story_indexer.query.local import build_local_engine
 
-        _local_engine["engine"] = build_local_engine(_story_root(), _static_events())
+        # Overlay official-English episode titles onto the index rows before build,
+        # so the engine composes English citation labels (falls back to JP H1 for
+        # events not yet localized, or when the EN master DB is unreachable).
+        events = _static_events()
+        try:
+            _overlay_en_titles(events)
+        except Exception:  # egress blocked / offline -> keep Japanese labels
+            pass
+        _local_engine["engine"] = build_local_engine(_story_root(), events)
     return _local_engine["engine"]
 
 
@@ -397,7 +413,17 @@ def _get_local_engine():
 GENERATE = os.environ.get("SEKAI_GENERATE", "1") != "0"
 
 
-def _local_retrieval(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> dict:
+def _no_lexical_overlap(result: dict) -> bool:
+    """True when a scoped retrieval surfaced only zero-score scenes — i.e. the
+    question shares no lexical evidence (after translation) with the scoped event.
+    That's the signal a *carried* focus is stale and we should answer globally."""
+    cits = result.get("citations") or []
+    return not cits or all((c.get("score") or 0) == 0 for c in cits)
+
+
+def _local_retrieval(
+    req: QueryRequest, scope_arc_ids: tuple[str, ...] = (), *, soft_scope: bool = False
+) -> dict:
     """Local retrieval only (count/summarize/query) — no NL generation. Shared by
     the JSON and streaming paths so streaming can emit citations, then stream the
     answer over them. ``scope_arc_ids`` carries explicit refs or conversation
@@ -418,10 +444,25 @@ def _local_retrieval(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> 
         # lexical engine matches the JP corpus. No-op without a key -> lexical-only.
         from sekai_story_indexer.query.translate import translate_to_japanese
 
-        result = engine.query(
-            q, unit=req.unit, event_id=req.event_id, arc_ids=scope_arc_ids,
-            aux_query=translate_to_japanese(q),
-        )
+        aux = translate_to_japanese(q)
+        # A *carried* (soft) focus can go stale when the user moves on. Decide whether
+        # to keep it BEFORE the scoped query so a known topic change skips it entirely:
+        #   * names a character absent from the remembered event -> global (precise).
+        #   * names a character who IS present -> keep scope (even if generic words
+        #     would also overlap elsewhere) -> "when did Honami ask Kanade?" stays put.
+        #   * names no character -> query scoped, then fall back only if it shares no
+        #     lexical evidence at all (best-effort; needs the scoped result to judge).
+        absent = engine.names_absent_character(q, scope_arc_ids) if (soft_scope and scope_arc_ids) else False
+        if absent is True:
+            result = engine.query(q, unit=req.unit, event_id=req.event_id, aux_query=aux)
+            result["soft_scope_fell_back"] = True
+        else:
+            result = engine.query(
+                q, unit=req.unit, event_id=req.event_id, arc_ids=scope_arc_ids, aux_query=aux,
+            )
+            if absent is None and _no_lexical_overlap(result):
+                result = engine.query(q, unit=req.unit, event_id=req.event_id, aux_query=aux)
+                result["soft_scope_fell_back"] = True
     result.setdefault("intent", intent)
     result["resolved_question"] = q
     result["error"] = None
@@ -550,8 +591,10 @@ def _trim_extractive_citations(result: dict) -> None:
         ]
 
 
-def _query_local(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> dict:
-    result = _local_retrieval(req, scope_arc_ids)
+def _query_local(
+    req: QueryRequest, scope_arc_ids: tuple[str, ...] = (), *, soft_scope: bool = False
+) -> dict:
+    result = _local_retrieval(req, scope_arc_ids, soft_scope=soft_scope)
     if result.get("pre_summarized"):
         result["generated"] = True
         return result
@@ -625,7 +668,9 @@ def _structure_full_answer(answer: str) -> dict:
     }
 
 
-def _query_full(req: QueryRequest, *, arc_ids: tuple[str, ...] = ()) -> dict:
+def _query_full(
+    req: QueryRequest, *, arc_ids: tuple[str, ...] = (), soft_scope: bool = False
+) -> dict:
     try:
         from sekai_story_indexer.database import initialize_query_settings
         from sekai_story_indexer.query.engine import RetrievalConfig, StoryQueryEngine
@@ -636,7 +681,13 @@ def _query_full(req: QueryRequest, *, arc_ids: tuple[str, ...] = ()) -> dict:
         engine = StoryQueryEngine(retrieval_config=RetrievalConfig())
         # Pass the resolved event scope so a follow-up ("the climax of that story")
         # stays on the resolved arc instead of vector-searching the whole corpus.
-        return _structure_full_answer(engine.query(req.question, arc_ids=arc_ids))
+        result = _structure_full_answer(engine.query(req.question, arc_ids=arc_ids))
+        # Carried (soft) focus that found nothing in the scoped arc -> retry global,
+        # so a topic change isn't trapped on the remembered event.
+        if soft_scope and arc_ids and not result.get("citations"):
+            result = _structure_full_answer(engine.query(req.question))
+            result["soft_scope_fell_back"] = True
+        return result
     except Exception as exc:  # pragma: no cover - runtime/config
         return {
             "answer": None,
@@ -688,21 +739,34 @@ def _derived_answer(citations: list[dict]) -> str:
     return f"{lead}Relevant scenes (open a citation to read the exact line on sekai.best):\n{scenes}"
 
 
-def _query_derived(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> dict:
+def _query_derived(
+    req: QueryRequest, scope_arc_ids: tuple[str, ...] = (), *, soft_scope: bool = False
+) -> dict:
     from sekai_story_indexer.query.condense import condense
     from sekai_story_indexer.query.derived_index import score_query
 
     q = condense(req.question, req.history) if req.history else req.question
     refs = score_query(_derived_index(), q, top_k=6, arc_ids=scope_arc_ids, unit=req.unit)
+    # score_query returns [] when the scoped arc shares no evidence with the query.
+    # For a carried (soft) focus that means the user moved on -> answer globally.
+    # (The derived index has no speaker data, so unlike the local backend this only
+    # catches the no-overlap case, not a same-words-different-character topic change.)
+    fell_back = False
+    if soft_scope and scope_arc_ids and not refs:
+        refs = score_query(_derived_index(), q, top_k=6, unit=req.unit)
+        fell_back = True
     citations = [
         {"ref": i + 1, "arc_id": r["arc_id"], "episode": r["episode"], "unit": r["unit"],
          "label": r["label"], "nickname": r.get("nickname"), "source": r.get("source")}
         for i, r in enumerate(refs)
     ]
     answer = _derived_answer(citations)
-    return {"answer": answer, "answer_parts": [{"type": "text", "text": answer}],
-            "characters": [], "citations": citations, "intent": "query",
-            "backend": "derived", "resolved_question": q, "error": None}
+    result = {"answer": answer, "answer_parts": [{"type": "text", "text": answer}],
+              "characters": [], "citations": citations, "intent": "query",
+              "backend": "derived", "resolved_question": q, "error": None}
+    if fell_back:
+        result["soft_scope_fell_back"] = True
+    return result
 
 
 def _characters_meta() -> dict:
@@ -899,7 +963,9 @@ def _rag_log(log: dict, result: dict, scope_arc_ids: tuple[str, ...], **extra) -
     }
 
 
-def _resolve_request(req: QueryRequest) -> tuple[dict | None, tuple[str, ...], Focus | None, dict]:
+def _resolve_request(
+    req: QueryRequest,
+) -> tuple[dict | None, tuple[str, ...], Focus | None, dict, bool]:
     """Shared pipeline for the JSON and streaming endpoints.
 
     Returns ``(early_result, scope_arc_ids, focus, log)``. When ``early_result`` is
@@ -932,12 +998,12 @@ def _resolve_request(req: QueryRequest) -> tuple[dict | None, tuple[str, ...], F
     md = _metadata_intercept(req.question)
     if md is not None:
         return md, (), prev, {**log, "route": "metadata", "backend": md.get("backend"),
-                              "citations": len(md.get("citations") or [])}
+                              "citations": len(md.get("citations") or [])}, False
     # Ambiguous reference -> ask (with remembered focus for the conversational case).
     cl = _clarify_intercept(req.question, prev.character_id if prev else None)
     if cl is not None:
         return cl, (), prev, {**log, "route": "clarify", "backend": "clarify",
-                              "candidates": [o.get("label") for o in cl.get("options") or []]}
+                              "candidates": [o.get("label") for o in cl.get("options") or []]}, False
     # "Summarize <event>" -> pre-computed summary; update focus to that event.
     sm = _summarize_intercept(req.question)
     if sm is not None:
@@ -947,7 +1013,7 @@ def _resolve_request(req: QueryRequest) -> tuple[dict | None, tuple[str, ...], F
             label=(sm.get("citations") or [{}])[0].get("label"),
         )) if arcs else prev
         return sm, (), focus, {**log, "route": "summarize",
-                               "citations": len(sm.get("citations") or [])}
+                               "citations": len(sm.get("citations") or [])}, False
 
     # Content path. Union of arcs the question references (so comparisons aren't
     # locked to one), plus the focus-resolved event. References are matched by
@@ -971,15 +1037,19 @@ def _resolve_request(req: QueryRequest) -> tuple[dict | None, tuple[str, ...], F
     focus_cid = named_cid or (ev.get("focus_character_id") if ev else None) or None
 
     focus, scope_arcs = resolve_turn(
-        prev, referenced_arcs=tuple(referenced), character_id=focus_cid,
-        label=label, followup=followup,
+        prev, referenced_arcs=tuple(referenced), character_id=focus_cid, label=label,
     )
     _remember_focus(req.session_id, focus)
     log["focus"] = focus.as_dict()
-    if scope_arcs and not referenced:
+    log["followup"] = followup
+    # A scope that came from carried focus (not named this turn) is *soft*: the
+    # backend falls back to a global search if the remembered event turns out to be
+    # irrelevant to this question, so stickiness never traps a genuine topic change.
+    soft_scope = bool(scope_arcs) and not referenced
+    if soft_scope:
         log["carried_focus_arc"] = list(scope_arcs)
 
-    return None, tuple(scope_arcs), focus, log
+    return None, tuple(scope_arcs), focus, log, soft_scope
 
 
 # --- Chat slash commands (like Claude Code / other chat bots) -----------------
@@ -1254,18 +1324,18 @@ def command(req: CommandRequest) -> dict:
 def query(req: QueryRequest) -> dict:
     """Answer a question. Uses the local lexical engine by default (runs anywhere);
     set SEKAI_QUERY_BACKEND=full for the Google/Chroma RAG stack."""
-    early, scope_arc_ids, focus, log = _resolve_request(req)
+    early, scope_arc_ids, focus, log, soft_scope = _resolve_request(req)
     if early is not None:
         _log_turn(log)
         return _with_focus(early, focus)
 
     if QUERY_BACKEND == "full":
-        result = _query_full(req, arc_ids=scope_arc_ids)
+        result = _query_full(req, arc_ids=scope_arc_ids, soft_scope=soft_scope)
     elif QUERY_BACKEND == "derived":
-        result = _query_derived(req, scope_arc_ids)
+        result = _query_derived(req, scope_arc_ids, soft_scope=soft_scope)
     else:
         try:
-            result = _query_local(req, scope_arc_ids)
+            result = _query_local(req, scope_arc_ids, soft_scope=soft_scope)
         except Exception as exc:  # pragma: no cover - defensive
             result = {"answer": None, "error": f"local query failed: {exc}", "backend": "local"}
     _log_turn(_rag_log(log, result, scope_arc_ids))
@@ -1285,7 +1355,7 @@ def _stream_events(req: QueryRequest):
     """SSE event stream: a `meta` event, `delta` text events (real token streaming
     for local generation; chunked otherwise), then a `done` event with the full
     structured result (citations, scope, focus) for final rendering."""
-    early, scope_arc_ids, focus, log = _resolve_request(req)
+    early, scope_arc_ids, focus, log, soft_scope = _resolve_request(req)
     focus_d = focus.as_dict() if focus and (focus.arcs or focus.character_id) else None
 
     if early is not None:
@@ -1302,7 +1372,7 @@ def _stream_events(req: QueryRequest):
         # citation post-processing needs the complete text), so these deltas are
         # chunked-after-the-fact, not true token streaming. Real token streaming
         # here would need engine.stream_query wired through _structure_full_answer.
-        result = _query_full(req, arc_ids=scope_arc_ids)
+        result = _query_full(req, arc_ids=scope_arc_ids, soft_scope=soft_scope)
         yield _sse({"type": "meta", "backend": result.get("backend"), "focus": focus_d})
         for piece in _chunk_text(result.get("answer") or ""):
             yield _sse({"type": "delta", "text": piece})
@@ -1313,7 +1383,7 @@ def _stream_events(req: QueryRequest):
     if QUERY_BACKEND == "derived":
         # Prose-free public backend: answer from summaries + scene refs (no LLM,
         # no stored prose); the exact quote is fetched live on citation click.
-        result = _query_derived(req, scope_arc_ids)
+        result = _query_derived(req, scope_arc_ids, soft_scope=soft_scope)
         yield _sse({"type": "meta", "backend": "derived",
                     "intent": result.get("intent"), "focus": focus_d})
         for piece in _chunk_text(result.get("answer") or ""):
@@ -1324,7 +1394,7 @@ def _stream_events(req: QueryRequest):
 
     # Local: retrieve first (so we can stream the answer over the citations).
     try:
-        result = _local_retrieval(req, scope_arc_ids)
+        result = _local_retrieval(req, scope_arc_ids, soft_scope=soft_scope)
     except Exception as exc:  # pragma: no cover - defensive
         yield _sse({"type": "done", "answer": None,
                     "error": f"local query failed: {exc}", "backend": "local"})

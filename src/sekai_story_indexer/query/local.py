@@ -289,7 +289,15 @@ class LocalQueryEngine:
 
     # -- human-readable labels ----------------------------------------------
     def _episode_title(self, node: StoryNode) -> str:
-        """The episode's human title, from the scene's H1 (e.g. '1. 感じていること')."""
+        """The episode's human title. Prefers the official English title (when the
+        event row carries an ``episode_titles_en`` overlay, keyed by episode number),
+        else the scene's own H1 (JP, e.g. '1. 感じていること')."""
+        m = node.metadata
+        en_titles = self._meta_by_arc.get(m.arc_id, {}).get("episode_titles_en") or {}
+        # in-memory overlay uses int keys; a JSON-loaded one would use str -> try both
+        en = en_titles.get(m.episode_number) or en_titles.get(str(m.episode_number))
+        if en:
+            return f"{m.episode_number}. {en}"
         for ln in node.text.splitlines():
             match = _H1_RE.match(ln.strip())
             if match:
@@ -527,6 +535,34 @@ class LocalQueryEngine:
                     or any(len(t) >= 3 and t in q_tokens for t in tokenize(en))):
                 out.append((jp, en))
         return out
+
+    def names_absent_character(
+        self, question: str, arc_ids: tuple[str, ...]
+    ) -> bool | None:
+        """True when the question names character(s) but NONE of them appear in the
+        scoped event(s) — the signal that a *carried* conversation focus is stale
+        (the user asked about someone who isn't in the remembered event, so the
+        answer should go global). False when at least one named character is
+        present (keep the scope). None when the turn names no character, so the
+        caller falls back to other signals.
+
+        "Present" = speaks in the event OR is named in its prose (so a character who
+        is narrated/discussed but never gets a line still counts). The prose check
+        uses the distinctive JP full name only — EN name tokens are too short to
+        match reliably and would keep the scope alive on an incidental mention."""
+        targets = self._named_chars(question)
+        if not targets or not arc_ids:
+            return None
+        idxs = self._candidate_indices(None, None, tuple(arc_ids))
+        for jp, en in targets:
+            en_tokens = {t for t in en.lower().split() if len(t) >= 2}
+            for i in idxs:
+                node = self.nodes[i]
+                if jp and jp in node.text:  # narrated / third-person mention
+                    return False
+                if any(_speaker_is(t.speaker, jp, en_tokens) for t in node.dialogue_turns):
+                    return False  # a named character is in scope -> stay put
+        return True  # named characters, none present -> focus has gone stale
 
     def _units_in_question(self, question: str) -> set[str]:
         ql = question.lower()
