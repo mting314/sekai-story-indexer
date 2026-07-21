@@ -632,22 +632,40 @@ def build_local_engine(
 
 
 def _load_event_summaries(story_root: Path) -> dict[str, str]:
+    """Pre-computed event summaries (arc_id -> text) for the summarize shortcut.
+
+    Prefer the hierarchical store (``summaries_cache.json`` ``EVENT|<arc>`` entries
+    — the current summarizer's output); fall back per-arc to the legacy flat
+    ``event_summaries.json`` for events not yet regenerated hierarchically. This is
+    what lets the local/streaming chat serve the newer hierarchical format where it
+    exists instead of only the frozen legacy file.
+    """
     import json
+    import re
 
-    for candidate in (Path("event_summaries.json"), story_root.parent / "event_summaries.json"):
-        if candidate.exists():
-            try:
-                raw = json.loads(candidate.read_text(encoding="utf-8"))
-            except Exception:
-                return {}
-            # Values may be bare strings (old cache) or {summary, characters}
-            # (local/Ollama structured format) — normalize to text for retrieval,
-            # stripping inline {char_id=N} tags so they don't pollute search.
-            import re
+    # Values may be bare strings (legacy flat cache) or {summary, characters}
+    # (structured/hierarchical) — normalize to text, stripping inline {char_id=N}
+    # tags so they don't pollute search.
+    def _text(v) -> str:
+        s = v if isinstance(v, str) else (v or {}).get("summary", "")
+        return re.sub(r"\{char_id=\d+\}", "", s)
 
-            def _text(v):
-                s = v if isinstance(v, str) else (v or {}).get("summary", "")
-                return re.sub(r"\{char_id=\d+\}", "", s)
+    def _read(name: str) -> dict:
+        for candidate in (Path(name), story_root.parent / name):
+            if candidate.exists():
+                try:
+                    return json.loads(candidate.read_text(encoding="utf-8"))
+                except Exception:
+                    return {}
+        return {}
 
-            return {arc: _text(v) for arc, v in raw.items()}
-    return {}
+    # Legacy flat store: {arc: text | {summary, ...}}.
+    merged = {arc: _text(v) for arc, v in _read("event_summaries.json").items()}
+    # Hierarchical store: {"EVENT|<arc>": {...}, "EPISODE|...": ...} — take the
+    # EVENT tier and let a non-empty hierarchical summary override the legacy one.
+    for key, v in _read("summaries_cache.json").items():
+        if key.startswith("EVENT|"):
+            text = _text(v)
+            if text.strip():
+                merged[key.split("|", 1)[1]] = text
+    return merged
