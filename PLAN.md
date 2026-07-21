@@ -189,6 +189,14 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   allowed to populate the sidecars (the restricted harness blocks those hosts).
   Follow-up: replace the *inline* answer quote (still the LLM's translation) with the
   official EN verbatim once the sidecars are present.
+* **EN exact-line highlight in the derived (public) backend (deferred — has a cost).**
+  `/api/scene` picks the exact quoted line lexically, which fails for pure-English
+  questions (EN query tokens vs JP transcript — the same gap the local backend
+  bridges with query translation). Fix: run `query.translate.translate_to_japanese`
+  on the question inside `_fetch_scene_live`'s line-pick (retrieval/answers stay
+  keyless). **Caveat:** this adds a per-click Gemini translation call → real API
+  cost on a public host (cache per query; consider rate-limiting). Until then the
+  scene still loads live for EN queries, just without the specific line highlighted.
 * **Lyrics analysis via chat (deferred).** Let the chat answer about a
   commissioned song's lyrics — e.g. "what do the lyrics of BAKENOHANA mean / how
   do they tie to the event?" Needs a lyrics source (not in the current master-DB

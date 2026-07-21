@@ -1373,6 +1373,10 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
       pending.textContent = `⚠ ${res.error}`;
     } else {
       renderAssistant(pending, res); // swap progressive text for the rich view
+      // Streaming auto-scrolled to the bottom; for a long answer that leaves the
+      // start scrolled out of view (looks "cut off"). Re-anchor so the question +
+      // the beginning of the answer are visible, and the reader scrolls DOWN.
+      (pending.previousElementSibling || pending).scrollIntoView({ block: "start" });
       if (res.focus) showFocusChip(res.focus);
       state.history.push({ role: "user", text: q });
       state.history.push({ role: "assistant", text: res.answer || "" });
