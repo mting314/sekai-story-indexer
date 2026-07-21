@@ -813,6 +813,203 @@ def _resolve_request(req: QueryRequest) -> tuple[dict | None, tuple[str, ...], F
     return None, tuple(scope_arcs), focus, log
 
 
+# --- Chat slash commands (like Claude Code / other chat bots) -----------------
+# The user types `/cmd <args>` in the chat box; the frontend posts here. Each
+# handler returns the same response shape as /api/query so the UI renders it
+# uniformly (answer_parts, citations, focus chip).
+
+class CommandRequest(BaseModel):
+    command: str  # the full "/cmd args" line
+    session_id: str | None = None
+    unit: str | None = None
+
+
+# name -> one-line help (shown by /help; order preserved)
+_SLASH_COMMANDS: list[tuple[str, str]] = [
+    ("help", "List these commands"),
+    ("summarize <event>", "Event summary (e.g. /summarize mino7)"),
+    ("lines <event>", "Episode + dialogue-line counts for an event"),
+    ("characters <event>", "Cast (focus + speakers) of an event"),
+    ("song <event>", "The event's commissioned song + credits"),
+    ("scope <event>", "Pin the chat to an event; later questions stay scoped"),
+    ("clear", "Unpin the event focus"),
+]
+
+
+def _story_root() -> Path:
+    return Path(os.environ.get("SEKAI_STORY_ROOT", "story"))
+
+
+def _command_response(text: str, *, backend: str = "command", citations: list | None = None) -> dict:
+    return {
+        "answer": text,
+        "answer_parts": [{"type": "text", "text": text}],
+        "characters": [],
+        "citations": citations or [],
+        "intent": "command",
+        "backend": backend,
+        "error": None,
+    }
+
+
+def _resolve_command_event(arg: str, req: CommandRequest) -> dict | None:
+    """Resolve a command's <event> arg (nickname/name) to an event; fall back to
+    the session's pinned focus when no arg is given."""
+    events = load_events()
+    if arg:
+        from sekai_story_indexer.query.metadata import resolve_focus_reference
+
+        return resolve_focus_reference(arg, events, _characters_meta())
+    focus = _SESSIONS.get(req.session_id)
+    if focus and focus.arcs:
+        return next((e for e in events if e.get("arc_slug") == focus.arcs[0]), None)
+    return None
+
+
+def _event_scene_files(arc: str):
+    return sorted(_story_root().glob(f"*/*/{arc}/*.md")) if arc else []
+
+
+def _cmd_help(arg: str, req: CommandRequest) -> dict:
+    lines = ["**Chat commands**"] + [f"- `/{name}` — {desc}" for name, desc in _SLASH_COMMANDS]
+    lines.append("\n`<event>` accepts a nickname (`mino7`) or defaults to the pinned focus.")
+    return _command_response("\n".join(lines))
+
+
+def _cmd_summarize(arg: str, req: CommandRequest) -> dict:
+    ev = _resolve_command_event(arg, req)
+    if not ev:
+        return _command_response("Couldn't resolve that event — try e.g. `/summarize mino7`.")
+    arc = ev.get("arc_slug")
+    path = _hierarchical_cache_path()
+    cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    entry = cache.get(f"EVENT|{arc}")
+    summary = (entry.get("summary") if isinstance(entry, dict) else entry) or ""
+    if not summary.strip():
+        return _command_response(
+            f"No summary generated yet for **{ev.get('name')}** ({ev.get('nickname') or arc})."
+        )
+    citations = [{
+        "ref": 1, "arc_id": arc, "label": f"{ev.get('name')} — event summary",
+        "episode_title": "Event summary", "nickname": ev.get("nickname"), "excerpt": summary,
+    }]
+    return _command_response(summary, backend="summary", citations=citations)
+
+
+def _cmd_lines(arg: str, req: CommandRequest) -> dict:
+    ev = _resolve_command_event(arg, req)
+    if not ev:
+        return _command_response("Couldn't resolve that event — try e.g. `/lines mino7`.")
+    files = _event_scene_files(ev.get("arc_slug"))
+    if not files:
+        return _command_response(f"No story files on disk for **{ev.get('name')}**.")
+    total = 0
+    speakers: set[str] = set()
+    per: list[str] = []
+    for f in files:
+        n = 0
+        for raw in f.read_text(encoding="utf-8").splitlines():
+            s = raw.strip()
+            if not s or s == "---" or s.startswith("#"):
+                continue
+            n += 1
+            if ":" in s:
+                sp = s.split(":", 1)[0].strip()
+                if sp and len(sp) <= 24:
+                    speakers.add(sp)
+        total += n
+        m = re.match(r"(\d+)", f.stem)
+        per.append(f"- Episode {int(m.group(1)) if m else f.stem}: {n} lines")
+    head = (
+        f"**{ev.get('name')}** ({ev.get('nickname') or ev.get('arc_slug')}) — "
+        f"{len(files)} episodes · {total} lines · {len(speakers)} speakers"
+    )
+    return _command_response(head + "\n" + "\n".join(per))
+
+
+def _cmd_characters(arg: str, req: CommandRequest) -> dict:
+    ev = _resolve_command_event(arg, req)
+    if not ev:
+        return _command_response("Couldn't resolve that event — try e.g. `/characters mino7`.")
+    speakers: list[str] = []
+    seen: set[str] = set()
+    for f in _event_scene_files(ev.get("arc_slug")):
+        for raw in f.read_text(encoding="utf-8").splitlines():
+            s = raw.strip()
+            if s and s != "---" and not s.startswith("#") and ":" in s:
+                sp = s.split(":", 1)[0].strip()
+                if sp and len(sp) <= 24 and sp not in seen:
+                    seen.add(sp)
+                    speakers.append(sp)
+    parts = [f"**{ev.get('name')}** cast:"]
+    if ev.get("focus_character"):
+        parts.append(f"- Focus: {ev.get('focus_character')}")
+    parts.append(
+        f"- Speakers ({len(speakers)}): " + (", ".join(speakers[:50]) if speakers else "—")
+    )
+    return _command_response("\n".join(parts))
+
+
+def _cmd_song(arg: str, req: CommandRequest) -> dict:
+    ev = _resolve_command_event(arg, req)
+    if not ev:
+        return _command_response("Couldn't resolve that event — try e.g. `/song mino7`.")
+    if not ev.get("song_title"):
+        return _command_response(f"**{ev.get('name')}** has no commissioned song on record.")
+    bits = [f"🎵 **{ev.get('song_title')}** — {ev.get('name')}"]
+    for label, key in (("Composer", "song_composer"), ("Lyricist", "song_lyricist"), ("Arranger", "song_arranger")):
+        if ev.get(key):
+            bits.append(f"- {label}: {ev.get(key)}")
+    return _command_response("\n".join(bits))
+
+
+def _cmd_scope(arg: str, req: CommandRequest) -> dict:
+    ev = _resolve_command_event(arg, req)
+    if not ev:
+        return _command_response("Couldn't resolve that event — try e.g. `/scope mino7`.")
+    arc = ev.get("arc_slug")
+    focus = _remember_focus(req.session_id, Focus(arcs=(arc,), label=ev.get("name")))
+    text = (
+        f"📌 Pinned the chat to **{ev.get('name')}** ({ev.get('nickname') or arc}). "
+        "Follow-up questions stay scoped to it; `/clear` to unpin."
+    )
+    return _with_focus(_command_response(text), focus)
+
+
+def _cmd_clear(arg: str, req: CommandRequest) -> dict:
+    _SESSIONS.set(req.session_id, Focus())
+    result = _command_response("Focus cleared — questions now search the whole corpus.")
+    result["focus"] = None
+    return result
+
+
+_COMMAND_DISPATCH = {
+    "help": _cmd_help,
+    "summarize": _cmd_summarize, "summary": _cmd_summarize,
+    "lines": _cmd_lines, "linecount": _cmd_lines,
+    "characters": _cmd_characters, "cast": _cmd_characters,
+    "song": _cmd_song,
+    "scope": _cmd_scope, "focus": _cmd_scope,
+    "clear": _cmd_clear,
+}
+
+
+@app.post("/api/command")
+def command(req: CommandRequest) -> dict:
+    """Handle a chat slash command (`/summarize mino7`, `/lines`, `/help`, …)."""
+    line = req.command.strip().lstrip("/").strip()
+    if not line:
+        return _cmd_help("", req)
+    head, _, rest = line.partition(" ")
+    handler = _COMMAND_DISPATCH.get(head.lower())
+    if handler is None:
+        return _command_response(f"Unknown command `/{head}`. Type `/help` for the list.")
+    try:
+        return handler(rest.strip(), req)
+    except Exception as exc:  # noqa: BLE001 - never 500 a chat command
+        return _command_response(f"Command failed: {exc}")
+
+
 @app.post("/api/query")
 def query(req: QueryRequest) -> dict:
     """Answer a question. Uses the local lexical engine by default (runs anywhere);

@@ -1099,6 +1099,31 @@ async function streamAnswer(q, pending) {
   return done || { answer: text };
 }
 
+// Chat slash commands (/summarize, /lines, /help, …) — posted to /api/command,
+// rendered like a normal answer. Focus chip updates for /scope and /clear.
+async function runSlashCommand(q, pending) {
+  try {
+    const res = await fetch("/api/command", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        command: q,
+        session_id: ensureSessionId(),
+        unit: state.activeUnit === "all" ? null : state.activeUnit,
+      }),
+    }).then((r) => r.json());
+    renderAssistant(pending, res);
+    if ("focus" in res) {
+      if (res.focus) showFocusChip(res.focus);
+      else document.getElementById("scope-hint").classList.add("hidden");
+    }
+    state.history.push({ role: "user", text: q });
+    state.history.push({ role: "assistant", text: res.answer || "" });
+  } catch (err) {
+    pending.textContent = `⚠ ${err}`;
+  }
+}
+
 document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const input = document.getElementById("question");
@@ -1108,6 +1133,11 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   addMessage("user", q);
   const pending = addMessage("assistant", "");
   showThinking(pending);
+  if (q.startsWith("/")) {
+    await runSlashCommand(q, pending);
+    document.getElementById("messages").scrollTop = 1e9;
+    return;
+  }
   try {
     let res;
     try {

@@ -305,3 +305,73 @@ def test_summarize_intercept_serves_hierarchical_cache(client, tmp_path, monkeyp
     assert body["backend"] == "summary"
     assert "Hierarchical event summary" in body["answer"]
     assert "Episode Index" in body["answer"]
+
+
+# --- Chat slash commands -----------------------------------------------------
+
+_MARION = {
+    "nickname": "marion1", "arc_slug": "0002-marionette", "name": "Marionette",
+    "unit": "nightcord", "focus_character": "Kanade Yoisaki", "focus_character_id": 17,
+    "song_title": "Marionette Song", "song_composer": "MaruMaru", "song_lyricist": "LyriCo",
+}
+
+
+def _mock_marion(server_module, monkeypatch):
+    monkeypatch.setattr(server_module, "load_events", lambda: [_MARION])
+    monkeypatch.setattr(server_module, "_characters_meta", lambda: {"17": {"en": "Kanade"}})
+
+
+def test_command_help(client):
+    body = client.post("/api/command", json={"command": "/help"}).json()
+    assert body["backend"] == "command"
+    assert "summarize" in body["answer"] and "lines" in body["answer"]
+
+
+def test_command_unknown(client):
+    body = client.post("/api/command", json={"command": "/bogus"}).json()
+    assert "Unknown command" in body["answer"]
+
+
+def test_command_summarize_uses_hierarchical(client, tmp_path, monkeypatch):
+    import json
+
+    from webapp import server as server_module
+
+    _mock_marion(server_module, monkeypatch)
+    cache = {"EVENT|0002-marionette": {"summary": "Overview:\nMarionette event summary.",
+                                       "inputs": {"level": "event"}}}
+    cp = tmp_path / "summaries_cache.json"
+    cp.write_text(json.dumps(cache), encoding="utf-8")
+    monkeypatch.setenv("SEKAI_SUMMARIES_CACHE", str(cp))
+    body = client.post("/api/command", json={"command": "/summarize marion1"}).json()
+    assert body["backend"] == "summary"
+    assert "Marionette event summary" in body["answer"]
+
+
+def test_command_lines_counts_from_story_files(client, monkeypatch):
+    from webapp import server as server_module
+
+    _mock_marion(server_module, monkeypatch)
+    body = client.post("/api/command", json={"command": "/lines marion1"}).json()
+    assert "episodes" in body["answer"] and "lines" in body["answer"]
+    assert "Episode 1" in body["answer"]
+
+
+def test_command_song(client, monkeypatch):
+    from webapp import server as server_module
+
+    _mock_marion(server_module, monkeypatch)
+    body = client.post("/api/command", json={"command": "/song marion1"}).json()
+    assert "Marionette Song" in body["answer"] and "MaruMaru" in body["answer"]
+
+
+def test_command_scope_then_clear(client, monkeypatch):
+    from webapp import server as server_module
+
+    _mock_marion(server_module, monkeypatch)
+    scoped = client.post("/api/command",
+                         json={"command": "/scope marion1", "session_id": "cmd-sess"}).json()
+    assert scoped.get("focus", {}).get("arcs") == ["0002-marionette"]
+    cleared = client.post("/api/command",
+                          json={"command": "/clear", "session_id": "cmd-sess"}).json()
+    assert cleared["focus"] is None
