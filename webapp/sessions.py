@@ -57,20 +57,23 @@ def resolve_turn(
     ``(new_focus, scope_arcs)``.
 
     * Turn names arcs -> switch focus to them (reset), scope to them.
-    * No arcs, is a follow-up, prior focus has arcs -> carry them (the win).
     * No arcs, names a *different* character -> shift focus to that character,
-      drop the stale arc scope.
-    * Otherwise -> keep prior focus, apply no scope.
+      drop the stale arc scope (a topic switch to that character).
+    * Otherwise (no new arc, no different character) -> STAY on the prior event and
+      carry its scope, so a follow-up about the current event ("who is Iori?") isn't
+      lost to a global search even when it names no pronoun/connective. The absence
+      of a new topic is the signal; ``followup`` is accepted for back-compat but no
+      longer gates the carry.
     """
     if referenced_arcs:
         return (
             Focus(arcs=referenced_arcs, character_id=character_id, label=label),
             referenced_arcs,
         )
-    if followup and prev and prev.arcs:
-        return prev, prev.arcs
     if character_id is not None and (prev is None or character_id != prev.character_id):
         return Focus(character_id=character_id, label=label), ()
+    if prev and prev.arcs:
+        return prev, prev.arcs
     return (prev or Focus()), ()
 
 

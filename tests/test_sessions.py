@@ -29,12 +29,15 @@ def test_resolve_turn_carries_focus_on_followup():
     assert focus is prev
 
 
-def test_resolve_turn_no_carry_without_followup():
+def test_resolve_turn_stays_on_event_when_no_new_topic():
+    # A follow-up that names no new arc and no different character stays scoped to the
+    # prior event even without a pronoun/connective (e.g. "Who is STANDOUT's Iori?"
+    # after discussing that event) -> not lost to a global search.
     prev = Focus(arcs=("0005-x",))
     focus, scope = resolve_turn(
         prev, referenced_arcs=(), character_id=None, label=None, followup=False
     )
-    assert scope == ()  # a fresh open question does not inherit prior scope
+    assert scope == ("0005-x",) and focus is prev
 
 
 def test_resolve_turn_shifts_to_new_character():
