@@ -1383,3 +1383,28 @@ def test_scope_multiple_arc_ids_thread_as_union():
     analysis, _ = _prepare_capturing_analysis(("0006-lyric", "0002-marionette"))
     assert analysis is not None
     assert analysis.arc_ids == ("0006-lyric", "0002-marionette")
+
+
+def test_prepare_query_resolves_nickname_scope_from_question():
+    """Full engine resolves a community nickname in the question (e.g. 'airi1') to
+    its arc and constrains retrieval via arc_ids — no caller scope, no re-embedding."""
+    from sekai_story_indexer.query.scoping import ScopeIndex
+
+    engine = make_engine()
+    engine.retrieval_config = RetrievalConfig()  # routing_mode='off' -> analysis is None
+    engine.scope_index = ScopeIndex(
+        [{"event_id": 1, "arc_slug": "0005-airi-event", "nickname": "airi1", "unit": "more_more_jump"}]
+    )
+    captured: dict[str, Any] = {}
+    engine._expanded_question = lambda q: q  # type: ignore[method-assign]
+    engine._query_embedding = lambda q: [0.0]  # type: ignore[method-assign]
+
+    def fake_raw_only(question, *, query_embedding=None, analysis=None):
+        captured["analysis"] = analysis
+        return []
+
+    engine._raw_only_retrieve = fake_raw_only  # type: ignore[method-assign]
+    engine._prepare_query("what happens at the climax of airi1?")
+
+    assert captured["analysis"] is not None
+    assert captured["analysis"].arc_ids == ("0005-airi-event",)
