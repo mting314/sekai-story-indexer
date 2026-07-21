@@ -615,3 +615,28 @@ def test_overlay_attaches_en_episode_titles(monkeypatch):
     server._overlay_en_titles(rows)
     assert rows[0]["name"] == "Echo My Melody" and rows[0]["name_jp"] == "エコー"
     assert rows[0]["episode_titles_en"] == {1: "Melody EN", 2: "Savior EN"}
+
+
+def test_derived_soft_scope_falls_back_to_global(monkeypatch):
+    """Derived backend: a carried (soft) focus that finds nothing in the scoped arc
+    re-queries globally; an explicit (hard) scope does not."""
+    import sekai_story_indexer.query.derived_index as di
+    from webapp import server
+
+    def fake_score_query(index, q, *, top_k=5, aux_query="", arc_ids=(), unit=None):
+        if arc_ids:  # scoped -> no evidence in the carried event
+            return []
+        return [{"arc_id": "0021-stray", "episode": "e", "unit": "vivid_bad_squad",
+                 "label": "L", "nickname": None, "source": None}]
+
+    monkeypatch.setattr(di, "score_query", fake_score_query)
+    monkeypatch.setattr(server, "_derived_index", lambda: {})
+    req = server.QueryRequest(question="what happens at the concert")
+
+    soft = server._query_derived(req, ("0006-lyric",), soft_scope=True)
+    assert soft.get("soft_scope_fell_back") is True
+    assert soft["citations"][0]["arc_id"] == "0021-stray"
+
+    hard = server._query_derived(req, ("0006-lyric",), soft_scope=False)
+    assert hard.get("soft_scope_fell_back") is None
+    assert hard["citations"] == []  # explicit scope respected, no global bleed

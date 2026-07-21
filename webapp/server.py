@@ -445,18 +445,22 @@ def _local_retrieval(
         from sekai_story_indexer.query.translate import translate_to_japanese
 
         aux = translate_to_japanese(q)
-        result = engine.query(
-            q, unit=req.unit, event_id=req.event_id, arc_ids=scope_arc_ids, aux_query=aux,
-        )
-        # A *carried* (soft) focus can go stale when the user moves on. Drop it and
-        # answer globally when either: the question names a character who isn't in
-        # the remembered event (precise), or — for a non-character question — the
-        # event shares no lexical evidence with it at all (best-effort). A named
-        # character who IS present keeps the scope even if generic words also
-        # overlap, so "when did Honami ask Kanade?" stays on the summarized event.
-        if soft_scope and scope_arc_ids:
-            absent = engine.names_absent_character(q, scope_arc_ids)
-            if absent or (absent is None and _no_lexical_overlap(result)):
+        # A *carried* (soft) focus can go stale when the user moves on. Decide whether
+        # to keep it BEFORE the scoped query so a known topic change skips it entirely:
+        #   * names a character absent from the remembered event -> global (precise).
+        #   * names a character who IS present -> keep scope (even if generic words
+        #     would also overlap elsewhere) -> "when did Honami ask Kanade?" stays put.
+        #   * names no character -> query scoped, then fall back only if it shares no
+        #     lexical evidence at all (best-effort; needs the scoped result to judge).
+        absent = engine.names_absent_character(q, scope_arc_ids) if (soft_scope and scope_arc_ids) else False
+        if absent is True:
+            result = engine.query(q, unit=req.unit, event_id=req.event_id, aux_query=aux)
+            result["soft_scope_fell_back"] = True
+        else:
+            result = engine.query(
+                q, unit=req.unit, event_id=req.event_id, arc_ids=scope_arc_ids, aux_query=aux,
+            )
+            if absent is None and _no_lexical_overlap(result):
                 result = engine.query(q, unit=req.unit, event_id=req.event_id, aux_query=aux)
                 result["soft_scope_fell_back"] = True
     result.setdefault("intent", intent)
@@ -664,7 +668,9 @@ def _structure_full_answer(answer: str) -> dict:
     }
 
 
-def _query_full(req: QueryRequest, *, arc_ids: tuple[str, ...] = ()) -> dict:
+def _query_full(
+    req: QueryRequest, *, arc_ids: tuple[str, ...] = (), soft_scope: bool = False
+) -> dict:
     try:
         from sekai_story_indexer.database import initialize_query_settings
         from sekai_story_indexer.query.engine import RetrievalConfig, StoryQueryEngine
@@ -675,7 +681,13 @@ def _query_full(req: QueryRequest, *, arc_ids: tuple[str, ...] = ()) -> dict:
         engine = StoryQueryEngine(retrieval_config=RetrievalConfig())
         # Pass the resolved event scope so a follow-up ("the climax of that story")
         # stays on the resolved arc instead of vector-searching the whole corpus.
-        return _structure_full_answer(engine.query(req.question, arc_ids=arc_ids))
+        result = _structure_full_answer(engine.query(req.question, arc_ids=arc_ids))
+        # Carried (soft) focus that found nothing in the scoped arc -> retry global,
+        # so a topic change isn't trapped on the remembered event.
+        if soft_scope and arc_ids and not result.get("citations"):
+            result = _structure_full_answer(engine.query(req.question))
+            result["soft_scope_fell_back"] = True
+        return result
     except Exception as exc:  # pragma: no cover - runtime/config
         return {
             "answer": None,
@@ -727,21 +739,34 @@ def _derived_answer(citations: list[dict]) -> str:
     return f"{lead}Relevant scenes (open a citation to read the exact line on sekai.best):\n{scenes}"
 
 
-def _query_derived(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> dict:
+def _query_derived(
+    req: QueryRequest, scope_arc_ids: tuple[str, ...] = (), *, soft_scope: bool = False
+) -> dict:
     from sekai_story_indexer.query.condense import condense
     from sekai_story_indexer.query.derived_index import score_query
 
     q = condense(req.question, req.history) if req.history else req.question
     refs = score_query(_derived_index(), q, top_k=6, arc_ids=scope_arc_ids, unit=req.unit)
+    # score_query returns [] when the scoped arc shares no evidence with the query.
+    # For a carried (soft) focus that means the user moved on -> answer globally.
+    # (The derived index has no speaker data, so unlike the local backend this only
+    # catches the no-overlap case, not a same-words-different-character topic change.)
+    fell_back = False
+    if soft_scope and scope_arc_ids and not refs:
+        refs = score_query(_derived_index(), q, top_k=6, unit=req.unit)
+        fell_back = True
     citations = [
         {"ref": i + 1, "arc_id": r["arc_id"], "episode": r["episode"], "unit": r["unit"],
          "label": r["label"], "nickname": r.get("nickname"), "source": r.get("source")}
         for i, r in enumerate(refs)
     ]
     answer = _derived_answer(citations)
-    return {"answer": answer, "answer_parts": [{"type": "text", "text": answer}],
-            "characters": [], "citations": citations, "intent": "query",
-            "backend": "derived", "resolved_question": q, "error": None}
+    result = {"answer": answer, "answer_parts": [{"type": "text", "text": answer}],
+              "characters": [], "citations": citations, "intent": "query",
+              "backend": "derived", "resolved_question": q, "error": None}
+    if fell_back:
+        result["soft_scope_fell_back"] = True
+    return result
 
 
 def _characters_meta() -> dict:
@@ -938,7 +963,9 @@ def _rag_log(log: dict, result: dict, scope_arc_ids: tuple[str, ...], **extra) -
     }
 
 
-def _resolve_request(req: QueryRequest) -> tuple[dict | None, tuple[str, ...], Focus | None, dict]:
+def _resolve_request(
+    req: QueryRequest,
+) -> tuple[dict | None, tuple[str, ...], Focus | None, dict, bool]:
     """Shared pipeline for the JSON and streaming endpoints.
 
     Returns ``(early_result, scope_arc_ids, focus, log)``. When ``early_result`` is
@@ -1303,9 +1330,9 @@ def query(req: QueryRequest) -> dict:
         return _with_focus(early, focus)
 
     if QUERY_BACKEND == "full":
-        result = _query_full(req, arc_ids=scope_arc_ids)
+        result = _query_full(req, arc_ids=scope_arc_ids, soft_scope=soft_scope)
     elif QUERY_BACKEND == "derived":
-        result = _query_derived(req, scope_arc_ids)
+        result = _query_derived(req, scope_arc_ids, soft_scope=soft_scope)
     else:
         try:
             result = _query_local(req, scope_arc_ids, soft_scope=soft_scope)
@@ -1345,7 +1372,7 @@ def _stream_events(req: QueryRequest):
         # citation post-processing needs the complete text), so these deltas are
         # chunked-after-the-fact, not true token streaming. Real token streaming
         # here would need engine.stream_query wired through _structure_full_answer.
-        result = _query_full(req, arc_ids=scope_arc_ids)
+        result = _query_full(req, arc_ids=scope_arc_ids, soft_scope=soft_scope)
         yield _sse({"type": "meta", "backend": result.get("backend"), "focus": focus_d})
         for piece in _chunk_text(result.get("answer") or ""):
             yield _sse({"type": "delta", "text": piece})
@@ -1356,7 +1383,7 @@ def _stream_events(req: QueryRequest):
     if QUERY_BACKEND == "derived":
         # Prose-free public backend: answer from summaries + scene refs (no LLM,
         # no stored prose); the exact quote is fetched live on citation click.
-        result = _query_derived(req, scope_arc_ids)
+        result = _query_derived(req, scope_arc_ids, soft_scope=soft_scope)
         yield _sse({"type": "meta", "backend": "derived",
                     "intent": result.get("intent"), "focus": focus_d})
         for piece in _chunk_text(result.get("answer") or ""):

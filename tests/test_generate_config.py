@@ -61,3 +61,10 @@ def test_generation_config_passes_system_instruction() -> None:
 
     assert cfg.kwargs["system_instruction"] == "the-system-prompt"
     assert cfg.kwargs["temperature"] == 0.2
+
+
+def test_generation_config_omits_thinking_on_retry() -> None:
+    # the retry path (thinking=False) drops thinking_config but keeps the big ceiling
+    cfg = _generation_config(_FakeTypes, "sys", thinking=False)
+    assert "thinking_config" not in cfg.kwargs
+    assert cfg.kwargs["max_output_tokens"] >= 8192

@@ -539,24 +539,29 @@ class LocalQueryEngine:
     def names_absent_character(
         self, question: str, arc_ids: tuple[str, ...]
     ) -> bool | None:
-        """True when the question names character(s) but NONE of them speak in the
+        """True when the question names character(s) but NONE of them appear in the
         scoped event(s) — the signal that a *carried* conversation focus is stale
         (the user asked about someone who isn't in the remembered event, so the
         answer should go global). False when at least one named character is
         present (keep the scope). None when the turn names no character, so the
-        caller falls back to other signals."""
+        caller falls back to other signals.
+
+        "Present" = speaks in the event OR is named in its prose (so a character who
+        is narrated/discussed but never gets a line still counts). The prose check
+        uses the distinctive JP full name only — EN name tokens are too short to
+        match reliably and would keep the scope alive on an incidental mention."""
         targets = self._named_chars(question)
         if not targets or not arc_ids:
             return None
         idxs = self._candidate_indices(None, None, tuple(arc_ids))
         for jp, en in targets:
             en_tokens = {t for t in en.lower().split() if len(t) >= 2}
-            if any(
-                _speaker_is(turn.speaker, jp, en_tokens)
-                for i in idxs
-                for turn in self.nodes[i].dialogue_turns
-            ):
-                return False  # a named character is in scope -> stay put
+            for i in idxs:
+                node = self.nodes[i]
+                if jp and jp in node.text:  # narrated / third-person mention
+                    return False
+                if any(_speaker_is(t.speaker, jp, en_tokens) for t in node.dialogue_turns):
+                    return False  # a named character is in scope -> stay put
         return True  # named characters, none present -> focus has gone stale
 
     def _units_in_question(self, question: str) -> set[str]:
