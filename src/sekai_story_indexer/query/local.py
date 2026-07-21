@@ -81,7 +81,7 @@ class LocalQueryEngine:
         event_summaries: dict[str, str] | None = None,
     ):
         self.nodes = nodes
-        # pre-computed event summaries {arc_id: text} (from event_summaries.json) —
+        # pre-computed event summaries {arc_id: text} (hierarchical summaries_cache) —
         # used to answer 'summarize X' cheaply instead of re-reading raw scenes.
         self._event_summaries: dict[str, str] = event_summaries or {}
         # shared scope resolver (nickname/unit/event) + plot-weight + human-name lookups

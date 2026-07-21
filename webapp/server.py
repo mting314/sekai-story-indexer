@@ -170,16 +170,8 @@ def _regions_for(event: dict) -> dict:
     return regions
 
 
-def _summaries_path() -> Path:
-    env = os.environ.get("SEKAI_EVENT_SUMMARIES")
-    candidates = [Path(env)] if env else [Path("event_summaries.json"), HERE.parent / "event_summaries.json"]
-    return next((p for p in candidates if p.exists()), candidates[-1])
-
-
 def _entry(value) -> dict:
-    """Normalize a summary cache value (bare string or {summary, characters}).
-    Still used by the live citation/metadata path (_structure_full_answer,
-    _metadata_intercept) which reads event_summaries.json."""
+    """Normalize a summary cache value (bare string or {summary, characters})."""
     if isinstance(value, str):
         return {"summary": value, "characters": []}
     return {"summary": (value or {}).get("summary", ""), "characters": (value or {}).get("characters", [])}
@@ -199,6 +191,18 @@ def _hierarchical_cache_path() -> Path:
         [Path(env)] if env else [Path("summaries_cache.json"), HERE.parent / "summaries_cache.json"]
     )
     return next((p for p in candidates if p.exists()), candidates[-1])
+
+
+def _event_summaries_map() -> dict:
+    """``{arc -> summary entry}`` from the hierarchical cache (``EVENT|<arc>`` tier),
+    used by the full-backend citation excerpts + metadata answers. Replaces the
+    retired flat ``event_summaries.json``; returns {} when the cache is absent."""
+    path = _hierarchical_cache_path()
+    try:
+        cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except Exception:
+        return {}
+    return {k.split("|", 1)[1]: v for k, v in cache.items() if k.startswith("EVENT|")}
 
 
 @app.get("/api/hierarchical-summaries")
@@ -566,8 +570,7 @@ _TAG_STRIP = re.compile(r"\{char_id=\d+\}")
 
 def _structure_full_answer(answer: str) -> dict:
     events_by_arc = {e.get("arc_slug"): e for e in load_events()}
-    path = _summaries_path()
-    sums = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    sums = _event_summaries_map()  # {arc -> entry} from the hierarchical cache
     refs: dict[str, int] = {}  # arc_slug -> ref number
     order: list[str] = []
 
@@ -701,8 +704,7 @@ def _metadata_intercept(question: str) -> dict | None:
     try:
         from sekai_story_indexer.query.metadata import metadata_answer
 
-        path = _summaries_path()
-        sums = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        sums = _event_summaries_map()  # {arc -> entry} from the hierarchical cache
         return metadata_answer(question, load_events(), _characters_meta(), sums)
     except Exception:
         return None

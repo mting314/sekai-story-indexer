@@ -59,10 +59,6 @@ def test_load_local_summary_nodes(tmp_path):
         json.dumps({"0097-x": {"01": {"summary": "## Overview\nKohane{char_id=13} sings.", "characters": [13]}}}),
         encoding="utf-8",
     )
-    (tmp_path / "event_summaries.json").write_text(
-        json.dumps({"0097-x": {"summary": "## Overview\nKohane{char_id=13} performs.", "characters": [13]}}),
-        encoding="utf-8",
-    )
     (tmp_path / "unit_summaries.json").write_text(
         json.dumps({"vivid_bad_squad": {"summary": "## Overview\nVBS forms.", "characters": [13]}}),
         encoding="utf-8",
@@ -77,8 +73,8 @@ def test_load_local_summary_nodes(tmp_path):
         os.chdir(cwd)
 
     by_level = {n.summary_level: n for n in nodes}
-    assert set(by_level) == {1, 2, 3}                       # unit, event, episode
+    # event tier (level 2) retired with event_summaries.json -> unit + episode only
+    assert set(by_level) == {1, 3}                          # unit, episode
     assert all(n.metadata.unit == "vivid_bad_squad" for n in nodes)
     assert all("char_id" not in n.text for n in nodes)      # inline tags stripped
-    assert by_level[2].metadata.arc_id == "0097-x"
     assert by_level[3].metadata.parent_part_id == "0097-x:01"
