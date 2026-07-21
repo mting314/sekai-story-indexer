@@ -8,6 +8,7 @@ const state = {
   hier: null, // cached /api/hierarchical-summaries tree
   commands: [], // /api/commands catalog for the slash-command menu
   cmd: { open: false, items: [], active: 0 },
+  inputHistory: [], histIdx: 0, // terminal-style ↑/↓ recall of submitted inputs
 };
 
 // Route external (sekai.best) art through the server image proxy so it loads even
@@ -926,6 +927,15 @@ function tagSpan(name, id) {
   return `<span class="ent char" style="color:${c.color}">${icon}${name}</span>`;
 }
 
+// Fixed summary-section labels (from the summarizer) — rendered as styled
+// subheadings when they appear as a bare "Label:" line, so summaries in the chat
+// get the same visual hierarchy as the Summaries tab.
+const SECTION_LABELS = new Set([
+  "Overview", "Key Events", "Character Developments", "Continuity Facts",
+  "Important Terms", "Episode Index", "Character Trajectories", "Unit / Club State",
+  "Part Index", "Episode Arc", "Relationship / Unit Developments",
+]);
+
 function renderMarkdown(src) {
   const esc = (s) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -974,11 +984,15 @@ function renderMarkdown(src) {
       continue;
     }
     if (list) { out.push("</ul>"); list = false; }
+    const sectionLabel = line.replace(/\s*:\s*$/, "");
     if (h) {
-      const lvl = Math.min(Math.max(h[1].length, 2), 4); // ## -> h2, kept 2..4
+      const lvl = Math.min(h[1].length + 1, 4); // # -> h2, ## -> h3, ###+ -> h4
       out.push(`<h${lvl}>${inline(h[2])}</h${lvl}>`);
+    } else if (SECTION_LABELS.has(sectionLabel)) {
+      out.push(`<div class="md-section">${escapeHtml(sectionLabel)}</div>`);
+    } else if (line.trim()) {
+      out.push(`<p>${inline(line)}</p>`);
     }
-    else if (line.trim()) out.push(`<p>${inline(line)}</p>`);
   }
   if (list) out.push("</ul>");
   return out.join("");
@@ -1154,22 +1168,37 @@ function wireCommandMenu() {
   const input = document.getElementById("question");
   input.addEventListener("input", updateCommandMenu);
   input.addEventListener("keydown", (e) => {
-    if (!state.cmd.open) return;
-    const n = state.cmd.items.length;
-    if (e.key === "ArrowDown") {
+    if (state.cmd.open) {
+      const n = state.cmd.items.length;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        state.cmd.active = (state.cmd.active + 1) % n;
+        renderCommandMenu();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        state.cmd.active = (state.cmd.active - 1 + n) % n;
+        renderCommandMenu();
+      } else if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault(); // complete instead of submitting
+        applyCommand(state.cmd.items[state.cmd.active]);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeCommandMenu();
+      }
+      return;
+    }
+    // Terminal-style history recall when the menu is closed.
+    const hist = state.inputHistory;
+    if (e.key === "ArrowUp" && hist.length) {
       e.preventDefault();
-      state.cmd.active = (state.cmd.active + 1) % n;
-      renderCommandMenu();
-    } else if (e.key === "ArrowUp") {
+      state.histIdx = Math.max(0, state.histIdx - 1);
+      input.value = hist[state.histIdx];
+      input.setSelectionRange(input.value.length, input.value.length);
+    } else if (e.key === "ArrowDown" && state.histIdx < hist.length) {
       e.preventDefault();
-      state.cmd.active = (state.cmd.active - 1 + n) % n;
-      renderCommandMenu();
-    } else if (e.key === "Enter" || e.key === "Tab") {
-      e.preventDefault(); // complete instead of submitting
-      applyCommand(state.cmd.items[state.cmd.active]);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      closeCommandMenu();
+      state.histIdx = Math.min(hist.length, state.histIdx + 1);
+      input.value = state.histIdx === hist.length ? "" : hist[state.histIdx];
+      input.setSelectionRange(input.value.length, input.value.length);
     }
   });
   input.addEventListener("blur", () => setTimeout(closeCommandMenu, 120));
@@ -1207,6 +1236,8 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   const q = input.value.trim();
   if (!q) return;
   input.value = "";
+  if (state.inputHistory[state.inputHistory.length - 1] !== q) state.inputHistory.push(q);
+  state.histIdx = state.inputHistory.length; // reset cursor to "current" (past end)
   addMessage("user", q);
   const pending = addMessage("assistant", "");
   showThinking(pending);

@@ -852,14 +852,36 @@ def _command_response(text: str, *, backend: str = "command", citations: list | 
     }
 
 
+def _resolve_event_ref(arg: str, events: list[dict], characters: dict) -> dict | None:
+    """Resolve a command's <event> arg to an event. Accepts a nickname (`mino7`),
+    `X's Nth focus event`, or the terse `<character> <N>` form (`minori 7`)."""
+    from sekai_story_indexer.query.metadata import _resolve_char, resolve_focus_reference
+
+    ev = resolve_focus_reference(arg, events, characters)
+    if ev:
+        return ev
+    # terse "<character> <N>" — resolve the character, then its Nth focus event.
+    m = re.search(r"(\d+)\s*$", arg)
+    if not m:
+        return None
+    n = int(m.group(1))
+    cid = _resolve_char(arg.lower(), characters)
+    if cid is None:
+        return None
+    matches = sorted(
+        (e for e in events if e.get("focus_character_id") == cid),
+        key=lambda e: (e.get("focus_index") or 0, e.get("started_at") or 0),
+    )
+    exact = next((e for e in matches if e.get("focus_index") == n), None)
+    return exact or (matches[n - 1] if 0 < n <= len(matches) else None)
+
+
 def _resolve_command_event(arg: str, req: CommandRequest) -> dict | None:
-    """Resolve a command's <event> arg (nickname/name) to an event; fall back to
-    the session's pinned focus when no arg is given."""
+    """Resolve a command's <event> arg (nickname/name/'<char> N') to an event;
+    fall back to the session's pinned focus when no arg is given."""
     events = load_events()
     if arg:
-        from sekai_story_indexer.query.metadata import resolve_focus_reference
-
-        return resolve_focus_reference(arg, events, _characters_meta())
+        return _resolve_event_ref(arg, events, _characters_meta())
     focus = _SESSIONS.get(req.session_id)
     if focus and focus.arcs:
         return next((e for e in events if e.get("arc_slug") == focus.arcs[0]), None)

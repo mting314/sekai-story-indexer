@@ -382,3 +382,23 @@ def test_commands_catalog(client):
     names = {c["command"] for c in cmds}
     assert {"help", "summarize", "lines", "song", "scope", "clear"} <= names
     assert all({"command", "args", "desc"} <= set(c) for c in cmds)
+
+
+def test_command_summarize_terse_char_number(client, tmp_path, monkeypatch):
+    """'/summarize minori 7' resolves via the terse '<character> <N>' form."""
+    import json
+
+    from webapp import server as server_module
+
+    monkeypatch.setattr(server_module, "load_events", lambda: [{
+        "nickname": "mino7", "arc_slug": "0209-x", "name": "Minori Event",
+        "unit": "more_more_jump", "focus_character_id": 5, "focus_index": 7,
+    }])
+    monkeypatch.setattr(server_module, "_characters_meta", lambda: {"5": {"en": "Minori Hanasato"}})
+    cache = {"EVENT|0209-x": {"summary": "Overview:\nMinori's frontline.", "inputs": {"level": "event"}}}
+    cp = tmp_path / "summaries_cache.json"
+    cp.write_text(json.dumps(cache), encoding="utf-8")
+    monkeypatch.setenv("SEKAI_SUMMARIES_CACHE", str(cp))
+    body = client.post("/api/command", json={"command": "/summarize minori 7"}).json()
+    assert body["backend"] == "summary"
+    assert "Minori's frontline" in body["answer"]
