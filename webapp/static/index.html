@@ -18,8 +18,9 @@
       <div id="messages" class="messages"></div>
       <div id="scope-hint" class="scope-hint hidden"></div>
       <form id="ask-form">
-        <input id="question" type="text" autocomplete="off"
-               placeholder="e.g. How does Kohane's confidence change across VBS?" />
+        <div id="cmd-menu" class="cmd-menu hidden" role="listbox"></div>
+        <textarea id="question" rows="1" autocomplete="off"
+               placeholder="Ask about the story… or type /help for commands"></textarea>
         <button type="submit">Ask</button>
       </form>
     </section>

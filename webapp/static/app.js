@@ -6,6 +6,9 @@ const state = {
   view: "timeline", summaries: null, meta: { characters: {}, units: {} }, entityRe: null,
   sessionId: null,
   hier: null, // cached /api/hierarchical-summaries tree
+  commands: [], // /api/commands catalog for the slash-command menu
+  cmd: { open: false, items: [], active: 0 },
+  inputHistory: [], histIdx: 0, // terminal-style ↑/↓ recall of submitted inputs
 };
 
 // Route external (sekai.best) art through the server image proxy so it loads even
@@ -36,6 +39,8 @@ async function boot() {
   state.units = units;
   state.events = events;
   state.meta = meta;
+  state.commands = await fetch("/api/commands").then((r) => r.json()).catch(() => []);
+  wireCommandMenu();
   buildEntityIndex();
   document.getElementById("tab-timeline").onclick = () => { state.view = "timeline"; renderCurrentView(); };
   document.getElementById("tab-summaries").onclick = () => { state.view = "summaries"; renderCurrentView(); };
@@ -305,7 +310,7 @@ function eventHero(ev, node) {
 }
 
 // Open the right sidebar with an episode's raw transcript (fetched on demand).
-async function openTranscript(arc, episodeSlug, label) {
+async function openTranscript(arc, episodeSlug, label, highlight) {
   const sb = document.getElementById("sidebar");
   document.getElementById("sb-title").textContent = label;
   document.getElementById("sb-sub").textContent = "raw transcript";
@@ -320,9 +325,39 @@ async function openTranscript(arc, episodeSlug, label) {
     return;
   }
   document.getElementById("sb-title").textContent = data.title || label;
-  el.innerHTML = renderMarkdown(data.text);
+  // Highlight a specific source line by bracketing it with sentinels BEFORE
+  // markdown-escaping, then swapping them for <mark> in the rendered HTML (so the
+  // match survives escaping and the citation's JP line matches the JP transcript).
+  let text = data.text;
+  if (highlight && text.includes(highlight)) {
+    text = text.replace(highlight, () => `⁦HL⁦${highlight}⁦LH⁦`); // fn replacer: no $-pattern interpretation
+  }
+  let html = renderMarkdown(text)
+    .replaceAll("⁦HL⁦", "<mark>")
+    .replaceAll("⁦LH⁦", "</mark>");
+  el.innerHTML = `<div class="answer-text">${html}</div>`;
   decorateNames(el, new Set());
-  el.scrollTop = 0;
+  const mark = el.querySelector("mark");
+  if (mark) mark.scrollIntoView({ block: "center" });
+  else el.scrollTop = 0;
+}
+
+// A citation click: for a raw-scene citation (has episode slug + source line), open
+// the full episode transcript with that line highlighted; otherwise fall back to
+// the excerpt view (e.g. event-summary citations).
+function openCitation(cite) {
+  if (cite && cite.episode && cite.arc_id) {
+    // Prefer the exact cited line; else fall back to the retrieved scene's first
+    // content line so the transcript at least scrolls to the right region (the
+    // extractive picker can't match an English question to Japanese lines).
+    let hl = cite.quote;
+    if (!hl && cite.excerpt) {
+      hl = (cite.excerpt.split("\n").find((l) => l.trim() && !l.trim().startsWith("#")) || "").trim();
+    }
+    openTranscript(cite.arc_id, cite.episode, cite.label || "Transcript", hl || "");
+  } else {
+    openExcerpt(cite);
+  }
 }
 
 
@@ -873,7 +908,7 @@ function renderAssistant(container, res) {
       const cite = byRef[p.ref];
       if (cite) {
         q.title = `${cite.label} — click for the full scene`;
-        q.onclick = () => openExcerpt(cite);
+        q.onclick = () => openCitation(cite);
         const tag = document.createElement("span");
         tag.className = "quote-ref";
         tag.textContent = ` [${p.ref}]`;
@@ -894,7 +929,7 @@ function renderAssistant(container, res) {
       a.textContent = `[${c.ref}] ${c.label}`;
       a.onclick = (e) => {
         e.preventDefault();
-        openExcerpt(c);
+        openCitation(c);
       };
       sources.appendChild(a);
     }
@@ -906,7 +941,7 @@ function renderAssistant(container, res) {
     a.onclick = (e) => {
       e.preventDefault();
       const c = byRef[a.dataset.ref];
-      if (c) openExcerpt(c);
+      if (c) openCitation(c);
     };
   });
 }
@@ -921,6 +956,15 @@ function tagSpan(name, id) {
     : "";
   return `<span class="ent char" style="color:${c.color}">${icon}${name}</span>`;
 }
+
+// Fixed summary-section labels (from the summarizer) — rendered as styled
+// subheadings when they appear as a bare "Label:" line, so summaries in the chat
+// get the same visual hierarchy as the Summaries tab.
+const SECTION_LABELS = new Set([
+  "Overview", "Key Events", "Character Developments", "Continuity Facts",
+  "Important Terms", "Episode Index", "Character Trajectories", "Unit / Club State",
+  "Part Index", "Episode Arc", "Relationship / Unit Developments",
+]);
 
 function renderMarkdown(src) {
   const esc = (s) =>
@@ -970,11 +1014,15 @@ function renderMarkdown(src) {
       continue;
     }
     if (list) { out.push("</ul>"); list = false; }
+    const sectionLabel = line.replace(/\s*:\s*$/, "");
     if (h) {
-      const lvl = Math.min(Math.max(h[1].length, 2), 4); // ## -> h2, kept 2..4
+      const lvl = Math.min(h[1].length + 1, 4); // # -> h2, ## -> h3, ###+ -> h4
       out.push(`<h${lvl}>${inline(h[2])}</h${lvl}>`);
+    } else if (SECTION_LABELS.has(sectionLabel)) {
+      out.push(`<div class="md-section">${escapeHtml(sectionLabel)}</div>`);
+    } else if (line.trim()) {
+      out.push(`<p>${inline(line)}</p>`);
     }
-    else if (line.trim()) out.push(`<p>${inline(line)}</p>`);
   }
   if (list) out.push("</ul>");
   return out.join("");
@@ -987,19 +1035,24 @@ function openExcerpt(cite) {
   if (cite.plot_weight && cite.plot_weight !== "unrated") bits.push(cite.plot_weight);
   if (cite.scene_index != null) bits.push(`scene ${cite.scene_index}`);
   document.getElementById("sb-sub").textContent = bits.join(" · ");
-  // Highlight the quoted line within the full excerpt.
   const esc = (s) =>
     (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  let body = esc(cite.excerpt || cite.quote || "");
+  const el = document.getElementById("sb-body");
   if (cite.quote) {
+    // Raw-scene excerpt: escape + highlight the quoted line (kept pre-wrap).
+    let body = esc(cite.excerpt || cite.quote || "");
     const q = esc(cite.quote);
     body = body.split(q).join(`<mark>${q}</mark>`);
+    el.innerHTML = body;
+    sb.classList.remove("hidden");
+    const m = el.querySelector("mark");
+    if (m) m.scrollIntoView({ block: "center" });
+    return;
   }
-  const el = document.getElementById("sb-body");
-  el.innerHTML = body;
+  // Summary / prose excerpt: render markdown with the same styling as the chat.
+  el.innerHTML = `<div class="answer-text">${renderMarkdown(cite.excerpt || "")}</div>`;
+  decorateNames(el, new Set());
   sb.classList.remove("hidden");
-  const m = el.querySelector("mark");
-  if (m) m.scrollIntoView({ block: "center" });
 }
 
 function closeExcerpt() {
@@ -1099,15 +1152,157 @@ async function streamAnswer(q, pending) {
   return done || { answer: text };
 }
 
+// --- Slash-command autocomplete menu (Claude-Code style) --------------------
+function _cmdMenu() {
+  return document.getElementById("cmd-menu");
+}
+
+function updateCommandMenu() {
+  const v = document.getElementById("question").value;
+  // Only while typing the command word: leading "/", letters, no space/args yet.
+  const m = /^\/([a-z]*)$/i.exec(v);
+  if (!m) return closeCommandMenu();
+  const prefix = m[1].toLowerCase();
+  const items = (state.commands || []).filter((c) => c.command.startsWith(prefix));
+  if (!items.length) return closeCommandMenu();
+  state.cmd = { open: true, items, active: 0 };
+  renderCommandMenu();
+}
+
+function renderCommandMenu() {
+  const el = _cmdMenu();
+  el.innerHTML = "";
+  state.cmd.items.forEach((c, i) => {
+    const row = document.createElement("div");
+    row.className = "cmd-item" + (i === state.cmd.active ? " active" : "");
+    row.setAttribute("role", "option");
+    row.innerHTML =
+      `<span class="cmd-name">/${escapeHtml(c.command)}</span>` +
+      (c.args ? ` <span class="cmd-args">${escapeHtml(c.args)}</span>` : "") +
+      `<span class="cmd-desc">${escapeHtml(c.desc)}</span>`;
+    // mousedown (not click) so the input doesn't blur before we apply.
+    row.onmousedown = (e) => { e.preventDefault(); applyCommand(c); };
+    el.appendChild(row);
+  });
+  el.classList.remove("hidden");
+}
+
+function closeCommandMenu() {
+  state.cmd = { open: false, items: [], active: 0 };
+  _cmdMenu().classList.add("hidden");
+}
+
+function applyCommand(c) {
+  const input = document.getElementById("question");
+  input.value = `/${c.command}` + (c.args ? " " : ""); // leave a space to type <event>
+  closeCommandMenu();
+  input.focus();
+}
+
+// Grow the composer textarea with its content, up to the CSS max-height.
+function autoGrowInput() {
+  const el = document.getElementById("question");
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 160) + "px";
+}
+
+function wireCommandMenu() {
+  const input = document.getElementById("question");
+  input.addEventListener("input", () => { updateCommandMenu(); autoGrowInput(); });
+  input.addEventListener("keydown", (e) => {
+    if (state.cmd.open) {
+      const n = state.cmd.items.length;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        state.cmd.active = (state.cmd.active + 1) % n;
+        renderCommandMenu();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        state.cmd.active = (state.cmd.active - 1 + n) % n;
+        renderCommandMenu();
+      } else if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault(); // complete instead of submitting
+        applyCommand(state.cmd.items[state.cmd.active]);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeCommandMenu();
+      }
+      return;
+    }
+    // Enter submits; Shift+Enter inserts a newline (textarea word-wraps).
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById("ask-form").requestSubmit();
+      return;
+    }
+    // Terminal-style history recall — only at the text boundaries so ↑/↓ still
+    // move the caret within multi-line input.
+    const hist = state.inputHistory;
+    const atStart = input.selectionStart === 0 && input.selectionEnd === 0;
+    const atEnd =
+      input.selectionStart === input.value.length && input.selectionEnd === input.value.length;
+    if (e.key === "ArrowUp" && atStart && hist.length) {
+      e.preventDefault();
+      state.histIdx = Math.max(0, state.histIdx - 1);
+      input.value = hist[state.histIdx];
+      autoGrowInput();
+      input.setSelectionRange(input.value.length, input.value.length);
+    } else if (e.key === "ArrowDown" && atEnd && state.histIdx < hist.length) {
+      e.preventDefault();
+      state.histIdx = Math.min(hist.length, state.histIdx + 1);
+      input.value = state.histIdx === hist.length ? "" : hist[state.histIdx];
+      autoGrowInput();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  });
+  input.addEventListener("blur", () => setTimeout(closeCommandMenu, 120));
+}
+
+// Chat slash commands (/summarize, /lines, /help, …) — posted to /api/command,
+// rendered like a normal answer. Focus chip updates for /scope and /clear.
+async function runSlashCommand(q, pending) {
+  try {
+    const res = await fetch("/api/command", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        command: q,
+        session_id: ensureSessionId(),
+        unit: state.activeUnit === "all" ? null : state.activeUnit,
+      }),
+    }).then((r) => r.json());
+    renderAssistant(pending, res);
+    if ("focus" in res) {
+      if (res.focus) showFocusChip(res.focus);
+      else document.getElementById("scope-hint").classList.add("hidden");
+    }
+    // Keep command turns in the conversation history so follow-ups have context
+    // (e.g. asking about a line from a /summarize). The command line reads fine as
+    // a user turn; the response is the assistant turn.
+    state.history.push({ role: "user", text: q });
+    state.history.push({ role: "assistant", text: res.answer || "" });
+  } catch (err) {
+    pending.textContent = `⚠ ${err}`;
+  }
+}
+
 document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const input = document.getElementById("question");
   const q = input.value.trim();
   if (!q) return;
   input.value = "";
+  autoGrowInput(); // collapse the textarea back to one row
+  if (state.inputHistory[state.inputHistory.length - 1] !== q) state.inputHistory.push(q);
+  state.histIdx = state.inputHistory.length; // reset cursor to "current" (past end)
   addMessage("user", q);
   const pending = addMessage("assistant", "");
   showThinking(pending);
+  if (q.startsWith("/")) {
+    await runSlashCommand(q, pending);
+    document.getElementById("messages").scrollTop = 1e9;
+    return;
+  }
   try {
     let res;
     try {

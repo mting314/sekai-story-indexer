@@ -376,11 +376,14 @@ def _best_supporting_line(excerpt: str, answer: str) -> str:
     return best
 
 
-def _finalize_citations(nl: str, citations: list[dict]) -> tuple[str, list[dict]]:
+def _finalize_citations(
+    nl: str, citations: list[dict], grounding: dict[int, str] | None = None
+) -> tuple[str, list[dict]]:
     """Keep only the citations the answer actually references, in first-cited order,
     renumber them contiguously, rewrite the answer's [n], and pin each kept citation
-    to its most-relevant supporting line. Leaves things unchanged if the model cited
-    nothing resolvable (so we never blank the sources)."""
+    to its supporting source line. Prefers the model's verbatim grounding line (when
+    it's actually present in that cited scene), else a lexical fallback. Leaves things
+    unchanged if the model cited nothing resolvable (so we never blank the sources)."""
     refs: list[int] = []
     for m in re.findall(r"\[(\d+)\]", nl):
         r = int(m)
@@ -395,9 +398,17 @@ def _finalize_citations(nl: str, citations: list[dict]) -> tuple[str, list[dict]
             continue
         remap[old] = len(kept) + 1
         c = {**c, "ref": remap[old]}
-        pinned = _best_supporting_line(c.get("excerpt", ""), nl)
-        if pinned:
-            c["quote"] = pinned
+        excerpt = c.get("excerpt", "")
+        # The model's verbatim JP grounding line — but only if it really appears in
+        # the cited scene (guards against paraphrase/hallucination mis-highlighting);
+        # otherwise fall back to the lexical best-line.
+        line = (grounding or {}).get(old, "")
+        if line and line in excerpt:
+            c["quote"] = line
+        else:
+            pinned = _best_supporting_line(excerpt, nl)
+            if pinned:
+                c["quote"] = pinned
         kept.append(c)
     if not kept:
         return nl, citations  # model didn't cite resolvably -> don't strip sources
@@ -409,8 +420,8 @@ def _finalize_citations(nl: str, citations: list[dict]) -> tuple[str, list[dict]
     return nl2, kept
 
 
-def _apply_generated_answer(result: dict, nl: str) -> None:
-    nl, kept = _finalize_citations(nl, result.get("citations") or [])
+def _apply_generated_answer(result: dict, nl: str, grounding: dict[int, str] | None = None) -> None:
+    nl, kept = _finalize_citations(nl, result.get("citations") or [], grounding)
     result["answer"] = nl
     result["citations"] = kept
     # prose + a supporting-quote block per cited source (the exact line, [ref]).
@@ -445,9 +456,10 @@ def _query_local(req: QueryRequest, scope_arc_ids: tuple[str, ...] = ()) -> dict
     if _can_generate_over(result):
         from sekai_story_indexer.query.generate import generate_answer
 
-        nl = generate_answer(result["resolved_question"], result["citations"])
-        if nl:
-            _apply_generated_answer(result, nl)
+        gen = generate_answer(result["resolved_question"], result["citations"])
+        if gen:
+            nl, grounding = gen
+            _apply_generated_answer(result, nl, grounding)
     if not result.get("generated"):
         _trim_extractive_citations(result)
     return result
@@ -813,6 +825,268 @@ def _resolve_request(req: QueryRequest) -> tuple[dict | None, tuple[str, ...], F
     return None, tuple(scope_arcs), focus, log
 
 
+# --- Chat slash commands (like Claude Code / other chat bots) -----------------
+# The user types `/cmd <args>` in the chat box; the frontend posts here. Each
+# handler returns the same response shape as /api/query so the UI renders it
+# uniformly (answer_parts, citations, focus chip).
+
+class CommandRequest(BaseModel):
+    command: str  # the full "/cmd args" line
+    session_id: str | None = None
+    unit: str | None = None
+
+
+# (name, args, one-line help) — drives /help, the /api/commands menu, and dispatch.
+_SLASH_COMMANDS: list[tuple[str, str, str]] = [
+    ("help", "", "List these commands"),
+    ("summarize", "<event>", "Event summary (e.g. /summarize mino7)"),
+    ("lines", "<event>", "Episode + dialogue-line counts for an event"),
+    ("characters", "<event>", "Cast (focus + speakers) of an event"),
+    ("song", "<event>", "The event's commissioned song + credits"),
+    ("scope", "<event>", "Pin the chat to an event; later questions stay scoped"),
+    ("clear", "", "Unpin the event focus"),
+]
+
+
+def _story_root() -> Path:
+    return Path(os.environ.get("SEKAI_STORY_ROOT", "story"))
+
+
+def _command_response(text: str, *, backend: str = "command", citations: list | None = None) -> dict:
+    return {
+        "answer": text,
+        "answer_parts": [{"type": "text", "text": text}],
+        "characters": [],
+        "citations": citations or [],
+        "intent": "command",
+        "backend": backend,
+        "error": None,
+    }
+
+
+def _resolve_event_ref(arg: str, events: list[dict], characters: dict) -> dict | None:
+    """Resolve a command's <event> arg to an event. Accepts a nickname (`mino7`),
+    `X's Nth focus event`, or the terse `<character> <N>` form (`minori 7`)."""
+    from sekai_story_indexer.query.metadata import _resolve_char, resolve_focus_reference
+
+    ev = resolve_focus_reference(arg, events, characters)
+    if ev:
+        return ev
+    # terse "<character> <N>" — resolve the character, then its Nth focus event.
+    m = re.search(r"(\d+)\s*$", arg)
+    if not m:
+        return None
+    n = int(m.group(1))
+    cid = _resolve_char(arg.lower(), characters)
+    if cid is None:
+        return None
+    matches = sorted(
+        (e for e in events if e.get("focus_character_id") == cid),
+        key=lambda e: (e.get("focus_index") or 0, e.get("started_at") or 0),
+    )
+    exact = next((e for e in matches if e.get("focus_index") == n), None)
+    return exact or (matches[n - 1] if 0 < n <= len(matches) else None)
+
+
+def _resolve_command_event(arg: str, req: CommandRequest) -> dict | None:
+    """Resolve a command's <event> arg (nickname/name/'<char> N') to an event;
+    fall back to the session's pinned focus when no arg is given."""
+    events = load_events()
+    if arg:
+        ev = _resolve_event_ref(arg, events, _characters_meta())
+        # Pin the resolved event as the session focus so plain follow-up questions
+        # ("when does this happen?") stay scoped to it, like /scope does.
+        if ev and ev.get("arc_slug"):
+            _remember_focus(req.session_id, Focus(arcs=(ev["arc_slug"],), label=ev.get("name")))
+        return ev
+    focus = _SESSIONS.get(req.session_id)
+    if focus and focus.arcs:
+        return next((e for e in events if e.get("arc_slug") == focus.arcs[0]), None)
+    return None
+
+
+def _event_scene_files(arc: str):
+    # slug-guard the arc before globbing (symmetry with /api/episode-raw)
+    if not (arc and _SLUG_RE.fullmatch(arc)):
+        return []
+    return sorted(_story_root().glob(f"*/*/{arc}/*.md"))
+
+
+def _cmd_help(arg: str, req: CommandRequest) -> dict:
+    lines = ["**Chat commands**"] + [
+        f"- `/{name}{(' ' + args) if args else ''}` — {desc}" for name, args, desc in _SLASH_COMMANDS
+    ]
+    lines.append("\n`<event>` accepts a nickname (`mino7`) or defaults to the pinned focus.")
+    return _command_response("\n".join(lines))
+
+
+def _cmd_summarize(arg: str, req: CommandRequest) -> dict:
+    ev = _resolve_command_event(arg, req)
+    if not ev:
+        return _command_response("Couldn't resolve that event — try e.g. `/summarize mino7`.")
+    arc = ev.get("arc_slug")
+    # Fast path: a pre-baked hierarchical summary, served directly.
+    path = _hierarchical_cache_path()
+    cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    entry = cache.get(f"EVENT|{arc}")
+    summary = (entry.get("summary") if isinstance(entry, dict) else entry) or ""
+    if summary.strip():
+        citations = [{
+            "ref": 1, "arc_id": arc, "label": f"{ev.get('name')} — event summary",
+            "episode_title": "Event summary", "nickname": ev.get("nickname"), "excerpt": summary,
+        }]
+        return _command_response(summary, backend="summary", citations=citations)
+    # No baked hierarchical summary -> delegate to the normal retrieval path scoped to
+    # this event: serves a legacy event_summaries.json entry (via the merged loader) or
+    # generates one on the fly from the retrieved scenes, so /summarize never falsely
+    # claims a summary is impossible for an event whose story is on disk.
+    qreq = QueryRequest(
+        question=f"summarize {ev.get('nickname') or ev.get('name') or arc}",
+        session_id=req.session_id,
+    )
+    result = _query_local(qreq, (arc,) if arc else ())
+    answer = (result.get("answer") or "").strip()
+    if not answer:
+        return _command_response(
+            f"Couldn't summarize **{ev.get('name')}** ({ev.get('nickname') or arc}) "
+            "— no story on disk for it."
+        )
+    return _command_response(
+        answer,
+        backend=result.get("backend") or "summary",
+        citations=result.get("citations") or [],
+    )
+
+
+def _cmd_lines(arg: str, req: CommandRequest) -> dict:
+    ev = _resolve_command_event(arg, req)
+    if not ev:
+        return _command_response("Couldn't resolve that event — try e.g. `/lines mino7`.")
+    files = _event_scene_files(ev.get("arc_slug"))
+    if not files:
+        return _command_response(f"No story files on disk for **{ev.get('name')}**.")
+    total = 0
+    speakers: set[str] = set()
+    per: list[str] = []
+    for f in files:
+        n = 0
+        for raw in f.read_text(encoding="utf-8").splitlines():
+            s = raw.strip()
+            if not s or s == "---" or s.startswith("#"):
+                continue
+            n += 1
+            if ":" in s:
+                sp = s.split(":", 1)[0].strip()
+                if sp and len(sp) <= 24:
+                    speakers.add(sp)
+        total += n
+        m = re.match(r"(\d+)", f.stem)
+        per.append(f"- Episode {int(m.group(1)) if m else f.stem}: {n} lines")
+    head = (
+        f"**{ev.get('name')}** ({ev.get('nickname') or ev.get('arc_slug')}) — "
+        f"{len(files)} episodes · {total} lines · {len(speakers)} speakers"
+    )
+    return _command_response(head + "\n" + "\n".join(per))
+
+
+def _cmd_characters(arg: str, req: CommandRequest) -> dict:
+    ev = _resolve_command_event(arg, req)
+    if not ev:
+        return _command_response("Couldn't resolve that event — try e.g. `/characters mino7`.")
+    speakers: list[str] = []
+    seen: set[str] = set()
+    for f in _event_scene_files(ev.get("arc_slug")):
+        for raw in f.read_text(encoding="utf-8").splitlines():
+            s = raw.strip()
+            if s and s != "---" and not s.startswith("#") and ":" in s:
+                sp = s.split(":", 1)[0].strip()
+                if sp and len(sp) <= 24 and sp not in seen:
+                    seen.add(sp)
+                    speakers.append(sp)
+    parts = [f"**{ev.get('name')}** cast:"]
+    if ev.get("focus_character"):
+        parts.append(f"- Focus: {ev.get('focus_character')}")
+    parts.append(
+        f"- Speakers ({len(speakers)}): " + (", ".join(speakers[:50]) if speakers else "—")
+    )
+    return _command_response("\n".join(parts))
+
+
+def _cmd_song(arg: str, req: CommandRequest) -> dict:
+    ev = _resolve_command_event(arg, req)
+    if not ev:
+        return _command_response("Couldn't resolve that event — try e.g. `/song mino7`.")
+    if not ev.get("song_title"):
+        return _command_response(f"**{ev.get('name')}** has no commissioned song on record.")
+    bits = [f"🎵 **{ev.get('song_title')}** — {ev.get('name')}"]
+    for label, key in (("Composer", "song_composer"), ("Lyricist", "song_lyricist"), ("Arranger", "song_arranger")):
+        if ev.get(key):
+            bits.append(f"- {label}: {ev.get(key)}")
+    return _command_response("\n".join(bits))
+
+
+def _cmd_scope(arg: str, req: CommandRequest) -> dict:
+    ev = _resolve_command_event(arg, req)
+    if not ev:
+        return _command_response("Couldn't resolve that event — try e.g. `/scope mino7`.")
+    arc = ev.get("arc_slug")
+    focus = _remember_focus(req.session_id, Focus(arcs=(arc,), label=ev.get("name")))
+    text = (
+        f"📌 Pinned the chat to **{ev.get('name')}** ({ev.get('nickname') or arc}). "
+        "Follow-up questions stay scoped to it; `/clear` to unpin."
+    )
+    return _with_focus(_command_response(text), focus)
+
+
+def _cmd_clear(arg: str, req: CommandRequest) -> dict:
+    _SESSIONS.set(req.session_id, Focus())
+    result = _command_response("Focus cleared — questions now search the whole corpus.")
+    result["focus"] = None
+    return result
+
+
+_COMMAND_DISPATCH = {
+    "help": _cmd_help,
+    "summarize": _cmd_summarize, "summary": _cmd_summarize,
+    "lines": _cmd_lines, "linecount": _cmd_lines,
+    "characters": _cmd_characters, "cast": _cmd_characters,
+    "song": _cmd_song,
+    "scope": _cmd_scope, "focus": _cmd_scope,
+    "clear": _cmd_clear,
+}
+
+
+@app.get("/api/commands")
+def commands_list() -> list[dict]:
+    """Slash-command catalog for the chat autocomplete menu."""
+    return [{"command": name, "args": args, "desc": desc} for name, args, desc in _SLASH_COMMANDS]
+
+
+@app.post("/api/command")
+def command(req: CommandRequest) -> dict:
+    """Handle a chat slash command (`/summarize mino7`, `/lines`, `/help`, …)."""
+    line = req.command.strip().lstrip("/").strip()
+    head, _, rest = line.partition(" ")
+    head = head.lower()
+    if not line:
+        result = _cmd_help("", req)
+    elif (handler := _COMMAND_DISPATCH.get(head)) is None:
+        result = _command_response(f"Unknown command `/{head}`. Type `/help` for the list.")
+    else:
+        try:
+            result = handler(rest.strip(), req)
+        except Exception as exc:  # noqa: BLE001 - never 500 a chat command
+            result = _command_response(f"Command failed: {exc}")
+    # Log command turns too, so /summarize (which can spend a generation call) is
+    # visible in the per-turn chat log like /api/query and the streaming path.
+    _log_turn({
+        "question": req.command, "route": "command", "command": head or "help",
+        "backend": result.get("backend"), "citations": len(result.get("citations") or []),
+        "session_id": req.session_id, "error": result.get("error"),
+    })
+    return result
+
+
 @app.post("/api/query")
 def query(req: QueryRequest) -> dict:
     """Answer a question. Uses the local lexical engine by default (runs anywhere);
@@ -882,14 +1156,17 @@ def _stream_events(req: QueryRequest):
                 "scope": result.get("scope"), "focus": focus_d})
 
     streamed = ""
+    grounding: dict[int, str] = {}
     if not result.get("pre_summarized") and _can_generate_over(result):
         from sekai_story_indexer.query.generate import generate_answer_stream
 
-        for piece in generate_answer_stream(result["resolved_question"], result["citations"]):
+        for piece in generate_answer_stream(
+            result["resolved_question"], result["citations"], grounding_out=grounding
+        ):
             streamed += piece
             yield _sse({"type": "delta", "text": piece})
     if streamed:
-        _apply_generated_answer(result, streamed)
+        _apply_generated_answer(result, streamed, grounding)
     else:  # extractive / pre-summarized / no key -> chunk the computed answer
         if result.get("pre_summarized"):
             result["generated"] = True
