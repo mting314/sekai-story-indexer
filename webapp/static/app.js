@@ -1117,8 +1117,9 @@ async function runSlashCommand(q, pending) {
       if (res.focus) showFocusChip(res.focus);
       else document.getElementById("scope-hint").classList.add("hidden");
     }
-    state.history.push({ role: "user", text: q });
-    state.history.push({ role: "assistant", text: res.answer || "" });
+    // Slash commands are meta actions, not dialogue — keep them out of the NL
+    // history so they don't skew follow-up condensation. Cross-turn scoping is
+    // handled server-side via /scope's focus state.
   } catch (err) {
     pending.textContent = `⚠ ${err}`;
   }

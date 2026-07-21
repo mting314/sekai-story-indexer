@@ -867,7 +867,10 @@ def _resolve_command_event(arg: str, req: CommandRequest) -> dict | None:
 
 
 def _event_scene_files(arc: str):
-    return sorted(_story_root().glob(f"*/*/{arc}/*.md")) if arc else []
+    # slug-guard the arc before globbing (symmetry with /api/episode-raw)
+    if not (arc and _SLUG_RE.fullmatch(arc)):
+        return []
+    return sorted(_story_root().glob(f"*/*/{arc}/*.md"))
 
 
 def _cmd_help(arg: str, req: CommandRequest) -> dict:
