@@ -233,6 +233,12 @@ a.cite:hover { text-decoration: underline; }
 /* "Thinking" typing indicator — animated dots while the model generates the
    first token (before streaming begins), so the assistant bubble isn't blank. */
 .msg.thinking { color: var(--muted); }
+/* ChatGPT-style faded routing/thinking trace shown before the answer streams */
+.routing { display: flex; flex-direction: column; gap: 3px; }
+.routing-step { font-size: 12.5px; line-height: 1.5; color: var(--muted); opacity: .6; display: flex; align-items: center; gap: 6px; }
+.routing-step.done { opacity: .45; }
+.routing-step.active { opacity: .85; font-style: italic; }
+.routing-step.done::first-letter { color: var(--accent); }
 .typing { display: inline-flex; gap: 5px; align-items: center; padding: 2px 0; }
 .typing span {
   width: 7px; height: 7px; border-radius: 50%; background: var(--accent);

@@ -918,6 +918,38 @@ function clearThinking(el) {
   el.textContent = "";
 }
 
+// ChatGPT-style faded "thinking" trace: the routing steps the backend took, with
+// an animated ellipsis on the active (last) step. Cleared when the answer starts.
+function routingSteps(meta) {
+  const steps = ["Reading your question"];
+  const label = (meta.focus && meta.focus.label) || (meta.scope && meta.scope.label);
+  const scopeArc = meta.scope && meta.scope.arc_id;
+  if (label) steps.push(`Focusing on ${label}`);
+  else if (scopeArc) steps.push(`Focusing on ${scopeArc}`);
+  else if (state.activeUnit && state.activeUnit !== "all") {
+    steps.push(`Scoped to ${(state.meta.units[state.activeUnit] || {}).name || state.activeUnit}`);
+  }
+  const act =
+    meta.intent === "summarize" ? "Summarizing the event"
+    : meta.intent === "count" ? "Counting dialogue"
+    : "Searching the story";
+  steps.push(meta.backend === "derived" || meta.backend === "full" ? `${act}` : act);
+  if (meta.backend) steps.push("Writing the answer");
+  return steps;
+}
+
+function showRouting(el, steps) {
+  el.classList.add("thinking");
+  const dots = '<span class="typing"><span></span><span></span><span></span></span>';
+  const rows = steps.map((s, i) => {
+    const active = i === steps.length - 1;
+    return `<div class="routing-step${active ? " active" : " done"}">` +
+      `${active ? "" : "✓ "}${escapeHtml(s)}${active ? " " + dots : ""}</div>`;
+  });
+  el.innerHTML = `<div class="routing">${rows.join("")}</div>`;
+  document.getElementById("messages").scrollTop = 1e9;
+}
+
 // Render a rich assistant answer: text runs + clickable quote blocks that open
 // the excerpt sidebar, plus a compact source list.
 function renderAssistant(container, res) {
@@ -1190,6 +1222,7 @@ async function streamAnswer(q, pending) {
         document.getElementById("messages").scrollTop = 1e9;
       } else if (evt.type === "meta") {
         if (evt.focus) showFocusChip(evt.focus);
+        if (firstDelta) showRouting(pending, routingSteps(evt)); // faded thinking trace
       } else if (evt.type === "done") {
         done = evt;
       }

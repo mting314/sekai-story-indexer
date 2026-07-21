@@ -1289,7 +1289,8 @@ def _stream_events(req: QueryRequest):
         # Prose-free public backend: answer from summaries + scene refs (no LLM,
         # no stored prose); the exact quote is fetched live on citation click.
         result = _query_derived(req, scope_arc_ids)
-        yield _sse({"type": "meta", "backend": "derived", "focus": focus_d})
+        yield _sse({"type": "meta", "backend": "derived",
+                    "intent": result.get("intent"), "focus": focus_d})
         for piece in _chunk_text(result.get("answer") or ""):
             yield _sse({"type": "delta", "text": piece})
         _log_turn(_rag_log(log, result, scope_arc_ids, streamed=True))
