@@ -261,9 +261,13 @@ a.cite:hover { text-decoration: underline; }
   border-radius: 6px 6px 0 0; }
 .summary-tab:hover { color: var(--text); background: #ffffff0d; }
 .summary-tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
-/* fixed height so switching tabs doesn't make the layout jump; long sections
-   scroll within the pane instead of resizing it */
-.summary-tabpane { height: 240px; overflow-y: auto; padding-right: 6px; }
+/* Stack every section pane in ONE grid cell so the card is always as tall as the
+   TALLEST section: no scrollbar (everything fits) and no vertical jump when
+   switching tabs (height is constant). Hidden panes keep their space via
+   visibility (not display:none), which is what sizes the cell. */
+.summary-tabpanes { display: grid; }
+.summary-tabpanes > .summary-tabpane { grid-area: 1 / 1; visibility: hidden; }
+.summary-tabpanes > .summary-tabpane.active { visibility: visible; }
 /* event-title header at the top of an answer (EN title where localized) */
 .answer-event-header { margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid #ffffff1a; }
 .answer-event-title { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.25; }
