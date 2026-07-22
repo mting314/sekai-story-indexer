@@ -614,19 +614,34 @@ def _apply_generated_answer(result: dict, nl: str, grounding: dict[int, str] | N
 
 
 def _trim_extractive_citations(result: dict) -> None:
-    """For an extractive (non-generated) answer, keep only the citations the quote
-    blocks actually reference — otherwise a scoped whole-event query would list the
-    entire event as sources (mirrors the generated path's referenced-only trim)."""
-    refs = {
-        p.get("ref")
-        for p in (result.get("answer_parts") or [])
-        if p.get("type") == "quote" and p.get("ref") is not None
-    }
-    if refs:
-        result["citations"] = [
-            c for c in (result.get("citations") or []) if c.get("ref") in refs
-        ]
-    _overlay_extractive_en(result)
+    """For an extractive (non-generated) answer, give EACH excerpt its own citation
+    anchored to its OWN line.
+
+    The retrieval layer numbers citations per retrieved *scene* (ref = rank) and
+    every quoted line inherits its scene's ref. When several excerpts come from the
+    same top scene they all collapse to ``[1]`` whose ``quote`` is only the first
+    line, so clicking any of them jumps to the same spot. Here — where the excerpts
+    ARE the answer — we rebuild one citation per quote (copying the scene's coords
+    but carrying that quote's own line), renumbered 1..N, so ``[n]`` and its click
+    resolve to the correct transcript line. Inherently trims to referenced scenes."""
+    _overlay_extractive_en(result)  # attach text_en to each quote first
+    quotes = [p for p in (result.get("answer_parts") or []) if p.get("type") == "quote"]
+    if not quotes:
+        return  # text-only / pre-summarized extractive answer: nothing to renumber
+    by_ref = {c.get("ref"): c for c in (result.get("citations") or [])}
+    new_citations: list[dict] = []
+    for i, p in enumerate(quotes, start=1):
+        cite = dict(by_ref.get(p.get("ref")) or {})
+        cite["ref"] = i
+        cite["quote"] = p.get("text", "")  # this excerpt's own line -> correct anchor
+        en = p.get("text_en")
+        if en:
+            cite["quote_en"] = en
+        else:
+            cite.pop("quote_en", None)  # drop the scene's stale best-quote EN
+        new_citations.append(cite)
+        p["ref"] = i  # excerpt now points at its own line-citation
+    result["citations"] = new_citations
 
 
 def _overlay_extractive_en(result: dict) -> None:

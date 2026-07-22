@@ -238,18 +238,36 @@ def test_image_proxy_rejects_non_sekai_host(client):
     assert client.get("/api/img", params={"u": "http://storage.sekai.best/x"}).status_code == 400
 
 
-def test_trim_extractive_citations_keeps_only_quoted():
+def test_extractive_citations_are_per_line():
+    """Each extractive excerpt gets its OWN citation anchored to its own line —
+    including when several excerpts come from the same retrieved scene (the
+    all-cite-[1]-and-jump-to-the-same-spot bug). Also trims to referenced scenes."""
     from webapp import server
     result = {
         "answer_parts": [
-            {"type": "text", "text": "..."},
-            {"type": "quote", "ref": 2, "text": "a"},
-            {"type": "quote", "ref": 5, "text": "b"},
+            {"type": "text", "text": "From X:"},
+            {"type": "quote", "ref": 1, "text": "line one"},   # same scene as ↓
+            {"type": "quote", "ref": 1, "text": "line two"},   # same scene, diff line
+            {"type": "quote", "ref": 3, "text": "line three"},  # a different scene
         ],
-        "citations": [{"ref": i} for i in range(1, 9)],
+        "citations": [
+            {"ref": 1, "label": "Ep 1", "arc_id": "0001", "episode": "01", "quote": "line one"},
+            {"ref": 2, "label": "Ep 2", "arc_id": "0001", "episode": "02", "quote": "unused"},
+            {"ref": 3, "label": "Ep 3", "arc_id": "0001", "episode": "03", "quote": "y"},
+        ],
     }
     server._trim_extractive_citations(result)
-    assert {c["ref"] for c in result["citations"]} == {2, 5}
+    cites = result["citations"]
+    # one citation per excerpt, renumbered 1..N (scene 2 was never quoted -> dropped)
+    assert [c["ref"] for c in cites] == [1, 2, 3]
+    # each anchors to its OWN line
+    assert [c["quote"] for c in cites] == ["line one", "line two", "line three"]
+    # the two same-scene excerpts keep that scene's coords but differ by line
+    assert cites[0]["label"] == cites[1]["label"] == "Ep 1"
+    assert cites[0]["quote"] != cites[1]["quote"]
+    assert cites[2]["label"] == "Ep 3"
+    # each excerpt now points at its own line-citation
+    assert [p["ref"] for p in result["answer_parts"] if p["type"] == "quote"] == [1, 2, 3]
 
 
 def test_hierarchical_summaries_endpoint(client, tmp_path, monkeypatch):
