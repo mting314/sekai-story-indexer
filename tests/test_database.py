@@ -64,9 +64,10 @@ def test_generation_model_uses_google_by_default(monkeypatch):
     class FakeGoogleModel:
         created: list[tuple[str, Any]] = []
 
-        def __init__(self, model_name: str, *, provider: Any):
+        def __init__(self, model_name: str, *, provider: Any, settings: Any = None):
             self.model_name = model_name
             self.provider = provider
+            self.settings = settings
             self.created.append((model_name, provider))
 
     monkeypatch.setattr(database, "GoogleProvider", FakeGoogleProvider)
@@ -266,9 +267,10 @@ def test_client_and_model_helpers_return_singletons(monkeypatch):
     class FakeGoogleModel:
         created: list[tuple[str, Any]] = []
 
-        def __init__(self, model_name: str, *, provider: Any):
+        def __init__(self, model_name: str, *, provider: Any, settings: Any = None):
             self.model_name = model_name
             self.provider = provider
+            self.settings = settings
             self.created.append((model_name, provider))
 
     monkeypatch.setattr(database.chromadb, "PersistentClient", FakePersistentClient)

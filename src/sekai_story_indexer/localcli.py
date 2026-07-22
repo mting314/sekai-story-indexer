@@ -114,6 +114,104 @@ def classify(events_index: Path = typer.Option(Path("events_index.json"))):
     typer.echo(f"classified {len(rows)} events: {dict(dist)}")
 
 
+@app.command()
+def summarize(
+    story_root: Path = typer.Option(Path("story")),
+    cache: Path = typer.Option(Path("summaries_cache.json")),
+    limit: int = typer.Option(
+        0, help="Generate at most N NEW event summaries (0 = all). Cached ones are "
+        "reused for free, so this is resumable + a cost knob for partial runs."
+    ),
+    include_unit_stories: bool = typer.Option(
+        False, help="Also summarize unit-story arcs (default: event arcs only)."
+    ),
+):
+    """LLM 'Refine' event-tier summaries into the summaries cache (needs
+    GOOGLE_API_KEY + generation deps). Fingerprint-cached + resumable; threads a
+    rolling previous-event summary for continuity. Skips Chroma entirely."""
+    import re
+
+    try:
+        from .database import (
+            get_chat_model_name,
+            get_embedding_model_name,
+            get_generation_model_name,
+            get_generation_provider_name,
+            initialize_ingest_settings,
+        )
+        from .indexer.manifest import (
+            SUMMARY_CACHE_SCHEMA_VERSION,
+            SummaryCacheContext,
+            hash_files,
+            hash_json_file,
+        )
+        from .indexer.parser import PARSER_VERSION
+        from .indexer.processor import StoryProcessor
+        from .indexer.summarizer import SUMMARIZATION_PROMPT_VERSION, HierarchicalSummarizer
+        from .story_order import load_story_order
+    except ImportError as exc:  # generation stack not installed
+        typer.secho(
+            f"`sekai summarize` needs the generation deps (pydantic-ai + google): {exc}\n"
+            "Install with `uv sync`.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1) from exc
+
+    initialize_ingest_settings()
+    md_files = sorted(story_root.rglob("*.md"), key=str)  # *.md.en excluded (ends .en)
+    story_order = load_story_order()  # no story_root validation (unit arcs not in yaml)
+    raw_nodes = []
+    for f in md_files:
+        raw_nodes.extend(StoryProcessor.process_file(f))
+
+    event_arc = re.compile(r"^\d{4}-")  # event arcs; excludes unit-story arcs (NN-…)
+    nodes = raw_nodes if include_unit_stories else [
+        n for n in raw_nodes if event_arc.match(n.metadata.arc_id)
+    ]
+    arcs = {n.metadata.arc_id for n in nodes}
+    cache_dict = json.loads(cache.read_text(encoding="utf-8")) if cache.exists() else {}
+    already = sum(1 for a in arcs if f"EVENT|{a}" in cache_dict)
+    typer.echo(
+        f"{len(arcs)} arcs in scope · {already} already cached · "
+        f"limit={'all' if not limit else limit}"
+    )
+
+    glossary_path = Path("glossary.json")
+    glossary = json.loads(glossary_path.read_text(encoding="utf-8")) if glossary_path.exists() else None
+    cache_context = SummaryCacheContext(
+        source_file_hashes=hash_files(md_files),
+        parser_version=PARSER_VERSION,
+        summarization_prompt_version=SUMMARIZATION_PROMPT_VERSION,
+        glossary_hash=hash_json_file(glossary_path),
+        chat_model=get_chat_model_name(),
+        generation_provider=get_generation_provider_name(),
+        generation_model=get_generation_model_name(),
+        embedding_model=get_embedding_model_name(),
+        summary_cache_schema_version=SUMMARY_CACHE_SCHEMA_VERSION,
+    )
+    summarizer = HierarchicalSummarizer(
+        glossary=glossary, story_order=story_order, cache_context=cache_context
+    )
+    try:
+        summarizer.summarize_events(nodes, cache_file=str(cache), limit=limit)
+    except Exception as exc:
+        msg = str(exc)
+        # A rate/spend-cap stop is expected + resumable (cache saved per-event);
+        # anything else is a real error and should surface with its traceback.
+        if not any(s in msg for s in ("429", "RESOURCE_EXHAUSTED", "spend", "quota")):
+            raise
+        typer.secho(
+            f"\nStopped early (API limit): {msg[:200]}\n"
+            "Per-event progress is saved; re-run `sekai summarize` to resume.",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1) from exc
+
+    final = json.loads(cache.read_text(encoding="utf-8"))
+    have = sum(1 for a in arcs if f"EVENT|{a}" in final)
+    typer.echo(f"Done. {have}/{len(arcs)} event summaries cached in {cache}.")
+
+
 @app.command("eval")
 def eval_command(golden: Path = typer.Option(Path("eval/golden_local.json"))):
     """Run the local regression eval; non-zero exit on any regression."""

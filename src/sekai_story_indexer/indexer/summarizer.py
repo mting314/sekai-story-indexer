@@ -377,19 +377,28 @@ class HierarchicalSummarizer:
             "previous_summary_hash": hash_text(prev_summary) if prev_summary else "",
         }
 
-    def summarize_hierarchy(self, raw_nodes: list[StoryNode], cache_file: str = "summaries_cache.json") -> list[StoryNode]:
+    def summarize_hierarchy(
+        self, raw_nodes: list[StoryNode], cache_file: str = "summaries_cache.json", *, limit: int = 0
+    ) -> list[StoryNode]:
         """Build the event-tier summaries. Sekai stores one scene per episode, so the
         Part/Episode sub-tiers are redundant — each event is summarized once, directly
         from its raw scenes. Returns the Tier-1 (Event) summary nodes."""
         safe_print("\n--- Generating Tier 1 (Event) Summaries ---")
-        return self.summarize_events(raw_nodes, cache_file)
+        return self.summarize_events(raw_nodes, cache_file, limit=limit)
 
-    def summarize_events(self, raw_nodes: list[StoryNode], cache_file: str = "summaries_cache.json") -> list[StoryNode]:
+    def summarize_events(
+        self, raw_nodes: list[StoryNode], cache_file: str = "summaries_cache.json", *, limit: int = 0
+    ) -> list[StoryNode]:
         """One Tier-1 (Event) summary per event, generated in a single call from the
         event's raw scenes in reading order. Scenes are grouped by arc and labelled
         '## Episode N' so the model can still emit a per-episode index. A rolling
-        previous-event summary is threaded for cross-event continuity."""
+        previous-event summary is threaded for cross-event continuity.
+
+        ``limit`` (>0) stops after generating that many *new* summaries — cached
+        predecessors are still loaded (free) so continuity threading is preserved,
+        making it a resumable, cost-bounded knob for a partial build."""
         cache = _load_cache(cache_file)
+        generated = 0
 
         events: dict[str, list[StoryNode]] = defaultdict(list)
         for node in raw_nodes:
@@ -437,12 +446,16 @@ class HierarchicalSummarizer:
                 safe_print(f"Loading cached event summary for {cache_key}...")
                 current_summary = cached
             else:
+                if limit and generated >= limit:
+                    safe_print(f"Reached --limit {limit}; stopping before {cache_key}.")
+                    break
                 safe_print(f"Summarizing Event: {cache_key}...")
                 current_summary = self._generate_rolling_summary(
                     current_text=combined_text,
                     prev_summary=prev_context,
                     level_name="Event",
                 )
+                generated += 1
                 _store_cached_summary(
                     cache,
                     cache_key,

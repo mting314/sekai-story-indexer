@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from pydantic_ai import Agent
-from pydantic_ai.models.google import GoogleModel
+from pydantic_ai.models.google import GoogleModel, GoogleModelSettings
 from pydantic_ai.providers.google import GoogleProvider
 
 load_dotenv()
@@ -20,6 +20,14 @@ DEFAULT_CHAT_MODEL = "gemini-flash-latest"
 DEFAULT_ROUTER_MODEL = "gemini-flash-latest"
 DEFAULT_GENERATION_PROVIDER = "google"
 DEFAULT_EMBEDDING_MODEL = "gemini-embedding-2"
+# Reasoning tier for ALL google-provider generation built via create_google_model
+# — summaries, State Ledger extraction, routing, and translation audit. These are
+# grounded/structured tasks over supplied context that need little deliberation, so
+# the cheap tier keeps a full ~200-event run (and every other call) inexpensive
+# (parity with the query-time generator in query/generate.py). Flash models honor
+# it; others ignore it. NOTE: this is deliberately global; scope it per-call if a
+# task ever needs deeper reasoning.
+INGEST_THINKING_LEVEL = "low"
 DEFAULT_CHROMA_DB_PATH = "./chroma_db"
 RETRIEVAL_DOCUMENT = "RETRIEVAL_DOCUMENT"
 RETRIEVAL_QUERY = "RETRIEVAL_QUERY"
@@ -172,6 +180,9 @@ def create_google_model(model_name: str | None = None) -> GoogleModel:
         _google_models[cache_key] = GoogleModel(
             model_name,
             provider=GoogleProvider(api_key=api_key),
+            settings=GoogleModelSettings(
+                google_thinking_config={"thinking_level": INGEST_THINKING_LEVEL}
+            ),
         )
     return _google_models[cache_key]
 
