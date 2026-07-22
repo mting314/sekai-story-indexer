@@ -515,9 +515,25 @@ class LocalQueryEngine:
                 "pre_summarized": True,  # webapp: don't re-generate over raw scenes
             }
 
+        # No pre-computed summary: build an extractive "skim" — the opening line of
+        # each cited scene — so /summarize still returns readable content when the
+        # LLM can't refine it (keyless / quota). The webapp localizes these lines to
+        # official-EN; when a key is available the caller generates a real summary
+        # over the same scenes instead (this answer is then replaced).
+        parts: list[dict] = [{"type": "text", "text": f"Summary of {label} (excerpts):"}]
+        for r, i in enumerate(idxs):
+            line = next(
+                (ln.strip() for ln in self.nodes[i].text.splitlines()
+                 if ln.strip() and not ln.startswith("#")),
+                "",
+            )
+            if line:
+                parts.append({"type": "quote", "ref": r + 1, "text": line})
+                citations[r]["quote"] = line
+        answer = "\n".join([parts[0]["text"], *(p["text"] for p in parts[1:])])
         return {
-            "answer": f"Summary of {label}",
-            "answer_parts": [{"type": "text", "text": f"Summary of {label}"}],
+            "answer": answer,
+            "answer_parts": parts,
             "citations": citations,
             "scope": scope.as_dict(),
             "backend": "local",

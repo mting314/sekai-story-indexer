@@ -497,6 +497,22 @@ def _can_generate_over(result: dict) -> bool:
     )
 
 
+def _note_quota_fallback(result: dict, can_generate: bool) -> None:
+    """Generation was applicable but produced nothing and the quota breaker is
+    tripped -> tell the UI the answer is extractive because the cap was hit (so the
+    plain answer is explained, not mistaken for a bug)."""
+    if not can_generate:
+        return
+    from sekai_story_indexer.query.generate import quota_paused
+
+    if quota_paused():
+        result["generation_status"] = "quota"
+        result["notice"] = (
+            "AI answer generation is paused (generation quota reached) — "
+            "showing retrieved excerpts."
+        )
+
+
 def _best_supporting_line(excerpt: str, answer: str) -> str:
     """The line in a cited scene most relevant to the answer — pins WHERE a claim
     came from (the UI highlights it in the excerpt), instead of the whole episode."""
@@ -585,10 +601,14 @@ def _apply_generated_answer(result: dict, nl: str, grounding: dict[int, str] | N
     result["answer"] = nl
     result["citations"] = kept
     # prose + a supporting-quote block per cited source (the exact line, [ref]).
+    # Carry the official-EN line as text_en so the UI can show the quote in English.
     parts: list[dict] = [{"type": "text", "text": nl}]
     for c in kept:
         if c.get("quote"):
-            parts.append({"type": "quote", "ref": c["ref"], "text": c["quote"]})
+            part = {"type": "quote", "ref": c["ref"], "text": c["quote"]}
+            if c.get("quote_en"):
+                part["text_en"] = c["quote_en"]
+            parts.append(part)
     result["answer_parts"] = parts
     result["generated"] = True
 
@@ -606,6 +626,33 @@ def _trim_extractive_citations(result: dict) -> None:
         result["citations"] = [
             c for c in (result.get("citations") or []) if c.get("ref") in refs
         ]
+    _overlay_extractive_en(result)
+
+
+def _overlay_extractive_en(result: dict) -> None:
+    """Attach the official-EN counterpart to each extractive quote (JP source line ->
+    verbatim English), so the supporting quotes read in English where the scene is
+    localized. Each element is looked up by its OWN JP line; JP stays the fallback."""
+    en_map = _official_en_map()
+    if not en_map:
+        return
+    lead = None
+    lines: list[str] = []
+    for p in result.get("answer_parts") or []:
+        if p.get("type") == "quote":
+            en = en_map.get(p.get("text", ""))
+            if en:
+                p["text_en"] = en
+            lines.append(en or p.get("text", ""))
+        elif p.get("type") == "text":
+            lead = p.get("text")
+    for c in result.get("citations") or []:
+        en = en_map.get(c.get("quote", ""))
+        if en:
+            c["quote_en"] = en
+    # rebuild the plain answer string (streaming deltas + parts-less clients) in EN
+    if lines:
+        result["answer"] = (f"{lead}\n" if lead else "") + "\n".join(lines)
 
 
 def _query_local(
@@ -615,7 +662,8 @@ def _query_local(
     if result.get("pre_summarized"):
         result["generated"] = True
         return result
-    if _can_generate_over(result):
+    can_gen = _can_generate_over(result)
+    if can_gen:
         from sekai_story_indexer.query.generate import generate_answer
 
         gen = generate_answer(result["resolved_question"], result["citations"])
@@ -624,6 +672,7 @@ def _query_local(
             _apply_generated_answer(result, nl, grounding)
     if not result.get("generated"):
         _trim_extractive_citations(result)
+        _note_quota_fallback(result, can_gen)
     return result
 
 
@@ -1203,8 +1252,14 @@ def _cmd_summarize(arg: str, req: CommandRequest) -> dict:
         backend=result.get("backend") or "summary",
         citations=result.get("citations") or [],
     )
-    if result.get("generated"):
-        resp["generated"] = True  # so the backend subtext reads "AI-synthesized"
+    # Preserve the rich result so the extractive skim shows its supporting-quote
+    # blocks (localized to EN) and any degraded-mode notice — _command_response
+    # otherwise flattens everything to a single text part.
+    if result.get("answer_parts"):
+        resp["answer_parts"] = result["answer_parts"]
+    for k in ("generated", "generation_status", "notice"):
+        if result.get(k):
+            resp[k] = result[k]
     return resp
 
 
@@ -1421,7 +1476,8 @@ def _stream_events(req: QueryRequest):
 
     streamed = ""
     grounding: dict[int, str] = {}
-    if not result.get("pre_summarized") and _can_generate_over(result):
+    can_gen = not result.get("pre_summarized") and _can_generate_over(result)
+    if can_gen:
         from sekai_story_indexer.query.generate import generate_answer_stream
 
         for piece in generate_answer_stream(
@@ -1431,11 +1487,12 @@ def _stream_events(req: QueryRequest):
             yield _sse({"type": "delta", "text": piece})
     if streamed:
         _apply_generated_answer(result, streamed, grounding)
-    else:  # extractive / pre-summarized / no key -> chunk the computed answer
+    else:  # extractive / pre-summarized / no key / quota -> chunk the computed answer
         if result.get("pre_summarized"):
             result["generated"] = True
         else:
             _trim_extractive_citations(result)
+            _note_quota_fallback(result, can_gen)
         for piece in _chunk_text(result.get("answer") or ""):
             yield _sse({"type": "delta", "text": piece})
 

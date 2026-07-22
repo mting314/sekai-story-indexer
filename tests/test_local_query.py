@@ -239,3 +239,19 @@ def test_episode_title_overlay_tolerates_string_keys():
     ep1 = next(n for n in eng.nodes
                if n.metadata.arc_id == "0006-lyric" and n.metadata.episode_number == 1)
     assert eng._episode_title(ep1) == "1. Stringy Title (EN)"
+
+
+def test_summarize_extractive_skim_when_no_cached_summary():
+    """/summarize an event with no pre-computed summary + no LLM -> an extractive
+    skim: opening line of each scene as quote parts (localized by the webapp), not
+    a bare 'Summary of X' placeholder."""
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    eng._event_summaries = {}  # force the no-pre-summary branch
+    r = eng.summarize("summarize the event", arc_ids=("0006-lyric",))
+    assert r["intent"] == "summarize"
+    assert "pre_summarized" not in r  # so the webapp still tries to refine/localize
+    quotes = [p for p in r["answer_parts"] if p["type"] == "quote"]
+    assert quotes, "extractive summarize should produce quote parts"
+    # each quoted line is pinned onto its citation (so EN overlay can localize it)
+    quoted_refs = {p["ref"] for p in quotes}
+    assert all(c["quote"] for c in r["citations"] if c["ref"] in quoted_refs)

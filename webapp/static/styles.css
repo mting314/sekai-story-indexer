@@ -249,6 +249,10 @@ a.cite:hover { text-decoration: underline; }
 .routing-step.done::first-letter { color: var(--accent); }
 /* faded subtext: which backend produced the answer */
 .backend-note { margin-top: 8px; font-size: 11px; color: var(--muted); opacity: .55; letter-spacing: .02em; }
+/* degraded-mode banner (e.g. generation quota reached -> extractive fallback) */
+.answer-notice { margin: 0 0 10px; padding: 7px 10px; font-size: 12px; line-height: 1.4;
+  color: var(--text); background: #f2b73a1a; border: 1px solid #f2b73a55;
+  border-radius: 6px; }
 /* event-title header at the top of an answer (EN title where localized) */
 .answer-event-header { margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid #ffffff1a; }
 .answer-event-title { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.25; }
