@@ -20,10 +20,13 @@ DEFAULT_CHAT_MODEL = "gemini-flash-latest"
 DEFAULT_ROUTER_MODEL = "gemini-flash-latest"
 DEFAULT_GENERATION_PROVIDER = "google"
 DEFAULT_EMBEDDING_MODEL = "gemini-embedding-2"
-# Ingest-time generation (bottom-up summaries) is grounded synthesis over supplied
-# scenes — little deliberation needed. Cap reasoning at the cheap tier so a full
-# ~200-event summarization run stays inexpensive (parity with the query-time
-# generator in query/generate.py). Honored by flash models; ignored otherwise.
+# Reasoning tier for ALL google-provider generation built via create_google_model
+# — summaries, State Ledger extraction, routing, and translation audit. These are
+# grounded/structured tasks over supplied context that need little deliberation, so
+# the cheap tier keeps a full ~200-event run (and every other call) inexpensive
+# (parity with the query-time generator in query/generate.py). Flash models honor
+# it; others ignore it. NOTE: this is deliberately global; scope it per-call if a
+# task ever needs deeper reasoning.
 INGEST_THINKING_LEVEL = "low"
 DEFAULT_CHROMA_DB_PATH = "./chroma_db"
 RETRIEVAL_DOCUMENT = "RETRIEVAL_DOCUMENT"

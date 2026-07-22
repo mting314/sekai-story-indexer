@@ -194,9 +194,14 @@ def summarize(
     )
     try:
         summarizer.summarize_events(nodes, cache_file=str(cache), limit=limit)
-    except Exception as exc:  # e.g. 429 monthly spend cap — cache is saved per-event
+    except Exception as exc:
+        msg = str(exc)
+        # A rate/spend-cap stop is expected + resumable (cache saved per-event);
+        # anything else is a real error and should surface with its traceback.
+        if not any(s in msg for s in ("429", "RESOURCE_EXHAUSTED", "spend", "quota")):
+            raise
         typer.secho(
-            f"\nStopped early: {str(exc)[:200]}\n"
+            f"\nStopped early (API limit): {msg[:200]}\n"
             "Per-event progress is saved; re-run `sekai summarize` to resume.",
             fg=typer.colors.YELLOW,
         )
