@@ -1034,6 +1034,40 @@ function backendLabel(res) {
   }
 }
 
+// Tabbed rendering of a sectioned event summary (Overview / Episode Index /
+// Character Trajectories / …). Sections come parsed from the server; the first is
+// shown by default. Falls back to flat prose in renderAssistant when absent.
+function renderSummaryTabs(container, res) {
+  const order = res.section_order || [];
+  const sections = res.sections || {};
+  const wrap = document.createElement("div");
+  wrap.className = "summary-tabs";
+  const nav = document.createElement("div");
+  nav.className = "summary-tabnav";
+  const pane = document.createElement("div");
+  pane.className = "summary-tabpane answer-text";
+  const show = (label) => {
+    pane.innerHTML = renderMarkdown(sections[label] || "");
+    decorateNames(pane, new Set(res.characters || []));
+    nav.querySelectorAll(".summary-tab").forEach((b) =>
+      b.classList.toggle("active", b.dataset.label === label),
+    );
+  };
+  for (const label of order) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "summary-tab";
+    b.dataset.label = label;
+    b.textContent = label;
+    b.onclick = () => show(label);
+    nav.appendChild(b);
+  }
+  wrap.appendChild(nav);
+  wrap.appendChild(pane);
+  container.appendChild(wrap);
+  if (order.length) show(order[0]);
+}
+
 function renderAssistant(container, res) {
   container.classList.remove("thinking");
   container.textContent = "";
@@ -1053,15 +1087,21 @@ function renderAssistant(container, res) {
   const quotes = parts.filter((p) => p.type === "quote");
   const texts = parts.filter((p) => p.type !== "quote");
 
-  // Natural-language answer (or extractive lead-in) — rendered as markdown.
-  for (const p of texts) {
-    const t = document.createElement("div");
-    t.className = "answer-text";
-    t.innerHTML = renderMarkdown(p.text);
-    // color-code + icon character/unit names (inline {char_id} tags handled in
-    // renderMarkdown; this catches plain-text names via the roster heuristic).
-    decorateNames(t, new Set(res.characters || []));
-    container.appendChild(t);
+  // A sectioned event summary -> tabbed view (Overview / Episode Index / …), which
+  // is far more skimmable than one flat block. Otherwise render the prose normally.
+  if (res.section_order && res.section_order.length) {
+    renderSummaryTabs(container, res);
+  } else {
+    // Natural-language answer (or extractive lead-in) — rendered as markdown.
+    for (const p of texts) {
+      const t = document.createElement("div");
+      t.className = "answer-text";
+      t.innerHTML = renderMarkdown(p.text);
+      // color-code + icon character/unit names (inline {char_id} tags handled in
+      // renderMarkdown; this catches plain-text names via the roster heuristic).
+      decorateNames(t, new Set(res.characters || []));
+      container.appendChild(t);
+    }
   }
 
   // Supporting quotes, collapsed under a small heading.

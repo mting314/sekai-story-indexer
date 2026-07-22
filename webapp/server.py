@@ -661,6 +661,7 @@ def _query_local(
     result = _local_retrieval(req, scope_arc_ids, soft_scope=soft_scope)
     if result.get("pre_summarized"):
         result["generated"] = True
+        _attach_summary_sections(result, result.get("answer") or "")
         return result
     can_gen = _can_generate_over(result)
     if can_gen:
@@ -1145,6 +1146,26 @@ def _story_root() -> Path:
     return Path(os.environ.get("SEKAI_STORY_ROOT", "story"))
 
 
+def _attach_summary_sections(result: dict, summary_text: str) -> None:
+    """Parse a hierarchical event summary into its fixed sections (Overview, Episode
+    Index, Character Trajectories, …) so the chat UI can render them as tabs. No-op
+    when the text isn't a real sectioned summary (e.g. the extractive skim)."""
+    try:
+        from sekai_story_indexer.indexer.summary_sections import (
+            EVENT_SUMMARY_SECTIONS,
+            extract_summary_sections,
+        )
+    except Exception:
+        return
+    sections = extract_summary_sections(summary_text or "")
+    if len(sections) < 2:
+        return
+    order = [s for s in EVENT_SUMMARY_SECTIONS if s in sections]
+    order += [s for s in sections if s not in order]  # keep any unexpected labels
+    result["sections"] = sections
+    result["section_order"] = order
+
+
 def _command_response(text: str, *, backend: str = "command", citations: list | None = None) -> dict:
     return {
         "answer": text,
@@ -1228,7 +1249,9 @@ def _cmd_summarize(arg: str, req: CommandRequest) -> dict:
             "ref": 1, "arc_id": arc, "label": f"{ev.get('name')} — event summary",
             "episode_title": "Event summary", "nickname": ev.get("nickname"), "excerpt": summary,
         }]
-        return _command_response(summary, backend="summary", citations=citations)
+        resp = _command_response(summary, backend="summary", citations=citations)
+        _attach_summary_sections(resp, summary)  # -> tabs in the chat UI
+        return resp
     # No baked hierarchical summary -> delegate to the normal retrieval path scoped
     # to this event: it generates a summary on the fly from the retrieved scenes (or
     # returns extractive scenes when keyless), so /summarize never falsely claims a
