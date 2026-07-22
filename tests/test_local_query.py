@@ -255,3 +255,67 @@ def test_summarize_extractive_skim_when_no_cached_summary():
     # each quoted line is pinned onto its citation (so EN overlay can localize it)
     quoted_refs = {p["ref"] for p in quotes}
     assert all(c["quote"] for c in r["citations"] if c["ref"] in quoted_refs)
+
+
+def test_positional_intent_detection():
+    from sekai_story_indexer.query.local import _positional_intent
+
+    assert _positional_intent("how does the event end?") == "late"
+    assert _positional_intent("what's the climax?") == "late"
+    assert _positional_intent("what happens at the end") == "late"
+    assert _positional_intent("how does it begin?") == "early"
+    assert _positional_intent("the opening scene") == "early"
+    assert _positional_intent("what happens to Kohane?") is None   # not positional
+    assert _positional_intent("summarize the whole event") is None
+    assert _positional_intent("from the beginning to the finale") is None  # ambiguous
+    # 'resolve/resolved' = a character deciding, NOT an ending signal
+    assert _positional_intent("how did Ichika resolve to help the band?") is None
+    assert _positional_intent("how is the misunderstanding resolved?") is None
+
+
+def test_budget_cover_bias_keeps_the_asked_end():
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    arc = "0006-lyric"
+    idxs = sorted(
+        (i for i, n in enumerate(eng.nodes) if n.metadata.arc_id == arc),
+        key=lambda i: eng._sort_key(eng.nodes[i]),
+    )
+    assert len(idxs) >= 3
+    budget = sum(len(eng.nodes[i].text) for i in idxs[:2]) - 1  # force a trim
+
+    late = eng._budget_cover(idxs, budget, bias="late")
+    early = eng._budget_cover(idxs, budget, bias="early")
+    assert late[-1] == idxs[-1]   # 'ending' keeps the final scene
+    assert early[0] == idxs[0]    # 'beginning' keeps the first scene
+    assert late != early
+    # both preserved in reading order
+    assert late == sorted(late, key=lambda i: eng._sort_key(eng.nodes[i]))
+    assert early == sorted(early, key=lambda i: eng._sort_key(eng.nodes[i]))
+    # no bias -> head + tail (both ends present)
+    default = eng._budget_cover(idxs, budget)
+    assert idxs[0] in default and idxs[-1] in default
+
+
+def test_scoped_event_hits_positional_score_boost():
+    """'late' intent ranks later scenes above earlier ones, 'early' the reverse.
+    Both questions ('how does it end' / '...begin') add no JP overlap, so with the
+    same aux token their base scores are identical — only the boost direction
+    differs, making the effect isolatable and deterministic."""
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    arc = "0006-lyric"
+    ordered = sorted(
+        (n for n in eng.nodes if n.metadata.arc_id == arc), key=eng._sort_key
+    )
+    assert len(ordered) >= 3
+    first, last = ordered[0], ordered[-1]
+    # a token present in BOTH the first and last scene, so both have non-zero base
+    fi, li = eng.nodes.index(first), eng.nodes.index(last)
+    tok = next(t for t in eng._tf[li] if t in eng._idf and t in eng._tf[fi])
+
+    def scores(question):
+        return {id(n): s for n, s in eng._scoped_event_hits(question, None, arc, aux_query=tok)}
+
+    late = scores("how does it end")     # -> 'late'  (finale weighted up)
+    early = scores("how does it begin")  # -> 'early' (opening weighted up)
+    assert late[id(last)] > early[id(last)]     # finale scores higher under 'late'
+    assert early[id(first)] > late[id(first)]   # opening scores higher under 'early'
