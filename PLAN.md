@@ -108,9 +108,12 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   Sekai tree.
 - [~] **Phase 2 — Bottom-up indexing.** Unit-tier summaries DONE for the local
   backend (`query/summaries.py`: deterministic overviews from event outlines,
-  Tier-1 nodes, retrievable). The **LLM Refine** summarizer + Chroma upsert /
-  manifest incrementality is the inherited full-engine path — needs a keyed run
-  (raised).
+  Tier-1 nodes, retrievable). The **LLM Refine** event summarizer is now runnable
+  standalone via `sekai summarize [--limit N]` (thinking_level=low for cost,
+  fingerprint-cached + resumable, continuity-threaded); **136/209 event summaries
+  built** into `summaries_cache.json` (the rest blocked on a Gemini spend cap —
+  raise it + re-run to resume). Chroma upsert / manifest incrementality remains the
+  inherited full-engine `indexer ingest` path (needs a keyed run).
 - [x] **Phase 3 — Relevance classifier.** `source/relevance.py` heuristic
   `plot_weight` (high/medium/filler), set on every fetch, wired into the local
   retrieval boost + citations; `sekai classify` command. (LLM refinement of the
@@ -144,8 +147,13 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   event's arc(s) (union, so comparisons aren't locked to one). Fixed the
   scope-drop that switched a follow-up to a different arc (airi1→airi2).
 - [x] **Phase 7 — Natural-chat conversation layer.** Server-side per-session focus
-  state (`webapp/sessions.py`: carry the current event/character across pronoun
-  follow-ups, reset on topic switch); clarify-instead-of-guess gate
+  state (`webapp/sessions.py`: **sticky** arc focus — carry the current event/
+  character across follow-ups until a *new* event is named, even for a bare
+  question that only names characters ("when did Honami ask Kanade for help?"),
+  with a **soft-scope global fallback** in `server.py` when the follow-up names a
+  character absent from the remembered event or shares no evidence with it, so a
+  real topic switch self-heals — wired across the local/derived/full backends);
+  clarify-instead-of-guess gate
   (`query/disambiguation.py`); deterministic contextual-retrieval prefixes
   (`query/context.py`: nickname / "character X's Nth focus event" / unit / song) —
   **live now for the local TF-IDF (free, no re-embed)** and **teed up for the full
@@ -164,6 +172,14 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   substitution inside JP sentences isn't genuinely useful without the LLM.
 
 ## 5. Known follow-ups / accuracy notes
+* **Grounded-answer reliability + cost (done).** Generated answers no longer
+  truncate mid-sentence: a flash "thinking" model bills reasoning against
+  `max_output_tokens`, and a detailed summary spent ~3.8k tokens thinking of a flat
+  4096 cap → only ~300 left → cut off. Now `max_output_tokens=8192` (a ceiling —
+  only emitted tokens bill, so it's free) plus `thinking_level="low"` (~0.7k
+  thinking, ~82% cheaper, and actually honored unlike `thinking_budget`), with a
+  retry that drops `thinking_config` if a model rejects `thinking_level`.
+  `query/generate.py`.
 * **Continuous daily ingestion + incremental re-embed (deferred).** The game ships
   a new event ~every 15 days; stand up a scheduled job that fetches new events
   (`indexer fetch --skip-existing`), ingests + embeds only the deltas (the
@@ -176,19 +192,21 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   momentum/inertia scrolling, snap-to-card, and the banner art (now on each row)
   as the visual anchor. Currently a plain vertical list (`renderTimeline` +
   `.event-card` in `webapp/static/`).
-* **Official English story quotes (implemented — needs a live EN fetch to populate).**
-  Answers now attach the *verbatim* official-EN line to each citation (`quote_en`,
+* **Official English story quotes (done — sidecars fetched + committed).**
+  Answers attach the *verbatim* official-EN line to each citation (`quote_en`,
   shown in the transcript sidebar) instead of only the LLM's paraphrase, with JP as
-  the source-of-truth fallback. Pipeline: `constants.EN_ASSET_CDN` +
+  the source-of-truth fallback. The full EN fetch has been run and the 1534
+  `*.md.en` sidecars are committed, so `quote_en` is populated in-repo (no live
+  fetch needed). Pipeline: `constants.EN_ASSET_CDN` +
   `client.en_event_scenario`/`en_unit_story_scenario` (best-effort, `{}` when a scene
   isn't localized) → `transform.align_en_to_jp` (1:1 by `TalkData` index, count-guarded)
   → `fetcher` writes a co-located `foo.md.en` sidecar (off the `*.md` glob so it's
   never indexed as JP; backfills onto an existing corpus under `--skip-existing`) →
   `query/official_en.load_official_en` builds the JP→EN line map → the webapp attaches
-  `quote_en` in `_finalize_citations`. Run `indexer fetch` where EN-CDN egress is
-  allowed to populate the sidecars (the restricted harness blocks those hosts).
+  `quote_en` in `_finalize_citations`. Sidecars are already populated in-repo; a
+  future `indexer fetch` refreshes them as new events localize.
   Follow-up: replace the *inline* answer quote (still the LLM's translation) with the
-  official EN verbatim once the sidecars are present.
+  official EN verbatim (the sidecars are now present).
 * **Full multi-language support (deferred).** Make a chosen display language (EN
   where localized, JP fallback; later TW/KR) consistent across *every* surface, not
   just the transcript sidebar:
@@ -198,6 +216,10 @@ even the filesystem sorted chronologically). Hand-authored content still uses
     the in-body highlight matches the shown language. Unlocalized scenes fall back to JP.
   - **event / song names in the timeline** — partial: `_overlay_en_titles` overlays
     official EN names (keeps `*_jp`).
+  - **episode titles in citation labels** — done: `_overlay_en_titles` attaches
+    `episode_titles_en` (from `client.en_episode_titles`) and the engine's
+    `_episode_title` prefers it, so Sources show e.g. "Ep 1. A Melody That Doesn't
+    Connect"; JP H1 fallback when unlocalized or egress is blocked.
   - **model responses** — English-only today (the generator is pinned to English via
     `answer_system.md`); real multi-language means generating in the selected locale.
   - **summaries** — English-only (the hierarchical summarizer writes English).
