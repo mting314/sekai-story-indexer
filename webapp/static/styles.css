@@ -253,6 +253,17 @@ a.cite:hover { text-decoration: underline; }
 .answer-notice { margin: 0 0 10px; padding: 7px 10px; font-size: 12px; line-height: 1.4;
   color: var(--text); background: #f2b73a1a; border: 1px solid #f2b73a55;
   border-radius: 6px; }
+/* tabbed event-summary view (Overview / Episode Index / Character Trajectories …) */
+.summary-tabnav { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 10px;
+  border-bottom: 1px solid #ffffff1a; }
+.summary-tab { background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--muted); font: inherit; font-size: 12px; padding: 5px 9px; cursor: pointer;
+  border-radius: 6px 6px 0 0; }
+.summary-tab:hover { color: var(--text); background: #ffffff0d; }
+.summary-tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+/* fixed height so switching tabs doesn't make the layout jump; long sections
+   scroll within the pane instead of resizing it */
+.summary-tabpane { height: 240px; overflow-y: auto; padding-right: 6px; }
 /* event-title header at the top of an answer (EN title where localized) */
 .answer-event-header { margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid #ffffff1a; }
 .answer-event-title { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.25; }

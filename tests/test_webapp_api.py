@@ -720,3 +720,26 @@ def test_extractive_quotes_get_official_en(monkeypatch):
     assert q["text_en"] == "Ena: Nice to meet you"
     assert result["citations"][0]["quote_en"] == "Ena: Nice to meet you"
     assert "Ena: Nice to meet you" in result["answer"]  # answer rebuilt in EN
+
+
+def test_attach_summary_sections_parses_tabs():
+    from webapp import server
+
+    text = (
+        "Overview:\nStuff happens.\n\n"
+        "Episode Index:\n1. A\n2. B\n\n"
+        "Character Trajectories:\nEna grows.\n"
+    )
+    r = {}
+    server._attach_summary_sections(r, text)
+    assert r["section_order"][0] == "Overview"  # canonical order preserved
+    assert set(r["sections"]) >= {"Overview", "Episode Index", "Character Trajectories"}
+    assert "Stuff happens" in r["sections"]["Overview"]
+
+
+def test_attach_summary_sections_noop_on_plain_text():
+    from webapp import server
+
+    r = {}
+    server._attach_summary_sections(r, "Summary of X (excerpts):\nEna: hi\nMizuki: yo")
+    assert "sections" not in r  # extractive skim has no real sections -> no tabs
