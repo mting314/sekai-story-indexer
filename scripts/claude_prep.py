@@ -31,14 +31,24 @@ if sys.argv[1:] == ["--list"]:
     sys.exit(0)
 
 arc = sys.argv[1]
-files = sorted(f for f in glob.glob(f"story/*/event/{arc}/*.md") if not f.endswith(".md.en"))
+# glob "*.md" matches only the JP scene files (".md.en" sidecars end in ".en").
+files = sorted(glob.glob(f"story/*/event/{arc}/*.md"))
 if not files:
     print(f"no scenes on disk for {arc}")
     sys.exit(1)
+# Prefer the official-EN localization sidecar when present (1:1-aligned with JP),
+# so summaries use canonical English names instead of hand-romanized readings.
+# Falls back to JP per-episode for events the EN server hasn't reached yet.
+en_episodes = 0
 for f in files:
     num = re.match(r"(\d+)", os.path.basename(f))
-    print(f"\n===== Episode {int(num.group(1)) if num else '?'} ({os.path.basename(f)}) =====")
-    print(open(f, encoding="utf-8").read().strip())
+    en = f + ".en"
+    src_file, lang = (en, "EN") if os.path.exists(en) else (f, "JP")
+    if lang == "EN":
+        en_episodes += 1
+    print(f"\n===== Episode {int(num.group(1)) if num else '?'} ({os.path.basename(src_file)}) [{lang}] =====")
+    print(open(src_file, encoding="utf-8").read().strip())
+print(f"\n# transcript source: {en_episodes}/{len(files)} episodes in official EN")
 
 g = json.load(open("glossary.json", encoding="utf-8")) if os.path.exists("glossary.json") else {}
 print("\n===== GLOSSARY — use these exact English names =====")
