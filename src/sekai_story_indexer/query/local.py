@@ -37,6 +37,26 @@ _H1_RE = re.compile(r"^#\s*(.+)$")
 # chars/token, kept under generate._context's own cap.
 _SCOPED_CTX_CHARS = 80_000
 
+# Positional intent: bias scoped scene selection/ranking toward one END of the
+# event (deterministic, no LLM) — "how does it end / the climax" -> late scenes,
+# "how does it begin / the opening" -> early scenes. Conservative patterns so a
+# stray "first"/"end" doesn't trigger it.
+_LATE_INTENT_RE = re.compile(
+    r"\b(climax|finale|ending|end of|conclusion|denouement|aftermath|resolution|"
+    r"resolved?|final (scene|episode|moment|part|arc)|at the end|"
+    r"how (does )?(it|the (event|story|arc)) ends?|"
+    r"what happens (at the end|in the end))\b",
+    re.IGNORECASE,
+)
+_EARLY_INTENT_RE = re.compile(
+    r"\b(beginning|opening|premise|prologue|at the (start|beginning|outset)|"
+    r"first (scene|episode|part)|"
+    r"how (does )?(it|the (event|story|arc)) (starts?|begins?)|"
+    r"what happens (at the start|at the beginning))\b",
+    re.IGNORECASE,
+)
+_POS_BOOST = 1.0  # max extra weight applied to scenes at the asked-about end
+
 # Unit references in questions (substring, lowercased) -> unit slug.
 _UNIT_KEYWORDS = {
     "leo/need": "leo_need", "leoneed": "leo_need", "leo need": "leo_need",
@@ -231,13 +251,28 @@ class LocalQueryEngine:
         scored.sort(key=lambda s: (-s[0], self._sort_key(self.nodes[s[1]])))
         return [(self.nodes[i], score) for score, i in scored[:k]]
 
-    def _budget_cover(self, idxs: list[int], budget_chars: int) -> list[int]:
-        """Select scenes within a char budget, always keeping the HEAD and TAIL so a
+    def _budget_cover(
+        self, idxs: list[int], budget_chars: int, bias: str | None = None
+    ) -> list[int]:
+        """Select scenes within a char budget. Default keeps the HEAD and TAIL so a
         scoped event's opening AND ending (climax) both survive; drop from the
-        middle. ``idxs`` must already be in reading order. Returns reading order."""
+        middle. ``bias='late'/'early'`` instead keeps scenes from that END (for
+        climax/ending vs beginning questions). ``idxs`` must be in reading order;
+        returns reading order."""
         total = sum(len(self.nodes[i].text) for i in idxs)
         if total <= budget_chars or len(idxs) <= 2:
             return idxs
+        if bias in ("early", "late"):
+            seq = idxs if bias == "early" else list(reversed(idxs))
+            picked_biased: list[int] = []
+            used_b = 0
+            for i in seq:
+                cost = len(self.nodes[i].text)
+                if picked_biased and used_b + cost > budget_chars:
+                    break
+                picked_biased.append(i)
+                used_b += cost
+            return picked_biased if bias == "early" else picked_biased[::-1]
         picked: list[tuple[int, int]] = []  # (position, node index)
         lo, hi, used, take_low = 0, len(idxs) - 1, 0, True
         while lo <= hi:
@@ -272,13 +307,20 @@ class LocalQueryEngine:
         lines. Reading order (not score) so the answer sees the arc start→finale."""
         idxs = self._candidate_indices(unit, arc_id)
         idxs.sort(key=lambda i: self._sort_key(self.nodes[i]))
-        idxs = self._budget_cover(idxs, _SCOPED_CTX_CHARS)
+        # Positional intent (climax/ending vs beginning) biases WHICH scenes survive
+        # the budget AND re-ranks the extractive quotes toward that end — no LLM.
+        bias = _positional_intent(question)
+        idxs = self._budget_cover(idxs, _SCOPED_CTX_CHARS, bias=bias)
         q_tokens = [t for t in self._expand_tokens(self._query_tokens(question, aux_query)) if t in self._idf]
+        n = len(idxs)
         hits: list[tuple[StoryNode, float]] = []
-        for i in idxs:
+        for rank, i in enumerate(idxs):
             tf = self._tf[i]
             score = sum(tf.get(t, 0) * self._idf[t] for t in q_tokens)
             score *= weight_factor(self._weight_by_arc.get(self.nodes[i].metadata.arc_id))
+            if bias and n > 1:  # nudge quote ranking toward the asked-about end
+                frac = rank / (n - 1)
+                score *= 1 + _POS_BOOST * (frac if bias == "late" else 1 - frac)
             hits.append((self.nodes[i], score))
         return hits
 
@@ -643,6 +685,17 @@ class LocalQueryEngine:
             "count": counts[0][1] if len(counts) == 1 else None,  # single-target convenience
             "scope": scope.as_dict(), "backend": "local", "intent": "count",
         }
+
+
+def _positional_intent(question: str) -> str | None:
+    """'late' for climax/ending questions, 'early' for beginning questions — used to
+    bias scoped scene selection + quote ranking toward that end of the event. None
+    when the question isn't positional or matches both (ambiguous)."""
+    late = bool(_LATE_INTENT_RE.search(question))
+    early = bool(_EARLY_INTENT_RE.search(question))
+    if late == early:  # neither, or both -> no bias
+        return None
+    return "late" if late else "early"
 
 
 def _speaker_is(speaker: str, jp_full: str, en_tokens: set[str]) -> bool:
