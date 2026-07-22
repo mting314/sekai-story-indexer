@@ -165,6 +165,20 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   `sekai fetch-unit-stories` → `story/<unit>/unit/…`, tested); non-event content
   is always-queryable. Card side-stories + Area conversations: modeled/scaffolded,
   fetch flows not yet built (raised — same pattern as unit stories).
+  - **TODO: fetch + summarize card side-stories and area conversations.** Build
+    the fetch flows (mirror `fetch_unit_stories`): card side-stories from
+    `cards.json` / `cardEpisodes.json` (each card has 2 episodes) → asset scenario;
+    area conversations from `actionSets.json` / `areas.json` (short map talks).
+    Write into the tree as new content types (`story/<unit>/card/…`,
+    `story/<unit>/area/…`), then run the same bottom-up summarizer over them so
+    they're retrievable/queryable like events.
+  - **Event-linkage (do after the fetch lands):** many card stories and area
+    talks tie into a specific event (limited cards released with an event;
+    seasonal/event area talks). Capture that link in metadata (e.g. `event_id` on
+    the card/area node via `eventCards` / release timing) so retrieval and
+    summaries can cross-reference the parent event, and the event summary can note
+    its associated card/area content. Add as a follow-up TODO once the raw
+    fetch+summarize is working.
 - [~] **Phase 6 — Translation & audit.** Inherited full-engine feature: the
   translation prompts + `--audit` loop already exist (`query/audit.py`, prompts)
   and consume our Sekai `glossary.json` + State Ledger. Needs a keyed run to
