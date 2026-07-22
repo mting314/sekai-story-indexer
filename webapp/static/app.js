@@ -1038,6 +1038,14 @@ function renderAssistant(container, res) {
   container.classList.remove("thinking");
   container.textContent = "";
   renderEventHeader(container, res); // event title (EN if localized) atop the answer
+  // Degraded-mode banner (e.g. generation quota reached): explains why the reply is
+  // extractive excerpts rather than a synthesized answer, so it doesn't look empty.
+  if (res.notice) {
+    const n = document.createElement("div");
+    n.className = "answer-notice";
+    n.textContent = res.notice;
+    container.appendChild(n);
+  }
   const byRef = {};
   for (const c of res.citations || []) byRef[c.ref] = c;
 
@@ -1060,12 +1068,16 @@ function renderAssistant(container, res) {
   if (quotes.length) {
     const h = document.createElement("div");
     h.className = "quotes-head";
-    h.textContent = res.generated ? "Supporting quotes" : "";
-    if (h.textContent) container.appendChild(h);
+    // When AI prose was generated these are "supporting"; in extractive mode (no
+    // key / quota fallback) the excerpts ARE the answer, so label them as such.
+    h.textContent = res.generated ? "Supporting quotes" : "Retrieved excerpts";
+    container.appendChild(h);
     for (const p of quotes) {
       const q = document.createElement("blockquote");
       q.className = "quote";
-      q.textContent = p.text;
+      // Prefer the official-EN line where the scene is localized; JP is the fallback
+      // (and stays available on hover / in the transcript sidebar on click).
+      q.textContent = p.text_en || p.text;
       const cite = byRef[p.ref];
       if (cite) {
         q.title = `${cite.label} — click for the full scene`;

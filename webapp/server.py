@@ -601,10 +601,14 @@ def _apply_generated_answer(result: dict, nl: str, grounding: dict[int, str] | N
     result["answer"] = nl
     result["citations"] = kept
     # prose + a supporting-quote block per cited source (the exact line, [ref]).
+    # Carry the official-EN line as text_en so the UI can show the quote in English.
     parts: list[dict] = [{"type": "text", "text": nl}]
     for c in kept:
         if c.get("quote"):
-            parts.append({"type": "quote", "ref": c["ref"], "text": c["quote"]})
+            part = {"type": "quote", "ref": c["ref"], "text": c["quote"]}
+            if c.get("quote_en"):
+                part["text_en"] = c["quote_en"]
+            parts.append(part)
     result["answer_parts"] = parts
     result["generated"] = True
 
@@ -622,6 +626,33 @@ def _trim_extractive_citations(result: dict) -> None:
         result["citations"] = [
             c for c in (result.get("citations") or []) if c.get("ref") in refs
         ]
+    _overlay_extractive_en(result)
+
+
+def _overlay_extractive_en(result: dict) -> None:
+    """Attach the official-EN counterpart to each extractive quote (JP source line ->
+    verbatim English), so the supporting quotes read in English where the scene is
+    localized. Each element is looked up by its OWN JP line; JP stays the fallback."""
+    en_map = _official_en_map()
+    if not en_map:
+        return
+    lead = None
+    lines: list[str] = []
+    for p in result.get("answer_parts") or []:
+        if p.get("type") == "quote":
+            en = en_map.get(p.get("text", ""))
+            if en:
+                p["text_en"] = en
+            lines.append(en or p.get("text", ""))
+        elif p.get("type") == "text":
+            lead = p.get("text")
+    for c in result.get("citations") or []:
+        en = en_map.get(c.get("quote", ""))
+        if en:
+            c["quote_en"] = en
+    # rebuild the plain answer string (streaming deltas + parts-less clients) in EN
+    if lines:
+        result["answer"] = (f"{lead}\n" if lead else "") + "\n".join(lines)
 
 
 def _query_local(
