@@ -130,12 +130,33 @@ def summarize(
         "changed — fill only the gaps (e.g. a local Ollama model without clobbering "
         "existing Gemini summaries)."
     ),
+    model: str = typer.Option(
+        "", help="Generation model to use (overrides SEKAI_INGEST_MODEL), "
+        "e.g. 'qwen2.5:14b' for Ollama or 'gemini-flash-latest' for Google."
+    ),
+    ollama: bool = typer.Option(
+        False, "--ollama", help="Route generation through a local Ollama server "
+        "(sets the OpenAI-compatible provider + URL + a dummy key for you). Pair with "
+        "--model <ollama-tag>."
+    ),
+    ollama_url: str = typer.Option(
+        "http://localhost:11434/v1", help="Ollama OpenAI-compatible base URL (with --ollama)."
+    ),
 ):
-    """LLM 'Refine' event-tier summaries into the summaries cache. Uses the
-    configured generation provider (Google by default; set SEKAI_INGEST_PROVIDER=openai
-    + OPENAI_BASE_URL for a local Ollama model). Fingerprint-cached + resumable; threads
-    a rolling previous-event summary for continuity. Skips Chroma entirely."""
+    """LLM 'Refine' event-tier summaries into the summaries cache. Defaults to the
+    Google provider; use --ollama --model <tag> for a local, free, no-cap run.
+    Fingerprint-cached + resumable; threads a rolling previous-event summary for
+    continuity. Skips Chroma entirely."""
+    import os
     import re
+
+    # CLI overrides -> the env the generation layer reads (before it's initialized).
+    if ollama:
+        os.environ["SEKAI_INGEST_PROVIDER"] = "openai"
+        os.environ["OPENAI_BASE_URL"] = ollama_url
+        os.environ.setdefault("OPENAI_API_KEY", "ollama")  # dummy; Ollama ignores it
+    if model:
+        os.environ["SEKAI_INGEST_MODEL"] = model
 
     try:
         from .database import (
@@ -164,6 +185,9 @@ def summarize(
         raise typer.Exit(1) from exc
 
     initialize_ingest_settings()
+    typer.echo(
+        f"generation: {get_generation_provider_name()} · model={get_generation_model_name()}"
+    )
     md_files = sorted(story_root.rglob("*.md"), key=str)  # *.md.en excluded (ends .en)
     story_order = load_story_order()  # no story_root validation (unit arcs not in yaml)
     raw_nodes = []
