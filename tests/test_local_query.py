@@ -268,6 +268,9 @@ def test_positional_intent_detection():
     assert _positional_intent("what happens to Kohane?") is None   # not positional
     assert _positional_intent("summarize the whole event") is None
     assert _positional_intent("from the beginning to the finale") is None  # ambiguous
+    # 'resolve/resolved' = a character deciding, NOT an ending signal
+    assert _positional_intent("how did Ichika resolve to help the band?") is None
+    assert _positional_intent("how is the misunderstanding resolved?") is None
 
 
 def test_budget_cover_bias_keeps_the_asked_end():

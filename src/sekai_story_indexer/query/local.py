@@ -42,8 +42,8 @@ _SCOPED_CTX_CHARS = 80_000
 # "how does it begin / the opening" -> early scenes. Conservative patterns so a
 # stray "first"/"end" doesn't trigger it.
 _LATE_INTENT_RE = re.compile(
-    r"\b(climax|finale|ending|end of|conclusion|denouement|aftermath|resolution|"
-    r"resolved?|final (scene|episode|moment|part|arc)|at the end|"
+    r"\b(climax|finale|ending|end of|conclusion|denouement|aftermath|"
+    r"final (scene|episode|moment|part|arc)|at the end|"
     r"how (does )?(it|the (event|story|arc)) ends?|"
     r"what happens (at the end|in the end))\b",
     re.IGNORECASE,
