@@ -36,7 +36,11 @@ load_dotenv()  # pick up GOOGLE_API_KEY from the repo-root .env
 # next success. Cooldown is best-effort (we don't know the real reset time).
 _QUOTA_COOLDOWN_S = int(os.getenv("SEKAI_QUOTA_COOLDOWN", "900"))  # 15 min
 _quota_tripped_until = 0.0
-_QUOTA_MARKERS = ("429", "resource_exhausted", "quota", "spend", "exceeded")
+# Only unambiguous quota/cap signals — NOT bare "exceeded"/"spend", which also match
+# timeouts ("deadline exceeded") and context-length errors and would wrongly disable
+# generation for the whole cooldown. Real cap messages carry 429 / RESOURCE_EXHAUSTED
+# / "quota" / "spending cap" anyway.
+_QUOTA_MARKERS = ("429", "resource_exhausted", "quota", "spending cap", "spend cap")
 
 
 def _is_quota_error(exc: Exception) -> bool:

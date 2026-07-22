@@ -20,6 +20,9 @@ def test_is_quota_error_matches_cap_signals_only():
     assert generate._is_quota_error(Exception("prepayment credits are depleted; quota"))
     assert not generate._is_quota_error(Exception("connection reset by peer"))
     assert not generate._is_quota_error(Exception("400 INVALID_ARGUMENT thinking_level"))
+    # must NOT trip on transient/other errors that merely contain "exceeded"
+    assert not generate._is_quota_error(Exception("504 deadline exceeded"))
+    assert not generate._is_quota_error(Exception("input token count exceeds the maximum"))
 
 
 def test_breaker_gates_generation_available(monkeypatch):

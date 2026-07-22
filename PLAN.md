@@ -192,6 +192,14 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   momentum/inertia scrolling, snap-to-card, and the banner art (now on each row)
   as the visual anchor. Currently a plain vertical list (`renderTimeline` +
   `.event-card` in `webapp/static/`).
+* **Richer summary display in chat (webapp, deferred).** The hierarchical event
+  summary has fixed sections (Overview, per-episode index, character development),
+  currently rendered as one flat markdown block. Give it a richer interface — e.g.
+  **tabs** (Overview / Episodes / Characters) or collapsible sections — so a long
+  summary is skimmable rather than a wall of text. The section structure is already
+  parsed (`indexer/summary_sections.py::extract_summary_sections`; the webapp gets
+  labeled `summary.sections`), so this is a front-end rendering upgrade in
+  `app.js` (`renderAssistant` / the summary-section renderer), no backend change.
 * **Official English story quotes (done — sidecars fetched + committed).**
   Answers attach the *verbatim* official-EN line to each citation (`quote_en`,
   shown in the transcript sidebar) instead of only the LLM's paraphrase, with JP as
