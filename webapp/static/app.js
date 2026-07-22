@@ -1035,8 +1035,10 @@ function backendLabel(res) {
 }
 
 // Tabbed rendering of a sectioned event summary (Overview / Episode Index /
-// Character Trajectories / …). Sections come parsed from the server; the first is
-// shown by default. Falls back to flat prose in renderAssistant when absent.
+// Character Trajectories / …). All section panes are rendered up front and stacked
+// in one grid cell (CSS), so the card is always as tall as the TALLEST section —
+// no scrollbar, and no vertical jump when switching tabs. First tab shown by
+// default. Falls back to flat prose in renderAssistant when absent.
 function renderSummaryTabs(container, res) {
   const order = res.section_order || [];
   const sections = res.sections || {};
@@ -1044,16 +1046,23 @@ function renderSummaryTabs(container, res) {
   wrap.className = "summary-tabs";
   const nav = document.createElement("div");
   nav.className = "summary-tabnav";
-  const pane = document.createElement("div");
-  pane.className = "summary-tabpane answer-text";
+  const panes = document.createElement("div");
+  panes.className = "summary-tabpanes";
+  const paneByLabel = {};
   const show = (label) => {
-    pane.innerHTML = renderMarkdown(sections[label] || "");
-    decorateNames(pane, new Set(res.characters || []));
+    for (const l of order) paneByLabel[l].classList.toggle("active", l === label);
     nav.querySelectorAll(".summary-tab").forEach((b) =>
       b.classList.toggle("active", b.dataset.label === label),
     );
   };
   for (const label of order) {
+    const pane = document.createElement("div");
+    pane.className = "summary-tabpane answer-text";
+    pane.innerHTML = renderMarkdown(sections[label] || "");
+    decorateNames(pane, new Set(res.characters || []));
+    panes.appendChild(pane);
+    paneByLabel[label] = pane;
+
     const b = document.createElement("button");
     b.type = "button";
     b.className = "summary-tab";
@@ -1063,7 +1072,7 @@ function renderSummaryTabs(container, res) {
     nav.appendChild(b);
   }
   wrap.appendChild(nav);
-  wrap.appendChild(pane);
+  wrap.appendChild(panes);
   container.appendChild(wrap);
   if (order.length) show(order[0]);
 }
