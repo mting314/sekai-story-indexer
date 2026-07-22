@@ -291,3 +291,28 @@ def test_budget_cover_bias_keeps_the_asked_end():
     # no bias -> head + tail (both ends present)
     default = eng._budget_cover(idxs, budget)
     assert idxs[0] in default and idxs[-1] in default
+
+
+def test_scoped_event_hits_positional_score_boost():
+    """'late' intent ranks later scenes above earlier ones, 'early' the reverse.
+    Both questions ('how does it end' / '...begin') add no JP overlap, so with the
+    same aux token their base scores are identical — only the boost direction
+    differs, making the effect isolatable and deterministic."""
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    arc = "0006-lyric"
+    ordered = sorted(
+        (n for n in eng.nodes if n.metadata.arc_id == arc), key=eng._sort_key
+    )
+    assert len(ordered) >= 3
+    first, last = ordered[0], ordered[-1]
+    # a token present in BOTH the first and last scene, so both have non-zero base
+    fi, li = eng.nodes.index(first), eng.nodes.index(last)
+    tok = next(t for t in eng._tf[li] if t in eng._idf and t in eng._tf[fi])
+
+    def scores(question):
+        return {id(n): s for n, s in eng._scoped_event_hits(question, None, arc, aux_query=tok)}
+
+    late = scores("how does it end")     # -> 'late'  (finale weighted up)
+    early = scores("how does it begin")  # -> 'early' (opening weighted up)
+    assert late[id(last)] > early[id(last)]     # finale scores higher under 'late'
+    assert early[id(first)] > late[id(first)]   # opening scores higher under 'early'
