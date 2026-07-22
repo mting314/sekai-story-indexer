@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -26,6 +27,37 @@ from dotenv import load_dotenv
 from ..prompts import render_system_prompt, render_user_prompt
 
 load_dotenv()  # pick up GOOGLE_API_KEY from the repo-root .env
+
+
+# Quota/spend-cap circuit breaker. Once a generation call comes back with a
+# quota/429, further calls are pointless until the window resets — so we trip a
+# breaker and skip generation (callers fall back to the extractive answer) for a
+# cooldown, instead of paying a doomed round-trip on every query. Reset on the
+# next success. Cooldown is best-effort (we don't know the real reset time).
+_QUOTA_COOLDOWN_S = int(os.getenv("SEKAI_QUOTA_COOLDOWN", "900"))  # 15 min
+_quota_tripped_until = 0.0
+_QUOTA_MARKERS = ("429", "resource_exhausted", "quota", "spend", "exceeded")
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    s = str(exc).lower()
+    return any(m in s for m in _QUOTA_MARKERS)
+
+
+def _trip_quota_breaker() -> None:
+    global _quota_tripped_until
+    _quota_tripped_until = time.time() + _QUOTA_COOLDOWN_S
+
+
+def _clear_quota_breaker() -> None:
+    global _quota_tripped_until
+    _quota_tripped_until = 0.0
+
+
+def quota_paused() -> bool:
+    """True while the quota breaker is tripped — generation is being skipped in
+    favor of extractive retrieval. Lets callers surface a 'quota' notice."""
+    return time.time() < _quota_tripped_until
 
 
 # Chat-appropriate length control — the original answer prompt has none.
@@ -77,7 +109,10 @@ def _parse_grounding(text: str) -> tuple[str, dict[int, str]]:
 
 
 def generation_available() -> bool:
-    return bool(os.getenv("GOOGLE_API_KEY"))
+    """Whether to attempt LLM generation: a key is set AND the quota breaker isn't
+    tripped. When it returns False mid-cooldown, callers keep the extractive answer
+    without a doomed API round-trip."""
+    return bool(os.getenv("GOOGLE_API_KEY")) and not quota_paused()
 
 
 def _glossary_str(glossary: dict | None) -> str:
@@ -217,7 +252,10 @@ def generate_answer(
                 contents=user,
                 config=_generation_config(types, system),
             )
-        except Exception:
+        except Exception as first:
+            if _is_quota_error(first):  # cap hit -> trip breaker, don't retry
+                _trip_quota_breaker()
+                return None
             # a model that rejects thinking_level still generates without it
             resp = client.models.generate_content(
                 model=_resolved_model(model),
@@ -227,8 +265,11 @@ def generate_answer(
         text = (resp.text or "").strip()
         if not text:
             return None
+        _clear_quota_breaker()  # a success means the cap has cleared
         return _parse_grounding(text)
-    except Exception:
+    except Exception as exc:
+        if _is_quota_error(exc):
+            _trip_quota_breaker()
         return None  # any API/quota/network error -> caller keeps extractive answer
 
 
@@ -279,15 +320,21 @@ def generate_answer_stream(
                         yield full[emitted:limit]
                         emitted = limit
                 break  # stream completed
-            except Exception:
+            except Exception as exc:
+                if _is_quota_error(exc):  # cap hit -> trip breaker, don't retry
+                    _trip_quota_breaker()
+                    raise
                 if with_thinking and emitted == 0:
                     full, cut = "", None  # nothing streamed yet -> safe to retry
                     continue
                 raise  # mid-stream failure or retry also failed
         if cut is None and len(full) > emitted:  # no marker -> flush the held-back tail
             yield full[emitted:]
+        _clear_quota_breaker()  # a completed stream means the cap has cleared
         _, grounding = _parse_grounding(full)
         if grounding_out is not None:
             grounding_out.update(grounding)
-    except Exception:
+    except Exception as exc:
+        if _is_quota_error(exc):
+            _trip_quota_breaker()
         return  # caller falls back to the extractive answer

@@ -674,3 +674,27 @@ def test_derived_soft_scope_falls_back_to_global(monkeypatch):
     hard = server._query_derived(req, ("0006-lyric",), soft_scope=False)
     assert hard.get("soft_scope_fell_back") is None
     assert hard["citations"] == []  # explicit scope respected, no global bleed
+
+
+def test_note_quota_fallback_sets_notice_when_paused():
+    from sekai_story_indexer.query import generate
+    from webapp import server
+
+    generate._trip_quota_breaker()
+    try:
+        r = {}
+        server._note_quota_fallback(r, can_generate=True)
+        assert r.get("generation_status") == "quota"
+        assert "quota" in r.get("notice", "").lower()
+
+        # generation wasn't applicable this turn -> no notice
+        r2 = {}
+        server._note_quota_fallback(r2, can_generate=False)
+        assert "generation_status" not in r2
+    finally:
+        generate._clear_quota_breaker()
+
+    # breaker clear -> no notice even when generation was applicable
+    r3 = {}
+    server._note_quota_fallback(r3, can_generate=True)
+    assert "generation_status" not in r3

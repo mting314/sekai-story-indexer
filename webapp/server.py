@@ -497,6 +497,22 @@ def _can_generate_over(result: dict) -> bool:
     )
 
 
+def _note_quota_fallback(result: dict, can_generate: bool) -> None:
+    """Generation was applicable but produced nothing and the quota breaker is
+    tripped -> tell the UI the answer is extractive because the cap was hit (so the
+    plain answer is explained, not mistaken for a bug)."""
+    if not can_generate:
+        return
+    from sekai_story_indexer.query.generate import quota_paused
+
+    if quota_paused():
+        result["generation_status"] = "quota"
+        result["notice"] = (
+            "AI answer generation is paused (generation quota reached) — "
+            "showing retrieved excerpts."
+        )
+
+
 def _best_supporting_line(excerpt: str, answer: str) -> str:
     """The line in a cited scene most relevant to the answer — pins WHERE a claim
     came from (the UI highlights it in the excerpt), instead of the whole episode."""
@@ -615,7 +631,8 @@ def _query_local(
     if result.get("pre_summarized"):
         result["generated"] = True
         return result
-    if _can_generate_over(result):
+    can_gen = _can_generate_over(result)
+    if can_gen:
         from sekai_story_indexer.query.generate import generate_answer
 
         gen = generate_answer(result["resolved_question"], result["citations"])
@@ -624,6 +641,7 @@ def _query_local(
             _apply_generated_answer(result, nl, grounding)
     if not result.get("generated"):
         _trim_extractive_citations(result)
+        _note_quota_fallback(result, can_gen)
     return result
 
 
@@ -1421,7 +1439,8 @@ def _stream_events(req: QueryRequest):
 
     streamed = ""
     grounding: dict[int, str] = {}
-    if not result.get("pre_summarized") and _can_generate_over(result):
+    can_gen = not result.get("pre_summarized") and _can_generate_over(result)
+    if can_gen:
         from sekai_story_indexer.query.generate import generate_answer_stream
 
         for piece in generate_answer_stream(
@@ -1431,11 +1450,12 @@ def _stream_events(req: QueryRequest):
             yield _sse({"type": "delta", "text": piece})
     if streamed:
         _apply_generated_answer(result, streamed, grounding)
-    else:  # extractive / pre-summarized / no key -> chunk the computed answer
+    else:  # extractive / pre-summarized / no key / quota -> chunk the computed answer
         if result.get("pre_summarized"):
             result["generated"] = True
         else:
             _trim_extractive_citations(result)
+            _note_quota_fallback(result, can_gen)
         for piece in _chunk_text(result.get("answer") or ""):
             yield _sse({"type": "delta", "text": piece})
 
