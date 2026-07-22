@@ -1252,8 +1252,14 @@ def _cmd_summarize(arg: str, req: CommandRequest) -> dict:
         backend=result.get("backend") or "summary",
         citations=result.get("citations") or [],
     )
-    if result.get("generated"):
-        resp["generated"] = True  # so the backend subtext reads "AI-synthesized"
+    # Preserve the rich result so the extractive skim shows its supporting-quote
+    # blocks (localized to EN) and any degraded-mode notice — _command_response
+    # otherwise flattens everything to a single text part.
+    if result.get("answer_parts"):
+        resp["answer_parts"] = result["answer_parts"]
+    for k in ("generated", "generation_status", "notice"):
+        if result.get(k):
+            resp[k] = result[k]
     return resp
 
 
