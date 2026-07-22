@@ -378,16 +378,18 @@ class HierarchicalSummarizer:
         }
 
     def summarize_hierarchy(
-        self, raw_nodes: list[StoryNode], cache_file: str = "summaries_cache.json", *, limit: int = 0
+        self, raw_nodes: list[StoryNode], cache_file: str = "summaries_cache.json", *,
+        limit: int = 0, skip_existing: bool = False,
     ) -> list[StoryNode]:
         """Build the event-tier summaries. Sekai stores one scene per episode, so the
         Part/Episode sub-tiers are redundant — each event is summarized once, directly
         from its raw scenes. Returns the Tier-1 (Event) summary nodes."""
         safe_print("\n--- Generating Tier 1 (Event) Summaries ---")
-        return self.summarize_events(raw_nodes, cache_file, limit=limit)
+        return self.summarize_events(raw_nodes, cache_file, limit=limit, skip_existing=skip_existing)
 
     def summarize_events(
-        self, raw_nodes: list[StoryNode], cache_file: str = "summaries_cache.json", *, limit: int = 0
+        self, raw_nodes: list[StoryNode], cache_file: str = "summaries_cache.json", *,
+        limit: int = 0, skip_existing: bool = False,
     ) -> list[StoryNode]:
         """One Tier-1 (Event) summary per event, generated in a single call from the
         event's raw scenes in reading order. Scenes are grouped by arc and labelled
@@ -396,7 +398,12 @@ class HierarchicalSummarizer:
 
         ``limit`` (>0) stops after generating that many *new* summaries — cached
         predecessors are still loaded (free) so continuity threading is preserved,
-        making it a resumable, cost-bounded knob for a partial build."""
+        making it a resumable, cost-bounded knob for a partial build.
+
+        ``skip_existing`` keeps any event that ALREADY has a cached summary as-is
+        even if its fingerprint no longer matches (e.g. a different model) — so you
+        can fill only the missing events with a new/local model without clobbering
+        summaries built by another one."""
         cache = _load_cache(cache_file)
         generated = 0
 
@@ -441,6 +448,12 @@ class HierarchicalSummarizer:
             )
             fingerprint = stable_hash(cache_inputs)
             cached = _cached_summary(cache, cache_key, fingerprint)
+            if cached is None and skip_existing and cache_key in cache:
+                # fingerprint differs (e.g. a different model) but a summary exists —
+                # keep it rather than regenerate, so a new model fills only the gaps.
+                stored = cache[cache_key]
+                cached = (stored.get("summary") if isinstance(stored, dict) else stored) or ""
+                safe_print(f"Keeping existing {cache_key} (--skip-existing).")
 
             if cached is not None:
                 safe_print(f"Loading cached event summary for {cache_key}...")

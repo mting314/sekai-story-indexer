@@ -125,10 +125,16 @@ def summarize(
     include_unit_stories: bool = typer.Option(
         False, help="Also summarize unit-story arcs (default: event arcs only)."
     ),
+    skip_existing: bool = typer.Option(
+        False, help="Keep events that already have a summary even if the model/prompt "
+        "changed — fill only the gaps (e.g. a local Ollama model without clobbering "
+        "existing Gemini summaries)."
+    ),
 ):
-    """LLM 'Refine' event-tier summaries into the summaries cache (needs
-    GOOGLE_API_KEY + generation deps). Fingerprint-cached + resumable; threads a
-    rolling previous-event summary for continuity. Skips Chroma entirely."""
+    """LLM 'Refine' event-tier summaries into the summaries cache. Uses the
+    configured generation provider (Google by default; set SEKAI_INGEST_PROVIDER=openai
+    + OPENAI_BASE_URL for a local Ollama model). Fingerprint-cached + resumable; threads
+    a rolling previous-event summary for continuity. Skips Chroma entirely."""
     import re
 
     try:
@@ -193,7 +199,9 @@ def summarize(
         glossary=glossary, story_order=story_order, cache_context=cache_context
     )
     try:
-        summarizer.summarize_events(nodes, cache_file=str(cache), limit=limit)
+        summarizer.summarize_events(
+            nodes, cache_file=str(cache), limit=limit, skip_existing=skip_existing
+        )
     except Exception as exc:
         msg = str(exc)
         # A rate/spend-cap stop is expected + resumable (cache saved per-event);

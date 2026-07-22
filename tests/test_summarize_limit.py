@@ -71,3 +71,30 @@ def test_limit_zero_generates_all(tmp_path):
     with patch.object(HierarchicalSummarizer, "_generate_rolling_summary", fake_gen):
         _summarizer().summarize_events(nodes, cache_file=cache, limit=0)
     assert calls["n"] == len(arcs)
+
+
+def test_skip_existing_keeps_summaries_from_another_model(tmp_path):
+    """--skip-existing keeps an event that already has a summary even when its
+    fingerprint no longer matches (e.g. built by a different model), so a new/local
+    model fills only the gaps without clobbering existing summaries."""
+    import json
+
+    nodes = _sample_event_nodes()
+    arcs = sorted({n.metadata.arc_id for n in nodes})
+    cache = tmp_path / "c.json"
+    # seed one arc with a stale-fingerprint summary (as if built by another model)
+    cache.write_text(json.dumps(
+        {f"EVENT|{arcs[0]}": {"summary": "KEEP ME", "fingerprint": "stale", "inputs": {}}}
+    ))
+    calls = {"n": 0}
+
+    def fake_gen(self, current_text, prev_summary=None, level_name="Event"):
+        calls["n"] += 1
+        return f"new {calls['n']}"
+
+    with patch.object(HierarchicalSummarizer, "_generate_rolling_summary", fake_gen):
+        _summarizer().summarize_events(nodes, cache_file=str(cache), skip_existing=True)
+
+    data = json.loads(cache.read_text())
+    assert data[f"EVENT|{arcs[0]}"]["summary"] == "KEEP ME"  # kept, not regenerated
+    assert calls["n"] == len(arcs) - 1  # only the gaps generated
