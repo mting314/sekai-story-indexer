@@ -2,8 +2,8 @@
 
 Hierarchical-RAG story indexer for **Hatsune Miku: Colorful Stage! (Project
 Sekai)**. Fork of [`linkura-story-indexer`](https://github.com/ahuei123456/linkura-story-indexer),
-retargeted from Hasunosora to Project Sekai. See **[PLAN.md](PLAN.md)** for the
-roadmap, **[DESIGN.md](DESIGN.md)** for architecture rationale, and
+retargeted from Hasunosora to Project Sekai. See **[PLAN.md](docs/PLAN.md)** for the
+roadmap, **[DESIGN.md](docs/DESIGN.md)** for architecture rationale, and
 **[CLAUDE.md](CLAUDE.md)** for a quick orientation.
 
 ## Fetching story data
@@ -79,7 +79,7 @@ sekai eval                    # standalone regression gate
 
 Regression evals live in `eval/golden_local.json` and run against the local
 backend in `tests/test_eval_local.py`, so retrieval/scoping/answer regressions
-fail CI. See `DESIGN.md` for the two-backend + eval strategy.
+fail CI. See `docs/DESIGN.md` for the two-backend + eval strategy.
 
 ---
 
