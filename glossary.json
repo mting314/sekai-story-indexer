@@ -38,16 +38,33 @@
   "locations_and_terms": {
     "セカイ": "Sekai",
     "ワンダーランズ": "Wonderlands (Phoenix Wonderland theme park)",
+    "フェニックスワンダーランド": "Phoenix Wonderland",
+    "フェニラン": "Phoenix Wonderland",
     "ナイトコード": "Nightcord (25:00 voice-chat circle)",
     "ミライ小町": "Mirai Komachi",
     "神山高校": "Kamiyama High School",
     "宮益坂女子学園": "Miyamasuzaka Girls Academy",
-    "ボカロ": "Vocaloid"
+    "ボカロ": "Vocaloid",
+    "モアモアハウス": "MORE MORE HOUSE",
+    "乃々木公園": "Nonogi Park",
+    "ソリス・レコード": "Solis Records",
+    "アイハザ": "iHaz",
+    "日陰に咲く花": "Flower Grows In The Shade"
   },
   "side_characters": {
     "凪": "Nagi",
     "まふゆの母": "Mafuyu's mother",
     "大河": "Taiga",
-    "洸太郎": "Kotaro"
+    "洸太郎": "Kotaro",
+    "真堂": "Shindo",
+    "太田": "Ota",
+    "川西": "Kawanishi",
+    "斎藤": "Saito",
+    "黒宮": "Kuromiya",
+    "有村": "Arimura",
+    "ユイカ": "Yuika",
+    "リオン": "Rion",
+    "フェニックス": "Phoenix",
+    "ネネロボ": "Robo-Nene"
   }
 }

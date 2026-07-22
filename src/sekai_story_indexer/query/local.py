@@ -127,13 +127,16 @@ class LocalQueryEngine:
         self._char_by_id: dict[int, tuple[str, str]] = {
             cid: (jp, _jp_to_en.get(jp, jp)) for cid, jp in CHARACTER_ID_TO_JP.items()
         }
-        for jp, en in (glossary.get("characters") or {}).items():
-            jp_toks, en_toks = tokenize(jp), tokenize(en)
-            for et in en_toks:
-                if len(et) >= 3:
-                    self._expansions.append((frozenset({et}), jp_toks))
-            if jp_toks and en_toks:
-                self._expansions.append((frozenset(jp_toks), en_toks))
+        # Main + named side characters bridge both ways; a rare EN surname token
+        # (>=3 chars) alone maps to the JP name so "Shindo" finds 真堂 scenes.
+        for section in ("characters", "side_characters"):
+            for jp, en in (glossary.get(section) or {}).items():
+                jp_toks, en_toks = tokenize(jp), tokenize(en)
+                for et in en_toks:
+                    if len(et) >= 3:
+                        self._expansions.append((frozenset({et}), jp_toks))
+                if jp_toks and en_toks:
+                    self._expansions.append((frozenset(jp_toks), en_toks))
         for section in ("units", "locations_and_terms"):
             for jp, en in (glossary.get(section) or {}).items():
                 jp_toks, en_toks = tokenize(jp), tokenize(en)

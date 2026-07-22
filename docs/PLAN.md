@@ -192,6 +192,36 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   momentum/inertia scrolling, snap-to-card, and the banner art (now on each row)
   as the visual anchor. Currently a plain vertical list (`renderTimeline` +
   `.event-card` in `webapp/static/`).
+* **Timeline-click quick-action upsell above the composer (webapp, deferred).**
+  Clicking an event in the timeline already sets the sticky chat focus
+  (`sessions.py` focus + `renderTimeline` selection). Add a UX layer: when an event
+  is focused, show a small "upsell" bar just above the composer with one-tap
+  prompt buttons scoped to that event — e.g. **"Summarize this event"**,
+  **"What's the conclusion?"**, **"Who's the focus character?"** — that fill/submit
+  the composer with the corresponding query for the focused arc. Front-end work in
+  `webapp/static/app.js` (render the action bar on focus-change, wire clicks to the
+  existing ask flow) + `styles.css`; no backend change (the focus arc is already
+  tracked and the queries route through the normal `/api/query` path). Dismiss the
+  bar when focus is dropped (soft-scope self-heal).
+* **Per-unit Virtual Singer identity for name highlighting (deferred, needs data
+  spike).** The six Virtual Singers (Miku, Rin, Len, Luka, MEIKO, KAITO) are not a
+  single character each — in-game they're **separate per-unit variants** with
+  distinct icons/designs (Leo/need Luka ≠ Nightcord Luka ≠ VBS Luka, etc.). Our
+  current name highlighting / character tagging collapses each VS into one entity,
+  so a highlighted "Luka" can't show the right unit-flavored identity.
+  - **Step 1 (data spike):** explore the master DB to see if the variants are
+    modeled as distinct characters in the *data* — check `gameCharacters.json`,
+    `gameCharacterUnits.json` / `character2ds.json` (2D model = unit-specific VS
+    costume) and how scenario `TalkData` references a speaker (character id vs.
+    2d-model id vs. plain display name). If the scenario carries a unit-specific
+    id, we can map each VS line to its unit deterministically and render/highlight
+    accordingly (icon + unit label).
+  - **Step 2 (fallback heuristic):** if the text/data only gives a bare VS name,
+    infer the unit from context — the event's owning unit, the Sekai the scene is
+    set in, and co-present unit members in the scene — to guess which VS variant is
+    speaking. Lower confidence; flag ambiguous cases rather than mislabel.
+  Touches `source/` (parse/keep the speaker id if present), `models/story.py`
+  (speaker→unit), and the webapp highlighter.
 * **Richer summary display in chat (webapp, deferred).** The hierarchical event
   summary has fixed sections (Overview, per-episode index, character development),
   currently rendered as one flat markdown block. Give it a richer interface — e.g.
