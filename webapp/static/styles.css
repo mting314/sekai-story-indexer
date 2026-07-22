@@ -90,6 +90,10 @@ main {
 .scope-hint .reply-sub { font-size: 12px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .scope-hint .reply-close { background: transparent; border: 0; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 2px; flex-shrink: 0; }
 .scope-hint .reply-close:hover { color: var(--text); }
+/* quick-action upsell shown above the composer when a timeline event is focused */
+.quick-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 8px; }
+.qa-btn { padding: 5px 11px; border-radius: 999px; border: 1px solid #2b2f3a; background: transparent; color: var(--muted); cursor: pointer; font-size: 12.5px; transition: background .12s, color .12s, border-color .12s; }
+.qa-btn:hover { background: var(--accent); color: #04222b; border-color: var(--accent); }
 .hidden { display: none !important; }
 
 /* timeline */

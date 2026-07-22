@@ -9,6 +9,7 @@ const state = {
   commands: [], // /api/commands catalog for the slash-command menu
   cmd: { open: false, items: [], active: 0 },
   inputHistory: [], histIdx: 0, // terminal-style ↑/↓ recall of submitted inputs
+  asking: false, // in-flight guard: one question at a time (no overlapping submits)
 };
 
 // Route external (sekai.best) art through the server image proxy so it loads even
@@ -908,6 +909,40 @@ function enableWheelInertia(el) {
   reset();
 }
 
+// Quick-action prompts shown above the composer once an event is focused. Each
+// submits a scoped question about the focused event (the server resolves "this
+// event" from state.scopeEventId), so one tap answers a common question.
+const QUICK_ACTIONS = [
+  { label: "Summarize this event", q: "Summarize this event." },
+  { label: "What's the conclusion?", q: "What happens at the end of this event?" },
+  { label: "Who's the focus character?", q: "Who is the focus character of this event, and what is their arc?" },
+];
+
+// Fill the composer with `q` and submit it through the normal ask flow (reuses
+// history, streaming, focus-chip handling, etc.).
+function askQuickQuestion(q) {
+  const input = document.getElementById("question");
+  input.value = q;
+  document.getElementById("ask-form").requestSubmit();
+}
+
+function renderQuickActions(show) {
+  const bar = document.getElementById("quick-actions");
+  if (!bar) return;
+  if (!show) {
+    bar.classList.add("hidden");
+    bar.innerHTML = "";
+    return;
+  }
+  bar.innerHTML = QUICK_ACTIONS.map(
+    (a, i) => `<button type="button" class="qa-btn" data-qa="${i}">${escapeHtml(a.label)}</button>`
+  ).join("");
+  bar.querySelectorAll(".qa-btn").forEach((btn) => {
+    btn.onclick = () => askQuickQuestion(QUICK_ACTIONS[+btn.dataset.qa].q);
+  });
+  bar.classList.remove("hidden");
+}
+
 function setScope(e) {
   if (!e.indexed) {
     addMessage(
@@ -932,7 +967,9 @@ function setScope(e) {
     ev.preventDefault();
     state.scopeEventId = null;
     hint.classList.add("hidden");
+    renderQuickActions(false);
   };
+  renderQuickActions(true);
   document.getElementById("question").focus();
 }
 
@@ -1506,7 +1543,10 @@ async function runSlashCommand(q, pending) {
     renderAssistant(pending, res);
     if ("focus" in res) {
       if (res.focus) showFocusChip(res.focus);
-      else document.getElementById("scope-hint").classList.add("hidden");
+      else {
+        document.getElementById("scope-hint").classList.add("hidden");
+        renderQuickActions(false); // keep the upsell in sync when focus is cleared
+      }
     }
     // Keep command turns in the conversation history so follow-ups have context
     // (e.g. asking about a line from a /summarize). The command line reads fine as
@@ -1520,9 +1560,11 @@ async function runSlashCommand(q, pending) {
 
 document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
+  if (state.asking) return; // ignore overlapping submits (double-tapped quick action / Enter mid-stream)
   const input = document.getElementById("question");
   const q = input.value.trim();
   if (!q) return;
+  state.asking = true;
   input.value = "";
   autoGrowInput(); // collapse the textarea back to one row
   if (state.inputHistory[state.inputHistory.length - 1] !== q) state.inputHistory.push(q);
@@ -1531,12 +1573,11 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
   addMessage("user", q);
   const pending = addMessage("assistant", "");
   showThinking(pending);
-  if (q.startsWith("/")) {
-    await runSlashCommand(q, pending);
-    document.getElementById("messages").scrollTop = 1e9;
-    return;
-  }
   try {
+    if (q.startsWith("/")) {
+      await runSlashCommand(q, pending);
+      return;
+    }
     let res;
     try {
       res = await streamAnswer(q, pending);
@@ -1569,8 +1610,10 @@ document.getElementById("ask-form").addEventListener("submit", async (ev) => {
     }
   } catch (err) {
     pending.textContent = `⚠ ${err}`;
+  } finally {
+    state.asking = false;
+    document.getElementById("messages").scrollTop = 1e9;
   }
-  document.getElementById("messages").scrollTop = 1e9;
 });
 
 document.addEventListener("click", (e) => {
