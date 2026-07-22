@@ -908,6 +908,40 @@ function enableWheelInertia(el) {
   reset();
 }
 
+// Quick-action prompts shown above the composer once an event is focused. Each
+// submits a scoped question about the focused event (the server resolves "this
+// event" from state.scopeEventId), so one tap answers a common question.
+const QUICK_ACTIONS = [
+  { label: "Summarize this event", q: "Summarize this event." },
+  { label: "What's the conclusion?", q: "What happens at the end of this event?" },
+  { label: "Who's the focus character?", q: "Who is the focus character of this event, and what is their arc?" },
+];
+
+// Fill the composer with `q` and submit it through the normal ask flow (reuses
+// history, streaming, focus-chip handling, etc.).
+function askQuickQuestion(q) {
+  const input = document.getElementById("question");
+  input.value = q;
+  document.getElementById("ask-form").requestSubmit();
+}
+
+function renderQuickActions(show) {
+  const bar = document.getElementById("quick-actions");
+  if (!bar) return;
+  if (!show) {
+    bar.classList.add("hidden");
+    bar.innerHTML = "";
+    return;
+  }
+  bar.innerHTML = QUICK_ACTIONS.map(
+    (a, i) => `<button type="button" class="qa-btn" data-qa="${i}">${escapeHtml(a.label)}</button>`
+  ).join("");
+  bar.querySelectorAll(".qa-btn").forEach((btn) => {
+    btn.onclick = () => askQuickQuestion(QUICK_ACTIONS[+btn.dataset.qa].q);
+  });
+  bar.classList.remove("hidden");
+}
+
 function setScope(e) {
   if (!e.indexed) {
     addMessage(
@@ -932,7 +966,9 @@ function setScope(e) {
     ev.preventDefault();
     state.scopeEventId = null;
     hint.classList.add("hidden");
+    renderQuickActions(false);
   };
+  renderQuickActions(true);
   document.getElementById("question").focus();
 }
 
