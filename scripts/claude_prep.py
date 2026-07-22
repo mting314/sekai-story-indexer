@@ -42,6 +42,6 @@ for f in files:
 
 g = json.load(open("glossary.json", encoding="utf-8")) if os.path.exists("glossary.json") else {}
 print("\n===== GLOSSARY — use these exact English names =====")
-for section in ("characters", "units", "locations_and_terms"):
+for section in ("characters", "side_characters", "units", "locations_and_terms"):
     for jp, en in (g.get(section) or {}).items():
         print(f"{jp} -> {en}")
