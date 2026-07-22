@@ -2,7 +2,7 @@
 
 Retrieval always returns *something*, so an ambiguous reference like
 "summarize that rise as one story" silently resolves to whatever ranked top —
-the whole-arc guess this module exists to prevent (see DESIGN.md / the
+the whole-arc guess this module exists to prevent (see docs/DESIGN.md / the
 conversational-RAG notes). Rather than answer confidently from one arbitrary
 interpretation, we enumerate the distinct candidate interpretations and, when
 there are two or more, return a *clarify* response asking the user to pick.

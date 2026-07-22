@@ -2,7 +2,7 @@
 
 Hierarchical-RAG story indexer for **Hatsune Miku: Colorful Stage! (Project
 Sekai)**. Fork of `ahuei123456/linkura-story-indexer`, retargeted from
-Hasunosora to Project Sekai. Read `PLAN.md` (roadmap) and `DESIGN.md` (why)
+Hasunosora to Project Sekai. Read `docs/PLAN.md` (roadmap) and `docs/DESIGN.md` (why)
 first; `AGENTS.md` has the hard repo policy.
 
 ## What this is
@@ -35,7 +35,7 @@ nightcord, virtual_singer, mixed. Scenes split by `---`; lines `speaker: text`.
   `event_id`, `started_at`.
 * `indexer fetch` CLI command.
 
-## Key decisions (see DESIGN.md)
+## Key decisions (see docs/DESIGN.md)
 * **One unified index + `unit` facet**, not five separate per-unit projects.
 * `unit` is a facet now; **Unit-tier summary** is the next tier to add (Phase 2).
 * **Index all filler**; `plot_weight` only re-ranks, never excludes.
@@ -78,7 +78,7 @@ app + evals work with no fetch/keys.
 No PyPI-egress? `PYTHONPATH=src <python-with-pydantic> -m pytest tests/`. The
 `sekai` paths need only typer + fastapi/uvicorn (for serve); no chromadb.
 
-## Phase status (see PLAN.md)
+## Phase status (see docs/PLAN.md)
 - Local backend fully implemented + tested (no API key):
   - Phase 2: Tier-1 unit overviews (`query/summaries.py`, deterministic).
   - Phase 3: `plot_weight` heuristic classifier + retrieval boost (`source/relevance.py`).

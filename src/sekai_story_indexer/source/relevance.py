@@ -1,6 +1,6 @@
 """Plot-weight classification — our own relevance verdict per event.
 
-The native ``is_key_story`` tag is overinclusive (see DESIGN.md). ``plot_weight``
+The native ``is_key_story`` tag is overinclusive (see docs/DESIGN.md). ``plot_weight``
 is *our* rating used to prioritize retrieval for thematic / character-arc queries
 while never excluding filler.
 

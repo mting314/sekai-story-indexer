@@ -18,7 +18,7 @@ small FastAPI backend.
   chat now; a hollow dot + dimmed card = on the timeline but not yet ingested
   (chat-answerable after the next `scripts/sync.sh`). A legend at the top counts
   each. Clicking a pending event explains it's not queryable yet instead of
-  scoping. This reflects the timeline-leads-index design (see `../DESIGN.md`).
+  scoping. This reflects the timeline-leads-index design (see `../docs/DESIGN.md`).
 
 ## Run
 

@@ -160,7 +160,7 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   engine** (prepended to the Chroma embedding + lexical text; takes effect on the
   next `indexer ingest` re-embed); history windowing (`condense.window_history`);
   and SSE streaming (`/api/query/stream` + `generate_answer_stream`). See
-  `docs/contextual_embeddings_plan.md`.
+  `contextual_embeddings_plan.md`.
 - [~] **Phase 5 — Content beyond events.** **Unit stories DONE** (real fetch:
   `sekai fetch-unit-stories` → `story/<unit>/unit/…`, tested); non-event content
   is always-queryable. Card side-stories + Area conversations: modeled/scaffolded,

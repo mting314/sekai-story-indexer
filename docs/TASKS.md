@@ -1,7 +1,7 @@
 # Tasks
 
 > **Status (reconciled with the code, 2026-07):** this is the inherited
-> `RAG_IMPROVEMENTS_4.md` roadmap from the linkura fork. **Essentially all of it is
+> `archive/RAG_IMPROVEMENTS.md` roadmap from the linkura fork. **Essentially all of it is
 > now implemented** — the boxes below are ticked to match what's in the code. The
 > only outstanding item is the SQLite/JSONL cache migration (deferred by design).
 >
