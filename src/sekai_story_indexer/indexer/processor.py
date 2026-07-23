@@ -1,9 +1,61 @@
+import json
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from ..models.story import StoryMetadata, StoryNode
 from ..source.transform import story_type_for
 from .parser import StoryParser
+
+
+@lru_cache(maxsize=16)
+def _load_content_parents_cached(path_str: str, _mtime: float) -> dict:
+    # _mtime is part of the cache key: a regenerated file (new mtime) is a cache
+    # miss, so a long-lived `serve` process that re-links picks up the new map.
+    try:
+        return json.loads(Path(path_str).read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _content_parents_for(file_path: Path) -> dict:
+    """Lazily load ``content_parents.json`` (card/area -> parent event), searched
+    next to the story tree then in the cwd. Returns ``{}`` when absent, so nesting
+    is a no-op on corpora that haven't been linked (e.g. the sample fixture)."""
+    parts = file_path.parts
+    try:
+        story_idx = parts.index("story")
+    except ValueError:
+        return {}
+    # content_parents.json sits next to the story tree (the dir above story/),
+    # exactly where the fetcher writes events_index.json — scoped to THIS tree so a
+    # processor run can't leak one tree's parents onto another.
+    root = Path(*parts[:story_idx]) if story_idx > 0 else Path(".")
+    cand = root / "content_parents.json"
+    if not cand.exists():
+        return {}
+    return _load_content_parents_cached(str(cand), cand.stat().st_mtime)
+
+
+def _parent_link(file_path: Path, content_type: str, arc_id: str, ep_name: str) -> tuple[int, str, str]:
+    """Resolve (parent_event_id, parent_arc_id, content_group) for a card/area node
+    from content_parents.json. Cards key by card id (leading digits of the dir
+    slug); area talks key by scenarioId (the talk filename minus its ``NNN_`` prefix)."""
+    if content_type not in ("card", "area"):
+        return 0, "", ""
+    cp = _content_parents_for(file_path)
+    if content_type == "card":
+        m = re.match(r"(\d+)", arc_id)
+        entry = (cp.get("cards") or {}).get(str(int(m.group(1)))) if m else None
+    else:  # area
+        entry = (cp.get("areas") or {}).get(re.sub(r"^\d+_", "", ep_name))
+    if not entry:
+        return 0, "", ""
+    return (
+        int(entry.get("parent_event_id") or 0),
+        entry.get("parent_arc_id") or "",
+        entry.get("content_group") or "",
+    )
 
 
 def _parent_ids(
@@ -63,6 +115,9 @@ class StoryProcessor:
             parent_year_id, parent_episode_id, parent_part_id = _parent_ids(
                 unit, arc_id, story_type, ep_name, part_name
             )
+            parent_event_id, parent_arc_id, content_group = _parent_link(
+                file_path, content_type, arc_id, ep_name
+            )
             return StoryMetadata(
                 unit=unit,
                 content_type=content_type,
@@ -75,6 +130,9 @@ class StoryProcessor:
                 parent_year_id=parent_year_id,
                 parent_episode_id=parent_episode_id,
                 parent_part_id=parent_part_id,
+                parent_event_id=parent_event_id,
+                parent_arc_id=parent_arc_id,
+                content_group=content_group,
             )
         except (ValueError, IndexError):
             part_name = file_path.parent.name

@@ -186,6 +186,123 @@ def fetch_unit_stories(
     return written
 
 
+def fetch_card_stories(
+    story_root: Path,
+    *,
+    limit: int | None = None,
+    scenario_fetch: Callable[[str, str], dict] | None = None,
+    en_scenario_fetch: Callable[[str, str], dict] | None = None,
+    cards_rows: list[dict] | None = None,
+    episode_rows: list[dict] | None = None,
+    skip_existing: bool = False,
+    log: Callable[[str], None] = print,
+) -> int:
+    """Fetch per-card side-stories into
+    ``story/<unit>/card/<NNNN-card-slug>/<NN_part>.md``. Returns episodes written.
+
+    Each card has two episodes (first/second part). Unit + character come from the
+    card's ``characterId`` (``cards.json``); like unit stories these are non-event
+    content, always-queryable once on disk. ``*_rows`` are injectable for tests."""
+    story_root = Path(story_root)
+    fetch_scenario = scenario_fetch or client.card_story_scenario
+    fetch_en = en_scenario_fetch or client.en_card_story_scenario
+    cards_by_id = {c["id"]: c for c in (cards_rows if cards_rows is not None else client.cards())}
+    episodes = episode_rows if episode_rows is not None else client.card_episodes()
+    by_card: dict[int, list[dict]] = {}
+    for ep in episodes:
+        by_card.setdefault(ep["cardId"], []).append(ep)
+    card_ids = sorted(by_card)
+    if limit:
+        card_ids = card_ids[:limit]
+    written = 0
+    for cid in card_ids:
+        card = cards_by_id.get(cid, {})
+        char_id = card.get("characterId", 0)
+        unit = resolve_unit(character_ids=[char_id]) if char_id else "mixed"
+        card_slug = f"{cid:04d}-{slugify(card.get('prefix', '')) or 'card'}"
+        for ep in sorted(by_card[cid], key=lambda e: e.get("seq", 0)):
+            part = 1 if ep.get("cardEpisodePartType") == "first_part" else 2
+            title = f"{part}. {ep.get('title', '')}".strip()
+            fname = episode_filename(part, ep.get("title", ""))
+            bundle, sid = ep["assetbundleName"], ep["scenarioId"]
+            out = story_root / tree_relpath(unit, "card", card_slug, fname)
+            if skip_existing and out.exists() and out.stat().st_size > 0:
+                written += 1
+                continue
+            try:
+                scenario = fetch_scenario(bundle, sid)
+            except Exception as exc:  # one bad episode must not abort the run
+                log(f"  skip card {card_slug} {sid}: {exc}")
+                continue
+            lines = scenario_to_lines(scenario)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(render_episode_markdown(title, [lines]), encoding="utf-8")
+            _write_en_sidecar(out, title, lines, fetch_en, bundle, sid)
+            written += 1
+        log(f"wrote {unit}/card/{card_slug}")
+    log(f"card stories: {written} episodes from {len(card_ids)} cards")
+    return written
+
+
+def fetch_area_conversations(
+    story_root: Path,
+    *,
+    limit: int | None = None,
+    scenario_fetch: Callable[[int, str], dict] | None = None,
+    en_scenario_fetch: Callable[[int, str], dict] | None = None,
+    action_set_rows: list[dict] | None = None,
+    area_rows: list[dict] | None = None,
+    skip_existing: bool = False,
+    log: Callable[[str], None] = print,
+) -> int:
+    """Fetch area conversations into
+    ``story/<unit>/area/<NN-area-slug>/<NNN_talk>.md``. Returns talks written.
+
+    Each ``actionSet`` with a ``scenarioId`` is one talk; unit comes from its
+    ``characterIds`` (often ``mixed``), the area label from ``areas.json``. The
+    asset lives in ``group<id//100>``. ``*_rows`` are injectable for tests."""
+    story_root = Path(story_root)
+    fetch_scenario = scenario_fetch or client.area_scenario
+    fetch_en = en_scenario_fetch or client.en_area_scenario
+    areas_by_id = {a["id"]: a for a in (area_rows if area_rows is not None else client.areas())}
+    rows = action_set_rows if action_set_rows is not None else client.action_sets()
+    acts = [a for a in rows if a.get("scenarioId")]
+    by_area: dict[int, list[dict]] = {}
+    for a in acts:
+        by_area.setdefault(a.get("areaId", 0), []).append(a)
+    area_ids = sorted(by_area)
+    if limit:
+        area_ids = area_ids[:limit]
+    written = 0
+    for area_id in area_ids:
+        area = areas_by_id.get(area_id, {})
+        area_slug = f"{area_id:02d}-{slugify(area.get('name', '')) or 'area'}"
+        for i, a in enumerate(sorted(by_area[area_id], key=lambda x: x["id"]), start=1):
+            unit = resolve_unit(character_ids=a.get("characterIds") or [])
+            sid, aid = a["scenarioId"], a["id"]
+            title = f"{i}. {area.get('name', '')}".strip()
+            fname = f"{i:03d}_{slugify(sid) or 'talk'}.md"
+            out = story_root / tree_relpath(unit, "area", area_slug, fname)
+            if skip_existing and out.exists() and out.stat().st_size > 0:
+                written += 1
+                continue
+            try:
+                scenario = fetch_scenario(aid, sid)
+            except Exception as exc:  # one bad talk must not abort the run
+                log(f"  skip area {area_slug} {sid}: {exc}")
+                continue
+            lines = scenario_to_lines(scenario)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(render_episode_markdown(title, [lines]), encoding="utf-8")
+            # EN sidecar: en_area_scenario(action_set_id, scenario_id) — the int id
+            # rides the "asset_bundle" slot _write_en_sidecar forwards verbatim.
+            _write_en_sidecar(out, title, lines, fetch_en, aid, sid)
+            written += 1
+        log(f"wrote area/{area_slug} ({len(by_area[area_id])} talks)")
+    log(f"area conversations: {written} talks from {len(area_ids)} areas")
+    return written
+
+
 def _lines_from_markdown(path: Path) -> list[tuple[str, str]]:
     """Re-read an episode markdown into ``(speaker, text)`` turns. Used only to get
     the JP line COUNT for aligning an EN sidecar onto an already-fetched episode
@@ -205,8 +322,8 @@ def _write_en_sidecar(
     jp_path: Path,
     title: str,
     jp_lines: list[tuple[str, str]],
-    fetch_en: Callable[[str, str], dict],
-    asset_bundle: str,
+    fetch_en: Callable[..., dict],
+    asset_bundle: str | int,
     scenario_id: str,
 ) -> bool:
     """Best-effort: fetch the official-EN scenario and, if it aligns 1:1 with the

@@ -181,6 +181,191 @@ def focus_character_id(event_card_ids: list[int], cards_by_id: dict[int, dict]) 
     return pool[0].get("characterId", 0)
 
 
+def build_card_parent_map(
+    event_cards: list[dict],
+    cards_by_id: dict[int, dict],
+) -> dict[int, dict]:
+    """Resolve each card's hierarchy parent, for nesting card side-stories under
+    their event.
+
+    The authoritative link is ``eventCards.json`` (``cardId`` -> ``eventId``). A
+    card reused across events (re-run / anniversary) is assigned its PRIMARY event:
+    rows flagged ``isDisplayCardStory`` win, then the earliest ``eventId``. Cards
+    with no ``eventCards`` row have no event parent and fall back to their
+    character, tagged ``"birthday"`` (``rarity_birthday``) or ``"other"``
+    (permanent / initial / gacha).
+
+    Returns ``{card_id: {"kind", "event_id", "character_id", "is_display_card_story"}}``
+    for every card in ``cards_by_id`` (callers filter to cards that actually have
+    side-stories). ``kind`` is ``"event" | "birthday" | "other"``; ``event_id`` is
+    ``None`` for the non-event kinds.
+    """
+    rows_by_card: dict[int, list[dict]] = {}
+    for row in event_cards:
+        cid = row.get("cardId")
+        if cid is not None:
+            rows_by_card.setdefault(cid, []).append(row)
+
+    out: dict[int, dict] = {}
+    for cid, rows in rows_by_card.items():
+        displayed = [r for r in rows if r.get("isDisplayCardStory")]
+        # Primary event: prefer a story-displaying row, then the earliest event id.
+        # `or (1<<30)` (not a dict default) so an explicit null eventId can't crash min().
+        primary = min(displayed or rows, key=lambda r: r.get("eventId") or (1 << 30))
+        out[cid] = {
+            "kind": "event",
+            "event_id": primary.get("eventId"),
+            "character_id": (cards_by_id.get(cid) or {}).get("characterId", 0),
+            "is_display_card_story": bool(displayed),
+        }
+
+    for cid, card in cards_by_id.items():
+        if cid in out:
+            continue
+        rarity = card.get("cardRarityType", "")
+        out[cid] = {
+            "kind": "birthday" if rarity == "rarity_birthday" else "other",
+            "event_id": None,
+            "character_id": card.get("characterId", 0),
+            "is_display_card_story": False,
+        }
+    return out
+
+
+def area_campaign_tag(scenario_id: str) -> str | None:
+    """Campaign/special-event tag for an area talk's scenarioId, or ``None`` for
+    generic base chatter.
+
+    Some area talks belong to a campaign or special event (April Fool, an
+    anniversary, the movie, a World Link sub-event) but unlock via serial code /
+    action-set chaining rather than an ``event_story`` condition — so they can't be
+    tied to a numbered event, yet they DO form a coherent group. This reads that
+    group from the scenarioId (e.g. ``areatalk_ev_theater_037`` -> ``"ev_theater"``,
+    ``areatalk_aprilfool2022_002`` -> ``"aprilfool2022"``, ``areatalk_3rdaniv_001``
+    -> ``"3rdaniv"``). The generic living-world chatter (``areatalk03_121``,
+    ``op_02area``) has no campaign and returns ``None``.
+    """
+    s = scenario_id.replace("-", "_")
+    is_campaign = ("_ev_" in s) or ("aprilfool" in s) or ("aniv" in s) or bool(re.search(r"(^|_)wl_", s))
+    if not is_campaign:
+        return None
+    stem = re.sub(r"_\d+$", "", s)          # drop the trailing sequence number
+    stem = re.sub(r"^areatalk_?", "", stem)  # drop the generic areatalk marker
+    return stem or None
+
+
+def build_area_event_map(
+    action_sets: list[dict],
+    release_conditions: list[dict],
+    event_stories: list[dict],
+) -> dict[int, dict]:
+    """Resolve each area talk's parent for nesting area conversations.
+
+    Area talks have no ``eventCards``-style FK. Classification, in precedence:
+
+    1. **event** — an ``event_story`` releaseCondition gates the talk on reading a
+       specific event-story episode, whose id resolves through ``eventStories`` to
+       an ``eventId``. This is the authoritative, exact link.
+    2. **campaign** — otherwise, if the scenarioId carries a campaign/special-event
+       tag (April Fool, anniversary, movie, World Link — see ``area_campaign_tag``).
+       These unlock via serial code / action-set chaining, so there's no numbered
+       event to point at, but they form a coherent group (``campaign`` field).
+    3. **permanent** — generic living-world chatter (``areatalk0N`` / ``op_``,
+       "owned from the start"), no event.
+
+    Returns ``{action_set_id: {"kind", "event_id", "campaign", "scenario_id"}}`` for
+    talks carrying a ``scenarioId``. ``kind`` is ``"event" | "campaign" |
+    "permanent"``; ``event_id`` is set only for ``event``, ``campaign`` only for
+    ``campaign``.
+
+    NOTE: classification is deliberately by unlock-condition + scenarioId tag, NOT
+    by cross-filling a scenarioId prefix from resolved talks — the generic
+    ``areatalk0N`` prefix is shared across events, so prefix cross-fill mislabels
+    base chatter (e.g. tagging all ``areatalk03_*`` with one event).
+    """
+    rc_by_id = {r["id"]: r for r in release_conditions}
+    episode_to_event: dict[int, int] = {}
+    for story in event_stories:
+        eid = story.get("eventId")
+        for ep in story.get("eventStoryEpisodes", []):
+            if ep.get("id") is not None and eid is not None:
+                episode_to_event[ep["id"]] = eid
+
+    out: dict[int, dict] = {}
+    for act in action_sets:
+        sid = act.get("scenarioId")
+        if not sid:
+            continue
+        rc = rc_by_id.get(act.get("releaseConditionId")) or {}
+        if rc.get("releaseConditionType") == "event_story":
+            out[act["id"]] = {
+                "kind": "event",
+                "event_id": episode_to_event.get(rc.get("releaseConditionTypeId")),
+                "campaign": None,
+                "scenario_id": sid,
+            }
+            continue
+        campaign = area_campaign_tag(sid)
+        if campaign:
+            out[act["id"]] = {"kind": "campaign", "event_id": None, "campaign": campaign, "scenario_id": sid}
+        else:
+            out[act["id"]] = {"kind": "permanent", "event_id": None, "campaign": None, "scenario_id": sid}
+    return out
+
+
+def build_content_parents(
+    card_parent_map: dict[int, dict],
+    area_event_map: dict[int, dict],
+    events_by_id: dict[int, dict],
+) -> dict:
+    """Compose the two resolvers into the ``content_parents.json`` artifact the
+    processor reads to nest card/area content under its parent event.
+
+    Cards are keyed by ``str(card_id)`` (the processor extracts it from the card
+    dir slug ``NNNN-...``); area talks are keyed by ``scenario_id`` (the processor
+    extracts it from the talk filename ``NNN_<scenarioId>``). Each entry carries the
+    parent event's id + arc slug (for hierarchy grouping), or a ``content_group``
+    for content with no parent event (campaign / birthday / other / permanent).
+    """
+    def arc_of(event_id: int | None) -> str:
+        ev = events_by_id.get(event_id) if event_id else None
+        return arc_slug(event_id, ev.get("name", "")) if ev else ""
+
+    cards: dict[str, dict] = {}
+    for cid, p in card_parent_map.items():
+        eid = p.get("event_id") or 0
+        kind = p.get("kind")
+        # event-linked with a resolved id -> nested (no group); event-linked but the
+        # id didn't resolve -> group 'other' rather than silently orphaning it;
+        # birthday/other -> their own group.
+        group = "" if (kind == "event" and eid) else ("other" if kind == "event" else kind or "")
+        cards[str(cid)] = {
+            "parent_event_id": eid,
+            "parent_arc_id": arc_of(eid),
+            "content_group": group,
+        }
+
+    areas: dict[str, dict] = {}
+    for p in area_event_map.values():
+        sid = p.get("scenario_id")
+        if not sid:
+            continue
+        eid = p.get("event_id") or 0
+        # resolved event -> nested (no group); otherwise keep the campaign tag, or
+        # derive one from the scenarioId (covers an event_story-gated talk whose
+        # episode id didn't resolve), else 'permanent'. Never silently orphan.
+        group = "" if eid else (p.get("campaign") or area_campaign_tag(sid) or "permanent")
+        # Key by the SLUGIFIED scenarioId — the fetcher slugifies it into the talk
+        # filename (areatalk_ev_x_001 -> ...areatalk-ev-x-001.md), so this is what the
+        # processor can reconstruct from disk to match this entry.
+        areas[slugify(sid)] = {
+            "parent_event_id": eid,
+            "parent_arc_id": arc_of(eid),
+            "content_group": group,
+        }
+    return {"cards": cards, "areas": areas}
+
+
 def song_info(music: dict | None) -> dict:
     """Flatten a ``musics.json`` record into commissioned-song fields."""
     if not music:

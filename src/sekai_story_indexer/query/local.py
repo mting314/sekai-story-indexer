@@ -215,18 +215,31 @@ class LocalQueryEngine:
         unit: str | None,
         arc_id: str | None,
         arc_ids: tuple[str, ...] = (),
+        *,
+        include_children: bool = True,
     ) -> list[int]:
-        arc_set = set(arc_ids)
+        scoped = set(arc_ids) | ({arc_id} if arc_id else set())
         out = []
         for i, node in enumerate(self.nodes):
             m = node.metadata
-            if unit and m.unit != unit:
-                continue
-            if arc_id and m.arc_id != arc_id:
-                continue
-            if arc_set and m.arc_id not in arc_set:
-                continue
-            out.append(i)
+            if scoped:
+                # Own-arc match (respects the unit filter) OR a nested card/area
+                # child whose parent event is in scope. Children ride in via their
+                # parent regardless of their OWN unit — an event's area talks are
+                # often 'mixed' and cards sit under the character's unit — so a
+                # scope on event X surfaces its card side-stories + area talks too.
+                # `include_children=False` keeps the scope to the event's OWN scenes
+                # (e.g. count_dialogue's exact per-event-story count).
+                own = m.arc_id in scoped and (not unit or m.unit == unit)
+                child = (
+                    include_children and bool(m.parent_arc_id) and m.parent_arc_id in scoped
+                )
+                if own or child:
+                    out.append(i)
+            else:
+                if unit and m.unit != unit:
+                    continue
+                out.append(i)
         return out
 
     # -- retrieval -----------------------------------------------------------
@@ -655,7 +668,11 @@ class LocalQueryEngine:
             return {"answer": msg, "answer_parts": [{"type": "text", "text": msg}],
                     "citations": [], "scope": scope.as_dict(), "backend": "local",
                     "intent": "count"}
-        idxs = self._candidate_indices(scope.unit, scope.arc_id, scope.arc_ids)
+        # Count the event's OWN scenes only — a count of lines "in event X" must not
+        # silently absorb its nested card/area children (keeps the exact contract).
+        idxs = self._candidate_indices(
+            scope.unit, scope.arc_id, scope.arc_ids, include_children=False
+        )
         counts = []
         for jp, en in targets:
             en_tokens = {t for t in en.lower().split() if len(t) >= 2}
