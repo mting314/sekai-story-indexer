@@ -76,6 +76,37 @@ def fetch_area_conversations_command(
     typer.echo(f"Wrote {n} area-conversation talks into {story_root}")
 
 
+@app.command("link-content")
+def link_content_command(
+    story_root: Path = typer.Option(Path("story")),
+    out: Path = typer.Option(None, help="Output path (default: content_parents.json next to story_root)"),
+):
+    """Build content_parents.json (card/area → parent event) so the processor can
+    nest card side-stories and area conversations under their event."""
+    from .source import client
+    from .source.transform import (
+        build_area_event_map,
+        build_card_parent_map,
+        build_content_parents,
+    )
+
+    out = out or (story_root.parent / "content_parents.json")
+    cards_by_id = {c["id"]: c for c in client.cards()}
+    card_map = build_card_parent_map(client.event_cards(), cards_by_id)
+    area_map = build_area_event_map(
+        client.action_sets(), client.release_conditions(), client.event_stories()
+    )
+    events_by_id = {e["id"]: e for e in client.events()}
+    doc = build_content_parents(card_map, area_map, events_by_id)
+    out.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+    ce = sum(1 for v in doc["cards"].values() if v["parent_event_id"])
+    ae = sum(1 for v in doc["areas"].values() if v["parent_event_id"])
+    typer.echo(
+        f"wrote {out}: {len(doc['cards'])} cards ({ce} event-linked), "
+        f"{len(doc['areas'])} area talks ({ae} event-linked)"
+    )
+
+
 @app.command("build-index")
 def build_index_command(
     story_root: Path = typer.Option(Path("story")),

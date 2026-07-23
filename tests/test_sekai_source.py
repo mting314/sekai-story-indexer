@@ -20,6 +20,7 @@ from sekai_story_indexer.source.transform import (
     arc_slug,
     build_area_event_map,
     build_card_parent_map,
+    build_content_parents,
     en_sidecar_path,
     episode_filename,
     focus_character_id,
@@ -141,6 +142,58 @@ def test_build_card_parent_map_earliest_event_when_no_story_flag():
     ]
     m = build_card_parent_map(event_cards, cards_by_id)
     assert m[50]["event_id"] == 7  # no story flag anywhere -> earliest event id
+
+
+def test_build_content_parents_composes_resolvers():
+    card_parent_map = {
+        1042: {"kind": "event", "event_id": 150, "character_id": 17},
+        30: {"kind": "birthday", "event_id": None, "character_id": 3},
+    }
+    area_event_map = {
+        839: {"kind": "event", "event_id": 2, "campaign": None, "scenario_id": "areatalk_ev_night_01_001"},
+        903: {"kind": "campaign", "event_id": None, "campaign": "aprilfool2023", "scenario_id": "areatalk_aprilfool2023_002"},
+        900: {"kind": "permanent", "event_id": None, "campaign": None, "scenario_id": "areatalk02_129"},
+    }
+    events_by_id = {150: {"id": 150, "name": "傷だらけの手で、私達は"}, 2: {"id": 2, "name": "囚われのマリオネット"}}
+    doc = build_content_parents(card_parent_map, area_event_map, events_by_id)
+    assert doc["cards"]["1042"]["parent_event_id"] == 150
+    assert doc["cards"]["1042"]["parent_arc_id"].startswith("0150-")
+    assert doc["cards"]["1042"]["content_group"] == ""      # event-linked -> no group
+    assert doc["cards"]["30"]["parent_event_id"] == 0 and doc["cards"]["30"]["content_group"] == "birthday"
+    # keyed by the SLUGIFIED scenarioId (matches the on-disk talk filename)
+    assert doc["areas"]["areatalk-ev-night-01-001"]["parent_event_id"] == 2
+    assert doc["areas"]["areatalk-aprilfool2023-002"]["content_group"] == "aprilfool2023"
+    assert doc["areas"]["areatalk02-129"]["content_group"] == "permanent"
+
+
+def test_processor_stamps_parent_from_content_parents(tmp_path):
+    import json as _json
+
+    from sekai_story_indexer.indexer.processor import StoryProcessor
+    # a card + an area file under a story tree, plus the parent map next to it
+    root = tmp_path
+    card = root / "story" / "nightcord" / "card" / "1042-x" / "01_a.md"
+    area = root / "story" / "mixed" / "area" / "16-y" / "004_areatalk-aprilfool2023-007.md"
+    for f in (card, area):
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("# 1. t\n\nA: hi\n", encoding="utf-8")
+    (root / "content_parents.json").write_text(_json.dumps({
+        "cards": {"1042": {"parent_event_id": 150, "parent_arc_id": "0150-z", "content_group": ""}},
+        "areas": {"areatalk-aprilfool2023-007": {"parent_event_id": 0, "parent_arc_id": "", "content_group": "aprilfool2023"}},
+    }), encoding="utf-8")
+    cm = StoryProcessor.extract_hierarchy(card)
+    assert cm.content_type == "card" and cm.parent_event_id == 150 and cm.parent_arc_id == "0150-z"
+    am = StoryProcessor.extract_hierarchy(area)
+    assert am.content_type == "area" and am.parent_event_id == 0 and am.content_group == "aprilfool2023"
+
+
+def test_processor_parent_link_noop_without_file(tmp_path):
+    from sekai_story_indexer.indexer.processor import StoryProcessor
+    card = tmp_path / "story" / "leo_need" / "card" / "0001-x" / "01_a.md"
+    card.parent.mkdir(parents=True, exist_ok=True)
+    card.write_text("# 1. t\n\nA: hi\n", encoding="utf-8")
+    m = StoryProcessor.extract_hierarchy(card)  # no content_parents.json present
+    assert m.parent_event_id == 0 and m.parent_arc_id == "" and m.content_group == ""
 
 
 def test_fetch_card_stories_writes_per_card_tree(tmp_path):

@@ -312,6 +312,50 @@ def build_area_event_map(
     return out
 
 
+def build_content_parents(
+    card_parent_map: dict[int, dict],
+    area_event_map: dict[int, dict],
+    events_by_id: dict[int, dict],
+) -> dict:
+    """Compose the two resolvers into the ``content_parents.json`` artifact the
+    processor reads to nest card/area content under its parent event.
+
+    Cards are keyed by ``str(card_id)`` (the processor extracts it from the card
+    dir slug ``NNNN-...``); area talks are keyed by ``scenario_id`` (the processor
+    extracts it from the talk filename ``NNN_<scenarioId>``). Each entry carries the
+    parent event's id + arc slug (for hierarchy grouping), or a ``content_group``
+    for content with no parent event (campaign / birthday / other / permanent).
+    """
+    def arc_of(event_id: int | None) -> str:
+        ev = events_by_id.get(event_id) if event_id else None
+        return arc_slug(event_id, ev.get("name", "")) if ev else ""
+
+    cards: dict[str, dict] = {}
+    for cid, p in card_parent_map.items():
+        eid = p.get("event_id") or 0
+        cards[str(cid)] = {
+            "parent_event_id": eid,
+            "parent_arc_id": arc_of(eid),
+            "content_group": "" if p.get("kind") == "event" else p.get("kind", ""),
+        }
+
+    areas: dict[str, dict] = {}
+    for p in area_event_map.values():
+        sid = p.get("scenario_id")
+        if not sid:
+            continue
+        eid = p.get("event_id") or 0
+        # Key by the SLUGIFIED scenarioId — the fetcher slugifies it into the talk
+        # filename (areatalk_ev_x_001 -> ...areatalk-ev-x-001.md), so this is what the
+        # processor can reconstruct from disk to match this entry.
+        areas[slugify(sid)] = {
+            "parent_event_id": eid,
+            "parent_arc_id": arc_of(eid),
+            "content_group": p.get("campaign") or ("" if p.get("kind") == "event" else "permanent"),
+        }
+    return {"cards": cards, "areas": areas}
+
+
 def song_info(music: dict | None) -> dict:
     """Flatten a ``musics.json`` record into commissioned-song fields."""
     if not music:
