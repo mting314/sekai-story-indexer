@@ -107,6 +107,23 @@ def cards() -> list[dict]:
     return fetch_json(f"{MASTER_DB}/cards.json")
 
 
+def card_episodes() -> list[dict]:
+    """cardEpisodes.json: per-card side stories (2 per card: first_part/second_part),
+    each with ``cardId``, ``scenarioId``, ``assetbundleName``, ``title``, ``seq``."""
+    return fetch_json(f"{MASTER_DB}/cardEpisodes.json")
+
+
+def action_sets() -> list[dict]:
+    """actionSets.json: area conversations, each with ``areaId``, ``characterIds``,
+    ``scenarioId`` (most rows) and ``id`` (drives the asset group folder)."""
+    return fetch_json(f"{MASTER_DB}/actionSets.json")
+
+
+def areas() -> list[dict]:
+    """areas.json: id -> {name, assetbundleName, ...} for area-conversation labels."""
+    return fetch_json(f"{MASTER_DB}/areas.json")
+
+
 # --- asset CDN --------------------------------------------------------------
 
 def event_scenario(asset_bundle: str, scenario_id: str) -> dict:
@@ -117,6 +134,25 @@ def event_scenario(asset_bundle: str, scenario_id: str) -> dict:
 def unit_story_scenario(chapter_asset_bundle: str, scenario_id: str) -> dict:
     """Unit-story scenario asset. Path keyed by the CHAPTER's assetbundleName."""
     url = f"{ASSET_CDN}/scenario/unitstory/{chapter_asset_bundle}/{scenario_id}.asset"
+    return fetch_json(url)
+
+
+def card_story_scenario(card_asset_bundle: str, scenario_id: str) -> dict:
+    """Card side-story scenario asset. Path keyed by the CARD's assetbundleName
+    (``character/member/<bundle>/<scenarioId>.asset``)."""
+    url = f"{ASSET_CDN}/character/member/{card_asset_bundle}/{scenario_id}.asset"
+    return fetch_json(url)
+
+
+def _actionset_group(action_set_id: int) -> int:
+    """Area-talk scenarios are foldered by ``group<id//100>`` on the CDN."""
+    return action_set_id // 100
+
+
+def area_scenario(action_set_id: int, scenario_id: str) -> dict:
+    """Area-conversation scenario asset
+    (``scenario/actionset/group<id//100>/<scenarioId>.asset``)."""
+    url = f"{ASSET_CDN}/scenario/actionset/group{_actionset_group(action_set_id)}/{scenario_id}.asset"
     return fetch_json(url)
 
 
@@ -137,6 +173,24 @@ def en_event_scenario(asset_bundle: str, scenario_id: str) -> dict:
 def en_unit_story_scenario(chapter_asset_bundle: str, scenario_id: str) -> dict:
     """Official-EN unit-story scenario asset. Returns {} when not yet localized."""
     url = f"{EN_ASSET_CDN}/scenario/unitstory/{chapter_asset_bundle}/{scenario_id}.asset"
+    try:
+        return fetch_json(url)
+    except Exception:
+        return {}
+
+
+def en_card_story_scenario(card_asset_bundle: str, scenario_id: str) -> dict:
+    """Official-EN card side-story scenario asset. Returns {} when not localized."""
+    url = f"{EN_ASSET_CDN}/character/member/{card_asset_bundle}/{scenario_id}.asset"
+    try:
+        return fetch_json(url)
+    except Exception:
+        return {}
+
+
+def en_area_scenario(action_set_id: int, scenario_id: str) -> dict:
+    """Official-EN area-conversation scenario asset. Returns {} when not localized."""
+    url = f"{EN_ASSET_CDN}/scenario/actionset/group{_actionset_group(action_set_id)}/{scenario_id}.asset"
     try:
         return fetch_json(url)
     except Exception:

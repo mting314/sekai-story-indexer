@@ -4,6 +4,8 @@ from sekai_story_indexer.indexer.processor import StoryProcessor
 from sekai_story_indexer.query.official_en import load_official_en
 from sekai_story_indexer.source.assets import event_logo_url, music_jacket_url
 from sekai_story_indexer.source.fetcher import (
+    fetch_area_conversations,
+    fetch_card_stories,
     fetch_unit_stories,  # noqa: F401  (import sanity)
     plan_event,
     story_order_doc,
@@ -64,6 +66,55 @@ def test_scenario_to_lines_extracts_speaker_and_body():
         ]
     }
     assert scenario_to_lines(scenario) == [("こはね", "おはよう みんな"), ("", "……")]
+
+
+def test_fetch_card_stories_writes_per_card_tree(tmp_path):
+    cards_rows = [{"id": 1, "characterId": 1, "prefix": "card one"}]  # char 1 = leo_need
+    episode_rows = [
+        {"id": 2, "cardId": 1, "seq": 2, "title": "b", "scenarioId": "s2",
+         "assetbundleName": "res001", "cardEpisodePartType": "second_part"},
+        {"id": 1, "cardId": 1, "seq": 1, "title": "a", "scenarioId": "s1",
+         "assetbundleName": "res001", "cardEpisodePartType": "first_part"},
+    ]
+    seen: list[tuple[str, str]] = []
+
+    def fake(bundle, sid):
+        seen.append((bundle, sid))
+        return {"TalkData": [{"WindowDisplayName": "一歌", "Body": "line"}]}
+
+    n = fetch_card_stories(
+        tmp_path, cards_rows=cards_rows, episode_rows=episode_rows,
+        scenario_fetch=fake, en_scenario_fetch=lambda *a: {}, log=lambda *_: None,
+    )
+    assert n == 2
+    card_dirs = list((tmp_path / "leo_need" / "card").iterdir())
+    assert len(card_dirs) == 1 and card_dirs[0].name.startswith("0001-")
+    files = sorted(p.name for p in card_dirs[0].glob("*.md"))
+    assert files[0].startswith("01_") and files[1].startswith("02_")  # part order
+    assert seen == [("res001", "s1"), ("res001", "s2")]  # fetched in seq order
+
+
+def test_fetch_area_conversations_resolves_unit_and_skips_scenarioless(tmp_path):
+    area_rows = [{"id": 4, "name": "area name"}]
+    action_set_rows = [
+        {"id": 5, "areaId": 4, "scenarioId": "as_a", "characterIds": [1]},      # leo_need
+        {"id": 6, "areaId": 4, "scenarioId": "as_b", "characterIds": [1, 5]},   # spans units -> mixed
+        {"id": 7, "areaId": 4, "scriptId": "x"},                                 # no scenarioId -> skipped
+    ]
+    seen: list[tuple[int, str]] = []
+
+    def fake(aid, sid):
+        seen.append((aid, sid))
+        return {"TalkData": [{"WindowDisplayName": "", "Body": "hi"}]}
+
+    n = fetch_area_conversations(
+        tmp_path, area_rows=area_rows, action_set_rows=action_set_rows,
+        scenario_fetch=fake, en_scenario_fetch=lambda *a: {}, log=lambda *_: None,
+    )
+    assert n == 2  # the scenarioId-less actionSet is skipped
+    assert seen == [(5, "as_a"), (6, "as_b")]  # area-talk id rides through to the scenario fetch
+    assert list((tmp_path / "leo_need" / "area").rglob("001_*.md"))   # single-unit talk
+    assert list((tmp_path / "mixed" / "area").rglob("002_*.md"))      # cross-unit talk -> mixed
 
 
 def test_render_episode_markdown_uses_scene_delimiter():

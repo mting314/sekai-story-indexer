@@ -50,6 +50,32 @@ def fetch_unit_stories_command(story_root: Path = typer.Option(Path("story"))):
     typer.echo(f"Wrote {n} unit-story episodes into {story_root}")
 
 
+@app.command("fetch-card-stories")
+def fetch_card_stories_command(
+    story_root: Path = typer.Option(Path("story")),
+    limit: int = typer.Option(0, help="Only the first N cards (0 = all ~1350 cards)."),
+    skip_existing: bool = typer.Option(True, help="Resume: skip episodes already on disk."),
+):
+    """Fetch per-card side-stories into story/<unit>/card/… (2 episodes per card)."""
+    from .source.fetcher import fetch_card_stories
+
+    n = fetch_card_stories(story_root, limit=limit or None, skip_existing=skip_existing)
+    typer.echo(f"Wrote {n} card-story episodes into {story_root}")
+
+
+@app.command("fetch-area-conversations")
+def fetch_area_conversations_command(
+    story_root: Path = typer.Option(Path("story")),
+    limit: int = typer.Option(0, help="Only the first N areas (0 = all)."),
+    skip_existing: bool = typer.Option(True, help="Resume: skip talks already on disk."),
+):
+    """Fetch area conversations into story/<unit>/area/… (one file per actionSet)."""
+    from .source.fetcher import fetch_area_conversations
+
+    n = fetch_area_conversations(story_root, limit=limit or None, skip_existing=skip_existing)
+    typer.echo(f"Wrote {n} area-conversation talks into {story_root}")
+
+
 @app.command("build-index")
 def build_index_command(
     story_root: Path = typer.Option(Path("story")),
