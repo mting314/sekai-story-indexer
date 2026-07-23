@@ -102,6 +102,9 @@ def test_event_scope_includes_nested_card_children(tmp_path):
     # but not an unrelated event
     arcs = {eng.nodes[i].metadata.arc_id for i in eng._candidate_indices(None, "0150-ena5")}
     assert {"0150-ena5", "1042-x"} <= arcs and "0001-other" not in arcs
+    # include_children=False keeps the scope to the event's OWN scenes (count path)
+    own = {eng.nodes[i].metadata.arc_id for i in eng._candidate_indices(None, "0150-ena5", include_children=False)}
+    assert "0150-ena5" in own and "1042-x" not in own
     # a token unique to the card surfaces when scoped to the parent event
     r = eng.query("zebrafish marmalade", event_id=150)
     assert any(c["arc_id"] == "1042-x" for c in r["citations"])
