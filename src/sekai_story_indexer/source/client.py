@@ -146,8 +146,9 @@ def unit_story_scenario(chapter_asset_bundle: str, scenario_id: str) -> dict:
 
 
 def card_story_scenario(card_asset_bundle: str, scenario_id: str) -> dict:
-    """Card side-story scenario asset. Path keyed by the CARD's assetbundleName
-    (``character/member/<bundle>/<scenarioId>.asset``)."""
+    """Card side-story scenario asset, at ``character/member/<bundle>/<scenarioId>.asset``.
+    ``bundle`` is the ``cardEpisodes`` row's ``assetbundleName`` (which the fetcher
+    passes); it normally equals the card's own bundle."""
     url = f"{ASSET_CDN}/character/member/{card_asset_bundle}/{scenario_id}.asset"
     return fetch_json(url)
 

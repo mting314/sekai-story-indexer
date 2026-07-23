@@ -210,7 +210,8 @@ def build_card_parent_map(
     for cid, rows in rows_by_card.items():
         displayed = [r for r in rows if r.get("isDisplayCardStory")]
         # Primary event: prefer a story-displaying row, then the earliest event id.
-        primary = min(displayed or rows, key=lambda r: r.get("eventId", 1 << 30))
+        # `or (1<<30)` (not a dict default) so an explicit null eventId can't crash min().
+        primary = min(displayed or rows, key=lambda r: r.get("eventId") or (1 << 30))
         out[cid] = {
             "kind": "event",
             "event_id": primary.get("eventId"),
@@ -333,10 +334,15 @@ def build_content_parents(
     cards: dict[str, dict] = {}
     for cid, p in card_parent_map.items():
         eid = p.get("event_id") or 0
+        kind = p.get("kind")
+        # event-linked with a resolved id -> nested (no group); event-linked but the
+        # id didn't resolve -> group 'other' rather than silently orphaning it;
+        # birthday/other -> their own group.
+        group = "" if (kind == "event" and eid) else ("other" if kind == "event" else kind or "")
         cards[str(cid)] = {
             "parent_event_id": eid,
             "parent_arc_id": arc_of(eid),
-            "content_group": "" if p.get("kind") == "event" else p.get("kind", ""),
+            "content_group": group,
         }
 
     areas: dict[str, dict] = {}
@@ -345,13 +351,17 @@ def build_content_parents(
         if not sid:
             continue
         eid = p.get("event_id") or 0
+        # resolved event -> nested (no group); otherwise keep the campaign tag, or
+        # derive one from the scenarioId (covers an event_story-gated talk whose
+        # episode id didn't resolve), else 'permanent'. Never silently orphan.
+        group = "" if eid else (p.get("campaign") or area_campaign_tag(sid) or "permanent")
         # Key by the SLUGIFIED scenarioId — the fetcher slugifies it into the talk
         # filename (areatalk_ev_x_001 -> ...areatalk-ev-x-001.md), so this is what the
         # processor can reconstruct from disk to match this entry.
         areas[slugify(sid)] = {
             "parent_event_id": eid,
             "parent_arc_id": arc_of(eid),
-            "content_group": p.get("campaign") or ("" if p.get("kind") == "event" else "permanent"),
+            "content_group": group,
         }
     return {"cards": cards, "areas": areas}
 

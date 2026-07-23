@@ -166,6 +166,31 @@ def test_build_content_parents_composes_resolvers():
     assert doc["areas"]["areatalk02-129"]["content_group"] == "permanent"
 
 
+def test_build_content_parents_no_silent_orphans_on_unresolved_event():
+    # event-kind entries whose event_id didn't resolve must still get a group,
+    # never {parent_event_id:0, content_group:""} (which is indistinguishable from
+    # unlinked content and drops out of both hierarchy and campaign grouping).
+    card_parent_map = {77: {"kind": "event", "event_id": None, "character_id": 1}}
+    area_event_map = {
+        88: {"kind": "event", "event_id": None, "campaign": None, "scenario_id": "areatalk_ev_x_001"},
+    }
+    doc = build_content_parents(card_parent_map, area_event_map, events_by_id={})
+    assert doc["cards"]["77"] == {"parent_event_id": 0, "parent_arc_id": "", "content_group": "other"}
+    # area falls back to a campaign tag derived from the scenarioId (ev_x)
+    assert doc["areas"]["areatalk-ev-x-001"]["content_group"] == "ev_x"
+
+
+def test_build_card_parent_map_survives_null_event_id():
+    # an explicit null eventId row must not crash min() during the tie-break
+    cards_by_id = {5: {"id": 5, "characterId": 1, "cardRarityType": "rarity_4"}}
+    event_cards = [
+        {"cardId": 5, "eventId": None, "isDisplayCardStory": False},
+        {"cardId": 5, "eventId": 8, "isDisplayCardStory": False},
+    ]
+    m = build_card_parent_map(event_cards, cards_by_id)
+    assert m[5]["event_id"] == 8  # the real id wins over the null
+
+
 def test_processor_stamps_parent_from_content_parents(tmp_path):
     import json as _json
 

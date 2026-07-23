@@ -9,7 +9,9 @@ from .parser import StoryParser
 
 
 @lru_cache(maxsize=16)
-def _load_content_parents_cached(path_str: str) -> dict:
+def _load_content_parents_cached(path_str: str, _mtime: float) -> dict:
+    # _mtime is part of the cache key: a regenerated file (new mtime) is a cache
+    # miss, so a long-lived `serve` process that re-links picks up the new map.
     try:
         return json.loads(Path(path_str).read_text(encoding="utf-8"))
     except Exception:
@@ -30,7 +32,9 @@ def _content_parents_for(file_path: Path) -> dict:
     # processor run can't leak one tree's parents onto another.
     root = Path(*parts[:story_idx]) if story_idx > 0 else Path(".")
     cand = root / "content_parents.json"
-    return _load_content_parents_cached(str(cand)) if cand.exists() else {}
+    if not cand.exists():
+        return {}
+    return _load_content_parents_cached(str(cand), cand.stat().st_mtime)
 
 
 def _parent_link(file_path: Path, content_type: str, arc_id: str, ep_name: str) -> tuple[int, str, str]:
