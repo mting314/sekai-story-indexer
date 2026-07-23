@@ -35,6 +35,47 @@ def client():
     return TestClient(server_module.app)
 
 
+def test_scoped_event_intercept_answers_from_summary(tmp_path, monkeypatch):
+    """Analytical quick-actions ('focus character' / 'conclusion' / 'summarize this
+    event') are answered from the scoped event's summary + focus metadata — keyed off
+    event_id OR the sticky focus — instead of drifting to extractive opening quotes."""
+    import importlib
+    import json as _json
+
+    from webapp import server as srv
+    from webapp.sessions import Focus
+
+    importlib.reload(srv)
+    ev = {"event_id": 19, "arc_slug": "0019-x", "name": "Secret Distance", "nickname": "mizu1",
+          "focus_character_id": 20, "focus_character": "暁山瑞希"}
+    summary = ("Overview:\nThe group takes a trip; it resolves happily.\n\n"
+               "Character Trajectories:\n- Mizuki Akiyama: organizes the tour.\n\n"
+               "Continuity Facts:\n- They grow closer.\n")
+    cache = tmp_path / "summaries_cache.json"
+    cache.write_text(_json.dumps({"EVENT|0019-x": {"summary": summary}}), encoding="utf-8")
+    monkeypatch.setattr(srv, "load_events", lambda: [ev])
+    monkeypatch.setattr(srv, "_hierarchical_cache_path", lambda: cache)
+    monkeypatch.setattr(srv, "_characters_meta", lambda: {"20": {"en": "Mizuki Akiyama"}})
+
+    # focus character via a HARD event_id scope
+    req = srv.QueryRequest(question="Who is the focus character of this event, and what is their arc?", event_id=19)
+    out = srv._scoped_event_intercept(req, None)
+    assert out and out["intent"] == "focus_character"
+    assert "Mizuki Akiyama" in out["answer"] and out["backend"] == "summary"
+
+    # conclusion via STICKY focus (no event_id) — the exact failure mode that drifted
+    req2 = srv.QueryRequest(question="What happens at the end of this event?")
+    out2 = srv._scoped_event_intercept(req2, Focus(arcs=("0019-x",)))
+    assert out2 and out2["intent"] == "conclusion" and "resolves happily" in out2["answer"]
+
+    # a genuine needle question is NOT intercepted (falls through to retrieval)
+    req3 = srv.QueryRequest(question="What did Mizuki say to Kanade in the taxi?", event_id=19)
+    assert srv._scoped_event_intercept(req3, None) is None
+
+    # no scoped event at all -> not intercepted
+    assert srv._scoped_event_intercept(srv.QueryRequest(question="summarize this event"), None) is None
+
+
 def test_health(client):
     r = client.get("/api/health")
     assert r.status_code == 200
