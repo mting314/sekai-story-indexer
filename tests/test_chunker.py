@@ -76,7 +76,10 @@ def test_chunks_do_not_cross_file_or_part_boundaries(tmp_path: Path) -> None:
 
 
 def test_abyss_regression_produces_fewer_retrieval_chunks() -> None:
-    abyss_path = next(Path("story").rglob("*.md"))
+    # Use the committed sample fixture (not the full story/ corpus, which is no
+    # longer checked in) — any real multi-scene episode exercises the chunker.
+    sample = Path(__file__).resolve().parent.parent / "sample" / "story"
+    abyss_path = next(p for p in sorted(sample.rglob("*.md")) if not p.name.endswith(".md.en"))
     raw_nodes = StoryProcessor.process_file(abyss_path)
 
     chunks = build_retrieval_chunks(raw_nodes)
