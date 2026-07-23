@@ -80,11 +80,14 @@ def test_glossary_bridge_enables_cross_lingual_query(tmp_path):
 
 def test_event_scope_includes_nested_card_children(tmp_path):
     story = tmp_path / "story"
-    ev = story / "nightcord" / "event" / "0150-ena5"; ev.mkdir(parents=True)
+    ev = story / "nightcord" / "event" / "0150-ena5"
+    ev.mkdir(parents=True)
     (ev / "01.md").write_text("# 1\n\nKanade: the parent event episode.\n", encoding="utf-8")
-    cd = story / "nightcord" / "card" / "1042-x"; cd.mkdir(parents=True)
+    cd = story / "nightcord" / "card" / "1042-x"
+    cd.mkdir(parents=True)
     (cd / "01.md").write_text("# 1\n\nKanade: zebrafish marmalade keepsake.\n", encoding="utf-8")
-    other = story / "leo_need" / "event" / "0001-other"; other.mkdir(parents=True)
+    other = story / "leo_need" / "event" / "0001-other"
+    other.mkdir(parents=True)
     (other / "01.md").write_text("# 1\n\nIchika: an unrelated event.\n", encoding="utf-8")
     (tmp_path / "content_parents.json").write_text(json.dumps({
         "cards": {"1042": {"parent_event_id": 150, "parent_arc_id": "0150-ena5", "content_group": ""}},
