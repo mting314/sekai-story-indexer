@@ -78,6 +78,35 @@ def test_glossary_bridge_enables_cross_lingual_query(tmp_path):
     assert r["citations"][0]["arc_id"] == "0002-x"
 
 
+def test_event_scope_includes_nested_card_children(tmp_path):
+    story = tmp_path / "story"
+    ev = story / "nightcord" / "event" / "0150-ena5"; ev.mkdir(parents=True)
+    (ev / "01.md").write_text("# 1\n\nKanade: the parent event episode.\n", encoding="utf-8")
+    cd = story / "nightcord" / "card" / "1042-x"; cd.mkdir(parents=True)
+    (cd / "01.md").write_text("# 1\n\nKanade: zebrafish marmalade keepsake.\n", encoding="utf-8")
+    other = story / "leo_need" / "event" / "0001-other"; other.mkdir(parents=True)
+    (other / "01.md").write_text("# 1\n\nIchika: an unrelated event.\n", encoding="utf-8")
+    (tmp_path / "content_parents.json").write_text(json.dumps({
+        "cards": {"1042": {"parent_event_id": 150, "parent_arc_id": "0150-ena5", "content_group": ""}},
+        "areas": {},
+    }), encoding="utf-8")
+    idx = [
+        {"event_id": 150, "arc_slug": "0150-ena5", "indexed": True, "unit": "nightcord"},
+        {"event_id": 1, "arc_slug": "0001-other", "indexed": True, "unit": "leo_need"},
+    ]
+    eng = build_local_engine(story, idx)
+    # the processor stamped the card's parent event through build_local_engine
+    card = [n for n in eng.nodes if n.metadata.content_type == "card"]
+    assert card and card[0].metadata.parent_arc_id == "0150-ena5"
+    # scoping to the event pulls in its own episode AND the nested card child,
+    # but not an unrelated event
+    arcs = {eng.nodes[i].metadata.arc_id for i in eng._candidate_indices(None, "0150-ena5")}
+    assert {"0150-ena5", "1042-x"} <= arcs and "0001-other" not in arcs
+    # a token unique to the card surfaces when scoped to the parent event
+    r = eng.query("zebrafish marmalade", event_id=150)
+    assert any(c["arc_id"] == "1042-x" for c in r["citations"])
+
+
 def test_aux_query_bridges_arbitrary_vocabulary(tmp_path):
     # A word NOT in any glossary (kinship etc.) reaches the JP scene only via the
     # translated aux_query — proving the query-translation bridge that replaced the
