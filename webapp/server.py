@@ -968,6 +968,19 @@ def _log_turn(rec: dict) -> None:
 
 
 _SUMMARIZE_RE = re.compile(r"\b(summar(?:y|ize|ise)|recap|overview|tl;?dr|synops)", re.IGNORECASE)
+# Analytical intents about the FOCUSED event that the extractive backend can't
+# answer by quote-picking — routed to the event's pre-built summary + metadata.
+_FOCUS_CHAR_RE = re.compile(
+    r"\bfocus character\b|who(?:'s| is| are) the (?:main|focus|central|lead)\b|"
+    r"whose (?:event|story|arc) is this",
+    re.IGNORECASE,
+)
+_CONCLUSION_RE = re.compile(
+    r"\bconclusion\b|\bfinale\b|what happens (?:at|in|by) the end|"
+    r"how (?:does|did) (?:it|this|the (?:event|story|arc)) (?:end|conclude|wrap up|resolve)|"
+    r"\bend(?:ing)? of (?:this|the) (?:event|story|arc)\b",
+    re.IGNORECASE,
+)
 
 
 def _summarize_intercept(question: str) -> dict | None:
@@ -1001,6 +1014,70 @@ def _summarize_intercept(question: str) -> dict | None:
                 "nickname": ev.get("nickname"), "excerpt": summary,
             }],
             "intent": "summarize", "backend": "summary", "error": None,
+        }
+    except Exception:
+        return None
+
+
+def _scoped_event_intercept(req: QueryRequest, prev: Focus | None) -> dict | None:
+    """Analytical questions ABOUT the focused event — 'summarize this event', 'who's
+    the focus character', 'what's the conclusion' — answered from the event's
+    pre-built summary + structured focus metadata instead of extractive quote-picking
+    (which can't answer them and, keyless, just returns the opening quotes).
+
+    Keys off the SCOPED event (explicit event_id, else the sticky conversation
+    focus), not the question text, since these phrasings say 'this event'. Genuine
+    needle questions ('what did X say about Y') don't match the intent patterns and
+    fall through to normal scoped retrieval."""
+    q = req.question
+    want_sum = bool(_SUMMARIZE_RE.search(q))
+    want_focus = bool(_FOCUS_CHAR_RE.search(q))
+    want_concl = bool(_CONCLUSION_RE.search(q))
+    if not (want_sum or want_focus or want_concl):
+        return None
+    try:
+        events = load_events()
+        ev = None
+        if req.event_id:
+            ev = next((e for e in events if e.get("event_id") == req.event_id), None)
+        if ev is None and prev and prev.arcs:
+            ev = next((e for e in events if e.get("arc_slug") == prev.arcs[0]), None)
+        if not ev:
+            return None  # no scoped event -> let the normal path handle it
+        arc = ev.get("arc_slug")
+        path = _hierarchical_cache_path()
+        cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        entry = cache.get(f"EVENT|{arc}")
+        summary = (entry.get("summary") if isinstance(entry, dict) else entry) or ""
+        if not summary.strip():
+            return None  # no summary to answer from -> fall through to retrieval
+
+        from sekai_story_indexer.indexer.summary_sections import extract_summary_sections
+
+        sections = extract_summary_sections(summary)
+        name, nick = ev.get("name"), ev.get("nickname")
+        if want_focus and not want_sum:
+            fc = (_characters_meta().get(str(ev.get("focus_character_id"))) or {}).get("en") \
+                or ev.get("focus_character") or "not clearly defined"
+            traj = sections.get("Character Trajectories") or summary
+            body = (f"The focus character of {name}" + (f" [{nick}]" if nick else "")
+                    + f" is {fc}.\n\nCharacter Trajectories:\n{traj}")
+            label, intent = f"{name} — focus character", "focus_character"
+        elif want_concl and not want_sum:
+            chunks = [c for c in (sections.get("Overview"), sections.get("Continuity Facts")) if c]
+            body = (f"How {name} concludes:\n\n" + "\n\n".join(chunks)) if chunks else summary
+            label, intent = f"{name} — conclusion", "conclusion"
+        else:  # summarize this (scoped) event
+            body, label, intent = summary, f"{name} — event summary", "summarize"
+        return {
+            "answer": body,
+            "answer_parts": [{"type": "text", "text": body}],
+            "characters": [],
+            "citations": [{
+                "ref": 1, "arc_id": arc, "label": label,
+                "episode_title": "Event summary", "nickname": nick, "excerpt": summary,
+            }],
+            "intent": intent, "backend": "summary", "error": None,
         }
     except Exception:
         return None
@@ -1096,6 +1173,18 @@ def _resolve_request(
         )) if arcs else prev
         return sm, (), focus, {**log, "route": "summarize",
                                "citations": len(sm.get("citations") or [])}, False
+    # Analytical question about the FOCUSED event (focus character / conclusion /
+    # 'summarize this event') -> answer from its summary + metadata, keyed off the
+    # scoped/sticky event rather than the question text.
+    se = _scoped_event_intercept(req, prev)
+    if se is not None:
+        arcs = tuple(c.get("arc_id") for c in (se.get("citations") or []) if c.get("arc_id"))
+        focus = _remember_focus(req.session_id, Focus(
+            arcs=arcs, character_id=prev.character_id if prev else None,
+            label=(se.get("citations") or [{}])[0].get("label"),
+        )) if arcs else prev
+        return se, (), focus, {**log, "route": "scoped_event", "intent": se.get("intent"),
+                               "citations": len(se.get("citations") or [])}, False
 
     # Content path. Union of arcs the question references (so comparisons aren't
     # locked to one), plus the focus-resolved event. References are matched by
