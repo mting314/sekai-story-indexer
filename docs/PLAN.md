@@ -201,6 +201,19 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   thinking, ~82% cheaper, and actually honored unlike `thinking_budget`), with a
   retry that drops `thinking_config` if a model rejects `thinking_level`.
   `query/generate.py`.
+* **Live transcript fetch on the deployed site — no corpus in the repo (TODO).**
+  Now that `story/` is untracked (copyrighted prose isn't checked in), a deployed
+  site must obtain verbatim quotes / direct story references by fetching lines
+  **live from sekai.best at click-time**, not by bundling transcripts. The infra
+  largely exists — see `docs/derived-hosting.md`: `scene_sources.json`
+  (`"arc/episode" -> {bundle, scenario_id, region}` — coords, NOT prose),
+  `GET /api/scene`, and the UI's `openLiveScene`. TODO: validate end-to-end with
+  real egress; ensure **every** citation carries live-fetch coords — events **and**
+  card/area (their bundle/scenario ids: card `character/member/<bundle>/<sid>`,
+  area `scenario/actionset/group<id//100>/<sid>`); make live-fetch the default
+  quote path when `story/` is absent, falling back to the on-disk `.md`/`.md.en`
+  for local dev. Lets the site show direct story references without rehosting
+  SEGA/Colorful Palette's text.
 * **Continuous daily ingestion + incremental re-embed (deferred).** The game ships
   a new event ~every 15 days; stand up a scheduled job that fetches new events
   (`indexer fetch --skip-existing`), ingests + embeds only the deltas (the
