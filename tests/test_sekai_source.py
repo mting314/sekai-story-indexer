@@ -106,11 +106,31 @@ def test_build_area_event_map_links_via_event_story_condition():
         {"id": 901, "scenarioId": "areatalk_ev_x_001", "releaseConditionId": 600},            # event but unresolved
         {"id": 902, "scriptId": "no_scenario"},                                                # skipped (no scenarioId)
     ]
+    action_sets += [
+        # campaign talk: no event_story condition, but scenarioId is April-Fool-tagged
+        {"id": 903, "scenarioId": "areatalk_aprilfool2022_002", "releaseConditionId": 500},
+        # movie/theater talk gated by serial code (permanent condition) but ev-tagged
+        {"id": 904, "scenarioId": "areatalk_ev_theater_037", "releaseConditionId": 500},
+    ]
     m = build_area_event_map(action_sets, release_conditions, event_stories)
     assert 902 not in m  # no scenarioId -> excluded
-    assert m[839] == {"kind": "event", "event_id": 2, "scenario_id": "areatalk_ev_night_01_001"}
-    assert m[900]["kind"] == "permanent" and m[900]["event_id"] is None
+    assert m[839] == {"kind": "event", "event_id": 2, "campaign": None, "scenario_id": "areatalk_ev_night_01_001"}
     assert m[901]["kind"] == "event" and m[901]["event_id"] is None  # event-gated but episode unknown
+    # areatalk02_129 is generic base chatter -> permanent (NOT mislabeled)
+    assert m[900]["kind"] == "permanent" and m[900]["campaign"] is None
+    # campaign-tagged talks are recovered from the "permanent" bucket by scenarioId
+    assert m[903]["kind"] == "campaign" and m[903]["campaign"] == "aprilfool2022"
+    assert m[904]["kind"] == "campaign" and m[904]["campaign"] == "ev_theater"
+
+
+def test_area_campaign_tag_ignores_generic_chatter():
+    from sekai_story_indexer.source.transform import area_campaign_tag
+    assert area_campaign_tag("areatalk03_121") is None
+    assert area_campaign_tag("op_02area") is None
+    assert area_campaign_tag("areatalk_aprilfool2023_007") == "aprilfool2023"
+    assert area_campaign_tag("areatalk_3rdaniv_098") == "3rdaniv"
+    assert area_campaign_tag("areatalk_ev_theater_037") == "ev_theater"
+    assert area_campaign_tag("areatalk_wl_wonder_01_001") == "wl_wonder_01"
 
 
 def test_build_card_parent_map_earliest_event_when_no_story_flag():

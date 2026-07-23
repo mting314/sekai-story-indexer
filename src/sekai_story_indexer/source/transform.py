@@ -231,25 +231,56 @@ def build_card_parent_map(
     return out
 
 
+def area_campaign_tag(scenario_id: str) -> str | None:
+    """Campaign/special-event tag for an area talk's scenarioId, or ``None`` for
+    generic base chatter.
+
+    Some area talks belong to a campaign or special event (April Fool, an
+    anniversary, the movie, a World Link sub-event) but unlock via serial code /
+    action-set chaining rather than an ``event_story`` condition — so they can't be
+    tied to a numbered event, yet they DO form a coherent group. This reads that
+    group from the scenarioId (e.g. ``areatalk_ev_theater_037`` -> ``"ev_theater"``,
+    ``areatalk_aprilfool2022_002`` -> ``"aprilfool2022"``, ``areatalk_3rdaniv_001``
+    -> ``"3rdaniv"``). The generic living-world chatter (``areatalk03_121``,
+    ``op_02area``) has no campaign and returns ``None``.
+    """
+    s = scenario_id.replace("-", "_")
+    is_campaign = ("_ev_" in s) or ("aprilfool" in s) or ("aniv" in s) or bool(re.search(r"(^|_)wl_", s))
+    if not is_campaign:
+        return None
+    stem = re.sub(r"_\d+$", "", s)          # drop the trailing sequence number
+    stem = re.sub(r"^areatalk_?", "", stem)  # drop the generic areatalk marker
+    return stem or None
+
+
 def build_area_event_map(
     action_sets: list[dict],
     release_conditions: list[dict],
     event_stories: list[dict],
 ) -> dict[int, dict]:
-    """Resolve each area talk's parent event, for nesting area conversations.
+    """Resolve each area talk's parent for nesting area conversations.
 
-    Area talks have no ``eventCards``-style FK. The authoritative link is the
-    talk's unlock condition: an ``event_story`` releaseCondition gates the talk on
-    reading a specific event-story episode, so its ``releaseConditionTypeId`` (an
-    ``eventStoryEpisode`` id) resolves through ``eventStories`` to that episode's
-    ``eventId``. Talks with any other condition (``none`` / ``action_set`` /
-    ``processed_serial_code`` / ``read_all_action_set_in_group``) are permanent
-    location flavor with no event parent.
+    Area talks have no ``eventCards``-style FK. Classification, in precedence:
 
-    Returns ``{action_set_id: {"kind", "event_id", "scenario_id"}}`` for talks that
-    carry a ``scenarioId``. ``kind`` is ``"event" | "permanent"``; ``event_id`` is
-    the parent event (``None`` for permanent, or if an event_story episode id can't
-    be resolved).
+    1. **event** — an ``event_story`` releaseCondition gates the talk on reading a
+       specific event-story episode, whose id resolves through ``eventStories`` to
+       an ``eventId``. This is the authoritative, exact link.
+    2. **campaign** — otherwise, if the scenarioId carries a campaign/special-event
+       tag (April Fool, anniversary, movie, World Link — see ``area_campaign_tag``).
+       These unlock via serial code / action-set chaining, so there's no numbered
+       event to point at, but they form a coherent group (``campaign`` field).
+    3. **permanent** — generic living-world chatter (``areatalk0N`` / ``op_``,
+       "owned from the start"), no event.
+
+    Returns ``{action_set_id: {"kind", "event_id", "campaign", "scenario_id"}}`` for
+    talks carrying a ``scenarioId``. ``kind`` is ``"event" | "campaign" |
+    "permanent"``; ``event_id`` is set only for ``event``, ``campaign`` only for
+    ``campaign``.
+
+    NOTE: classification is deliberately by unlock-condition + scenarioId tag, NOT
+    by cross-filling a scenarioId prefix from resolved talks — the generic
+    ``areatalk0N`` prefix is shared across events, so prefix cross-fill mislabels
+    base chatter (e.g. tagging all ``areatalk03_*`` with one event).
     """
     rc_by_id = {r["id"]: r for r in release_conditions}
     episode_to_event: dict[int, int] = {}
@@ -269,10 +300,15 @@ def build_area_event_map(
             out[act["id"]] = {
                 "kind": "event",
                 "event_id": episode_to_event.get(rc.get("releaseConditionTypeId")),
+                "campaign": None,
                 "scenario_id": sid,
             }
+            continue
+        campaign = area_campaign_tag(sid)
+        if campaign:
+            out[act["id"]] = {"kind": "campaign", "event_id": None, "campaign": campaign, "scenario_id": sid}
         else:
-            out[act["id"]] = {"kind": "permanent", "event_id": None, "scenario_id": sid}
+            out[act["id"]] = {"kind": "permanent", "event_id": None, "campaign": None, "scenario_id": sid}
     return out
 
 
