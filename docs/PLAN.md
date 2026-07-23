@@ -165,20 +165,25 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   `sekai fetch-unit-stories` → `story/<unit>/unit/…`, tested); non-event content
   is always-queryable. Card side-stories + Area conversations: modeled/scaffolded,
   fetch flows not yet built (raised — same pattern as unit stories).
-  - **TODO: fetch + summarize card side-stories and area conversations.** Build
-    the fetch flows (mirror `fetch_unit_stories`): card side-stories from
-    `cards.json` / `cardEpisodes.json` (each card has 2 episodes) → asset scenario;
-    area conversations from `actionSets.json` / `areas.json` (short map talks).
-    Write into the tree as new content types (`story/<unit>/card/…`,
-    `story/<unit>/area/…`), then run the same bottom-up summarizer over them so
-    they're retrievable/queryable like events.
-  - **Event-linkage (do after the fetch lands):** many card stories and area
-    talks tie into a specific event (limited cards released with an event;
-    seasonal/event area talks). Capture that link in metadata (e.g. `event_id` on
-    the card/area node via `eventCards` / release timing) so retrieval and
-    summaries can cross-reference the parent event, and the event summary can note
-    its associated card/area content. Add as a follow-up TODO once the raw
-    fetch+summarize is working.
+  - **Fetch flows — DONE (PR #40).** `sekai fetch-card-stories` (card side-stories
+    from `cards.json`/`cardEpisodes.json`, 2 parts/card, →`story/<unit>/card/…`) and
+    `sekai fetch-area-conversations` (area talks from `actionSets.json`/`areas.json`,
+    →`story/<unit>/area/…`), both with EN sidecars + `--skip-existing`. Asset paths:
+    card `character/member/<bundle>/<sid>.asset`, area
+    `scenario/actionset/group<id//100>/<sid>.asset`. **Not yet run at full scale**
+    (~2.7k card + ~2.8k area episodes) and **not yet committed as data.**
+  - **TODO: summarize the fetched card/area content.** Run the same bottom-up
+    summarizer over the card/area trees so they're retrievable/queryable like
+    events (large — a separate opt-in run, likely a workflow, given ~5.5k episodes).
+  - **TODO: nest card/area UNDER their parent event (hierarchy, not just a link).**
+    Many card stories and area talks belong to a specific event (limited cards
+    released with an event; seasonal/event area talks). Build a **hierarchy that
+    files them under the same event** — resolve the parent `event_id` (via
+    `eventCards` for cards; release-window / `areatalk_ev_*` scenarioId prefix for
+    area talks), and group card/area nodes beneath their event so retrieval, the
+    timeline, and the event summary present them as children of that event (e.g.
+    `story/<unit>/event/<arc>/{card,area}/…` or an `event_id` parent link the
+    processor understands). Do after the summarize step.
 - [~] **Phase 6 — Translation & audit.** Inherited full-engine feature: the
   translation prompts + `--audit` loop already exist (`query/audit.py`, prompts)
   and consume our Sekai `glossary.json` + State Ledger. Needs a keyed run to
