@@ -4,6 +4,8 @@ from sekai_story_indexer.indexer.processor import StoryProcessor
 from sekai_story_indexer.query.official_en import load_official_en
 from sekai_story_indexer.source.assets import event_logo_url, music_jacket_url
 from sekai_story_indexer.source.fetcher import (
+    fetch_area_conversations,
+    fetch_card_stories,
     fetch_unit_stories,  # noqa: F401  (import sanity)
     plan_event,
     story_order_doc,
@@ -16,6 +18,9 @@ from sekai_story_indexer.source.nicknames import (
 from sekai_story_indexer.source.transform import (
     align_en_to_jp,
     arc_slug,
+    build_area_event_map,
+    build_card_parent_map,
+    build_content_parents,
     en_sidecar_path,
     episode_filename,
     focus_character_id,
@@ -64,6 +69,205 @@ def test_scenario_to_lines_extracts_speaker_and_body():
         ]
     }
     assert scenario_to_lines(scenario) == [("こはね", "おはよう みんな"), ("", "……")]
+
+
+def test_build_card_parent_map_links_and_falls_back():
+    cards_by_id = {
+        10: {"id": 10, "characterId": 1, "cardRarityType": "rarity_4"},   # event-linked
+        20: {"id": 20, "characterId": 2, "cardRarityType": "rarity_4"},   # multi-event
+        30: {"id": 30, "characterId": 3, "cardRarityType": "rarity_birthday"},  # birthday
+        40: {"id": 40, "characterId": 4, "cardRarityType": "rarity_1"},   # permanent/other
+    }
+    event_cards = [
+        {"cardId": 10, "eventId": 5, "isDisplayCardStory": True},
+        # card 20 appears in two events: the earlier (3) has no story flag, the
+        # later (9) does -> the story-displaying event wins the tie-break.
+        {"cardId": 20, "eventId": 3, "isDisplayCardStory": False},
+        {"cardId": 20, "eventId": 9, "isDisplayCardStory": True},
+    ]
+    m = build_card_parent_map(event_cards, cards_by_id)
+    assert m[10] == {"kind": "event", "event_id": 5, "character_id": 1, "is_display_card_story": True}
+    assert m[20]["kind"] == "event" and m[20]["event_id"] == 9  # story-flag beats earlier id
+    assert m[30]["kind"] == "birthday" and m[30]["event_id"] is None and m[30]["character_id"] == 3
+    assert m[40]["kind"] == "other" and m[40]["event_id"] is None
+
+
+def test_build_area_event_map_links_via_event_story_condition():
+    event_stories = [
+        {"id": 2, "eventId": 2, "eventStoryEpisodes": [{"id": 1000016}, {"id": 1000017}]},
+    ]
+    release_conditions = [
+        {"id": 100108, "releaseConditionType": "event_story", "releaseConditionTypeId": 1000016},
+        {"id": 500, "releaseConditionType": "none"},
+        {"id": 600, "releaseConditionType": "event_story", "releaseConditionTypeId": 999999},  # unknown episode
+    ]
+    action_sets = [
+        {"id": 839, "scenarioId": "areatalk_ev_night_01_001", "releaseConditionId": 100108},  # -> event 2
+        {"id": 900, "scenarioId": "areatalk02_129", "releaseConditionId": 500},               # permanent
+        {"id": 901, "scenarioId": "areatalk_ev_x_001", "releaseConditionId": 600},            # event but unresolved
+        {"id": 902, "scriptId": "no_scenario"},                                                # skipped (no scenarioId)
+    ]
+    action_sets += [
+        # campaign talk: no event_story condition, but scenarioId is April-Fool-tagged
+        {"id": 903, "scenarioId": "areatalk_aprilfool2022_002", "releaseConditionId": 500},
+        # movie/theater talk gated by serial code (permanent condition) but ev-tagged
+        {"id": 904, "scenarioId": "areatalk_ev_theater_037", "releaseConditionId": 500},
+    ]
+    m = build_area_event_map(action_sets, release_conditions, event_stories)
+    assert 902 not in m  # no scenarioId -> excluded
+    assert m[839] == {"kind": "event", "event_id": 2, "campaign": None, "scenario_id": "areatalk_ev_night_01_001"}
+    assert m[901]["kind"] == "event" and m[901]["event_id"] is None  # event-gated but episode unknown
+    # areatalk02_129 is generic base chatter -> permanent (NOT mislabeled)
+    assert m[900]["kind"] == "permanent" and m[900]["campaign"] is None
+    # campaign-tagged talks are recovered from the "permanent" bucket by scenarioId
+    assert m[903]["kind"] == "campaign" and m[903]["campaign"] == "aprilfool2022"
+    assert m[904]["kind"] == "campaign" and m[904]["campaign"] == "ev_theater"
+
+
+def test_area_campaign_tag_ignores_generic_chatter():
+    from sekai_story_indexer.source.transform import area_campaign_tag
+    assert area_campaign_tag("areatalk03_121") is None
+    assert area_campaign_tag("op_02area") is None
+    assert area_campaign_tag("areatalk_aprilfool2023_007") == "aprilfool2023"
+    assert area_campaign_tag("areatalk_3rdaniv_098") == "3rdaniv"
+    assert area_campaign_tag("areatalk_ev_theater_037") == "ev_theater"
+    assert area_campaign_tag("areatalk_wl_wonder_01_001") == "wl_wonder_01"
+
+
+def test_build_card_parent_map_earliest_event_when_no_story_flag():
+    cards_by_id = {50: {"id": 50, "characterId": 1, "cardRarityType": "rarity_2"}}
+    event_cards = [
+        {"cardId": 50, "eventId": 12, "isDisplayCardStory": False},
+        {"cardId": 50, "eventId": 7, "isDisplayCardStory": False},
+    ]
+    m = build_card_parent_map(event_cards, cards_by_id)
+    assert m[50]["event_id"] == 7  # no story flag anywhere -> earliest event id
+
+
+def test_build_content_parents_composes_resolvers():
+    card_parent_map = {
+        1042: {"kind": "event", "event_id": 150, "character_id": 17},
+        30: {"kind": "birthday", "event_id": None, "character_id": 3},
+    }
+    area_event_map = {
+        839: {"kind": "event", "event_id": 2, "campaign": None, "scenario_id": "areatalk_ev_night_01_001"},
+        903: {"kind": "campaign", "event_id": None, "campaign": "aprilfool2023", "scenario_id": "areatalk_aprilfool2023_002"},
+        900: {"kind": "permanent", "event_id": None, "campaign": None, "scenario_id": "areatalk02_129"},
+    }
+    events_by_id = {150: {"id": 150, "name": "傷だらけの手で、私達は"}, 2: {"id": 2, "name": "囚われのマリオネット"}}
+    doc = build_content_parents(card_parent_map, area_event_map, events_by_id)
+    assert doc["cards"]["1042"]["parent_event_id"] == 150
+    assert doc["cards"]["1042"]["parent_arc_id"].startswith("0150-")
+    assert doc["cards"]["1042"]["content_group"] == ""      # event-linked -> no group
+    assert doc["cards"]["30"]["parent_event_id"] == 0 and doc["cards"]["30"]["content_group"] == "birthday"
+    # keyed by the SLUGIFIED scenarioId (matches the on-disk talk filename)
+    assert doc["areas"]["areatalk-ev-night-01-001"]["parent_event_id"] == 2
+    assert doc["areas"]["areatalk-aprilfool2023-002"]["content_group"] == "aprilfool2023"
+    assert doc["areas"]["areatalk02-129"]["content_group"] == "permanent"
+
+
+def test_build_content_parents_no_silent_orphans_on_unresolved_event():
+    # event-kind entries whose event_id didn't resolve must still get a group,
+    # never {parent_event_id:0, content_group:""} (which is indistinguishable from
+    # unlinked content and drops out of both hierarchy and campaign grouping).
+    card_parent_map = {77: {"kind": "event", "event_id": None, "character_id": 1}}
+    area_event_map = {
+        88: {"kind": "event", "event_id": None, "campaign": None, "scenario_id": "areatalk_ev_x_001"},
+    }
+    doc = build_content_parents(card_parent_map, area_event_map, events_by_id={})
+    assert doc["cards"]["77"] == {"parent_event_id": 0, "parent_arc_id": "", "content_group": "other"}
+    # area falls back to a campaign tag derived from the scenarioId (ev_x)
+    assert doc["areas"]["areatalk-ev-x-001"]["content_group"] == "ev_x"
+
+
+def test_build_card_parent_map_survives_null_event_id():
+    # an explicit null eventId row must not crash min() during the tie-break
+    cards_by_id = {5: {"id": 5, "characterId": 1, "cardRarityType": "rarity_4"}}
+    event_cards = [
+        {"cardId": 5, "eventId": None, "isDisplayCardStory": False},
+        {"cardId": 5, "eventId": 8, "isDisplayCardStory": False},
+    ]
+    m = build_card_parent_map(event_cards, cards_by_id)
+    assert m[5]["event_id"] == 8  # the real id wins over the null
+
+
+def test_processor_stamps_parent_from_content_parents(tmp_path):
+    import json as _json
+
+    from sekai_story_indexer.indexer.processor import StoryProcessor
+    # a card + an area file under a story tree, plus the parent map next to it
+    root = tmp_path
+    card = root / "story" / "nightcord" / "card" / "1042-x" / "01_a.md"
+    area = root / "story" / "mixed" / "area" / "16-y" / "004_areatalk-aprilfool2023-007.md"
+    for f in (card, area):
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("# 1. t\n\nA: hi\n", encoding="utf-8")
+    (root / "content_parents.json").write_text(_json.dumps({
+        "cards": {"1042": {"parent_event_id": 150, "parent_arc_id": "0150-z", "content_group": ""}},
+        "areas": {"areatalk-aprilfool2023-007": {"parent_event_id": 0, "parent_arc_id": "", "content_group": "aprilfool2023"}},
+    }), encoding="utf-8")
+    cm = StoryProcessor.extract_hierarchy(card)
+    assert cm.content_type == "card" and cm.parent_event_id == 150 and cm.parent_arc_id == "0150-z"
+    am = StoryProcessor.extract_hierarchy(area)
+    assert am.content_type == "area" and am.parent_event_id == 0 and am.content_group == "aprilfool2023"
+
+
+def test_processor_parent_link_noop_without_file(tmp_path):
+    from sekai_story_indexer.indexer.processor import StoryProcessor
+    card = tmp_path / "story" / "leo_need" / "card" / "0001-x" / "01_a.md"
+    card.parent.mkdir(parents=True, exist_ok=True)
+    card.write_text("# 1. t\n\nA: hi\n", encoding="utf-8")
+    m = StoryProcessor.extract_hierarchy(card)  # no content_parents.json present
+    assert m.parent_event_id == 0 and m.parent_arc_id == "" and m.content_group == ""
+
+
+def test_fetch_card_stories_writes_per_card_tree(tmp_path):
+    cards_rows = [{"id": 1, "characterId": 1, "prefix": "card one"}]  # char 1 = leo_need
+    episode_rows = [
+        {"id": 2, "cardId": 1, "seq": 2, "title": "b", "scenarioId": "s2",
+         "assetbundleName": "res001", "cardEpisodePartType": "second_part"},
+        {"id": 1, "cardId": 1, "seq": 1, "title": "a", "scenarioId": "s1",
+         "assetbundleName": "res001", "cardEpisodePartType": "first_part"},
+    ]
+    seen: list[tuple[str, str]] = []
+
+    def fake(bundle, sid):
+        seen.append((bundle, sid))
+        return {"TalkData": [{"WindowDisplayName": "一歌", "Body": "line"}]}
+
+    n = fetch_card_stories(
+        tmp_path, cards_rows=cards_rows, episode_rows=episode_rows,
+        scenario_fetch=fake, en_scenario_fetch=lambda *a: {}, log=lambda *_: None,
+    )
+    assert n == 2
+    card_dirs = list((tmp_path / "leo_need" / "card").iterdir())
+    assert len(card_dirs) == 1 and card_dirs[0].name.startswith("0001-")
+    files = sorted(p.name for p in card_dirs[0].glob("*.md"))
+    assert files[0].startswith("01_") and files[1].startswith("02_")  # part order
+    assert seen == [("res001", "s1"), ("res001", "s2")]  # fetched in seq order
+
+
+def test_fetch_area_conversations_resolves_unit_and_skips_scenarioless(tmp_path):
+    area_rows = [{"id": 4, "name": "area name"}]
+    action_set_rows = [
+        {"id": 5, "areaId": 4, "scenarioId": "as_a", "characterIds": [1]},      # leo_need
+        {"id": 6, "areaId": 4, "scenarioId": "as_b", "characterIds": [1, 5]},   # spans units -> mixed
+        {"id": 7, "areaId": 4, "scriptId": "x"},                                 # no scenarioId -> skipped
+    ]
+    seen: list[tuple[int, str]] = []
+
+    def fake(aid, sid):
+        seen.append((aid, sid))
+        return {"TalkData": [{"WindowDisplayName": "", "Body": "hi"}]}
+
+    n = fetch_area_conversations(
+        tmp_path, area_rows=area_rows, action_set_rows=action_set_rows,
+        scenario_fetch=fake, en_scenario_fetch=lambda *a: {}, log=lambda *_: None,
+    )
+    assert n == 2  # the scenarioId-less actionSet is skipped
+    assert seen == [(5, "as_a"), (6, "as_b")]  # area-talk id rides through to the scenario fetch
+    assert list((tmp_path / "leo_need" / "area").rglob("001_*.md"))   # single-unit talk
+    assert list((tmp_path / "mixed" / "area").rglob("002_*.md"))      # cross-unit talk -> mixed
 
 
 def test_render_episode_markdown_uses_scene_delimiter():

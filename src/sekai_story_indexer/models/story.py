@@ -61,6 +61,19 @@ class StoryMetadata(BaseModel):
     )
     event_id: int = Field(0, description="Sekai master-DB event id, 0 if not an event story")
     started_at: int = Field(0, description="Event release timestamp (ms epoch), for chronological order")
+    parent_event_id: int = Field(
+        0,
+        description="For card/area content: the PARENT event this content belongs to "
+        "(via eventCards for cards, the event_story unlock for area talks). 0 if none.",
+    )
+    parent_arc_id: str = Field(
+        "", description="Parent event's arc slug (e.g. '0150-...'), for nesting card/area under it."
+    )
+    content_group: str = Field(
+        "",
+        description="Grouping for card/area content with no parent event: a campaign tag "
+        "(e.g. 'aprilfool2023'), or 'birthday'/'other'/'permanent'. Empty for event content.",
+    )
     arc_id: str = Field(..., description="Volume id: event slug, 'main', or unit-story id")
     story_type: str = Field(
         ...,
