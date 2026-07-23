@@ -231,6 +231,51 @@ def build_card_parent_map(
     return out
 
 
+def build_area_event_map(
+    action_sets: list[dict],
+    release_conditions: list[dict],
+    event_stories: list[dict],
+) -> dict[int, dict]:
+    """Resolve each area talk's parent event, for nesting area conversations.
+
+    Area talks have no ``eventCards``-style FK. The authoritative link is the
+    talk's unlock condition: an ``event_story`` releaseCondition gates the talk on
+    reading a specific event-story episode, so its ``releaseConditionTypeId`` (an
+    ``eventStoryEpisode`` id) resolves through ``eventStories`` to that episode's
+    ``eventId``. Talks with any other condition (``none`` / ``action_set`` /
+    ``processed_serial_code`` / ``read_all_action_set_in_group``) are permanent
+    location flavor with no event parent.
+
+    Returns ``{action_set_id: {"kind", "event_id", "scenario_id"}}`` for talks that
+    carry a ``scenarioId``. ``kind`` is ``"event" | "permanent"``; ``event_id`` is
+    the parent event (``None`` for permanent, or if an event_story episode id can't
+    be resolved).
+    """
+    rc_by_id = {r["id"]: r for r in release_conditions}
+    episode_to_event: dict[int, int] = {}
+    for story in event_stories:
+        eid = story.get("eventId")
+        for ep in story.get("eventStoryEpisodes", []):
+            if ep.get("id") is not None and eid is not None:
+                episode_to_event[ep["id"]] = eid
+
+    out: dict[int, dict] = {}
+    for act in action_sets:
+        sid = act.get("scenarioId")
+        if not sid:
+            continue
+        rc = rc_by_id.get(act.get("releaseConditionId")) or {}
+        if rc.get("releaseConditionType") == "event_story":
+            out[act["id"]] = {
+                "kind": "event",
+                "event_id": episode_to_event.get(rc.get("releaseConditionTypeId")),
+                "scenario_id": sid,
+            }
+        else:
+            out[act["id"]] = {"kind": "permanent", "event_id": None, "scenario_id": sid}
+    return out
+
+
 def song_info(music: dict | None) -> dict:
     """Flatten a ``musics.json`` record into commissioned-song fields."""
     if not music:

@@ -124,6 +124,14 @@ def areas() -> list[dict]:
     return fetch_json(f"{MASTER_DB}/areas.json")
 
 
+def release_conditions() -> list[dict]:
+    """releaseConditions.json: id -> {releaseConditionType, releaseConditionTypeId, …}.
+    An ``event_story`` condition gates content on reading an event-story episode
+    (``releaseConditionTypeId`` = eventStoryEpisode id) — the link area talks use
+    to name their parent event."""
+    return fetch_json(f"{MASTER_DB}/releaseConditions.json")
+
+
 # --- asset CDN --------------------------------------------------------------
 
 def event_scenario(asset_bundle: str, scenario_id: str) -> dict:

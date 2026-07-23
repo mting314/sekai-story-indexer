@@ -18,6 +18,7 @@ from sekai_story_indexer.source.nicknames import (
 from sekai_story_indexer.source.transform import (
     align_en_to_jp,
     arc_slug,
+    build_area_event_map,
     build_card_parent_map,
     en_sidecar_path,
     episode_filename,
@@ -88,6 +89,28 @@ def test_build_card_parent_map_links_and_falls_back():
     assert m[20]["kind"] == "event" and m[20]["event_id"] == 9  # story-flag beats earlier id
     assert m[30]["kind"] == "birthday" and m[30]["event_id"] is None and m[30]["character_id"] == 3
     assert m[40]["kind"] == "other" and m[40]["event_id"] is None
+
+
+def test_build_area_event_map_links_via_event_story_condition():
+    event_stories = [
+        {"id": 2, "eventId": 2, "eventStoryEpisodes": [{"id": 1000016}, {"id": 1000017}]},
+    ]
+    release_conditions = [
+        {"id": 100108, "releaseConditionType": "event_story", "releaseConditionTypeId": 1000016},
+        {"id": 500, "releaseConditionType": "none"},
+        {"id": 600, "releaseConditionType": "event_story", "releaseConditionTypeId": 999999},  # unknown episode
+    ]
+    action_sets = [
+        {"id": 839, "scenarioId": "areatalk_ev_night_01_001", "releaseConditionId": 100108},  # -> event 2
+        {"id": 900, "scenarioId": "areatalk02_129", "releaseConditionId": 500},               # permanent
+        {"id": 901, "scenarioId": "areatalk_ev_x_001", "releaseConditionId": 600},            # event but unresolved
+        {"id": 902, "scriptId": "no_scenario"},                                                # skipped (no scenarioId)
+    ]
+    m = build_area_event_map(action_sets, release_conditions, event_stories)
+    assert 902 not in m  # no scenarioId -> excluded
+    assert m[839] == {"kind": "event", "event_id": 2, "scenario_id": "areatalk_ev_night_01_001"}
+    assert m[900]["kind"] == "permanent" and m[900]["event_id"] is None
+    assert m[901]["kind"] == "event" and m[901]["event_id"] is None  # event-gated but episode unknown
 
 
 def test_build_card_parent_map_earliest_event_when_no_story_flag():
