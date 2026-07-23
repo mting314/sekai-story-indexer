@@ -232,8 +232,13 @@ web/summary-reader-production/data/
 .claude/
 .codex/
 
-# The Project Sekai corpus + index (fetched via `sekai fetch`) is checked in so
-# the full app + ingest run without external egress (the restricted harness blocks
-# the CDN/DB hosts). Regenerate with `indexer fetch`. The sample/ fixture also stays
-# tracked for the lightweight test corpus.
+# Project Sekai story corpus (transcripts) is NOT checked in — it's copyrighted
+# game text, fetched via `sekai fetch` (+ `fetch-card-stories` /
+# `fetch-area-conversations`, then `sekai link-content` for content_parents.json).
+# Re-fetch wherever CDN/DB egress is allowed. The small committed sample/ fixture
+# is the offline test corpus, and OUR generated content stays tracked
+# (summaries_cache.json, glossary.json, events_index.json / story_order.yaml
+# metadata).
+/story/
+/content_parents.json
 chat_log.jsonl
