@@ -161,29 +161,31 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   next `indexer ingest` re-embed); history windowing (`condense.window_history`);
   and SSE streaming (`/api/query/stream` + `generate_answer_stream`). See
   `contextual_embeddings_plan.md`.
-- [~] **Phase 5 — Content beyond events.** **Unit stories DONE** (real fetch:
-  `sekai fetch-unit-stories` → `story/<unit>/unit/…`, tested); non-event content
-  is always-queryable. Card side-stories + Area conversations: modeled/scaffolded,
-  fetch flows not yet built (raised — same pattern as unit stories).
-  - **Fetch flows — DONE (PR #40).** `sekai fetch-card-stories` (card side-stories
-    from `cards.json`/`cardEpisodes.json`, 2 parts/card, →`story/<unit>/card/…`) and
-    `sekai fetch-area-conversations` (area talks from `actionSets.json`/`areas.json`,
-    →`story/<unit>/area/…`), both with EN sidecars + `--skip-existing`. Asset paths:
-    card `character/member/<bundle>/<sid>.asset`, area
-    `scenario/actionset/group<id//100>/<sid>.asset`. **Not yet run at full scale**
-    (~2.7k card + ~2.8k area episodes) and **not yet committed as data.**
-  - **TODO: summarize the fetched card/area content.** Run the same bottom-up
-    summarizer over the card/area trees so they're retrievable/queryable like
-    events (large — a separate opt-in run, likely a workflow, given ~5.5k episodes).
-  - **TODO: nest card/area UNDER their parent event (hierarchy, not just a link).**
-    Many card stories and area talks belong to a specific event (limited cards
-    released with an event; seasonal/event area talks). Build a **hierarchy that
-    files them under the same event** — resolve the parent `event_id` (via
-    `eventCards` for cards; release-window / `areatalk_ev_*` scenarioId prefix for
-    area talks), and group card/area nodes beneath their event so retrieval, the
-    timeline, and the event summary present them as children of that event (e.g.
-    `story/<unit>/event/<arc>/{card,area}/…` or an `event_id` parent link the
-    processor understands). Do after the summarize step.
+- [~] **Phase 5 — Content beyond events.** **Unit stories DONE** (`sekai
+  fetch-unit-stories` → `story/<unit>/unit/…`). **Card side-stories + Area
+  conversations: fetch, parent-resolution, and event-nesting all DONE** (PRs #40,
+  #42); only summarization remains.
+  - **Fetch** — `sekai fetch-card-stories` / `sekai fetch-area-conversations`
+    (mirror `fetch_unit_stories`; EN sidecars, resumable). Asset paths verified
+    live: card `character/member/<bundle>/<sid>.asset`, area
+    `scenario/actionset/group<id//100>/<sid>.asset`. Run at full scale locally
+    (2,708 card + 2,795 area episodes); the fetched data is **not committed** (large).
+  - **Parent resolvers** — card→event via the `eventCards` FK
+    (`build_card_parent_map`, with a re-run tie-break + birthday/other fallback);
+    area→event via the `event_story` unlock condition
+    (`build_area_event_map`, 3-way: **event** 1,517 / **campaign** 474 / **permanent**
+    804 — deterministic, 0 unresolved).
+  - **Nesting** — `sekai link-content` composes them into `content_parents.json`;
+    the processor stamps `parent_event_id` / `parent_arc_id` / `content_group` on
+    card/area nodes (no-op without the file), and the local engine surfaces them as
+    **children of a scoped event** (`_candidate_indices`, `include_children`;
+    `count_dialogue` opts out to keep its exact count).
+  - **TODO — summarize the fetched card/area content (the only remaining piece).**
+    Card = **per-card, WITH character arcs**; area = **per-event-group** (no arcs;
+    keep continuity facts + a plain character list); generic permanent-area talks
+    indexed raw (no summary). Large (~5.5k episodes) → an opt-in batched workflow
+    like the event-summary run. Keyed off the parent-event metadata above so the
+    summaries nest under their event.
 - [~] **Phase 6 — Translation & audit.** Inherited full-engine feature: the
   translation prompts + `--audit` loop already exist (`query/audit.py`, prompts)
   and consume our Sekai `glossary.json` + State Ledger. Needs a keyed run to
@@ -314,7 +316,8 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   `get_scene` tool pattern). Deferred: costs an extra LLM call per turn. Cheaper
   deterministic alternative if precision is needed first: intent-directed ranking
   (bias "climax/ending" → late episodes, "beginning" → early) — no extra call.
-* Card/Area fetch flows (Phase 5 remainder) — mirror `fetch_unit_stories`.
+* Card/Area **summarization** (Phase 5 remainder — fetch/resolvers/nesting done):
+  card per-card with arcs, area per-event-group, via a batched workflow.
 * Full-engine: join `events_index` plot_weight into node metadata at ingest so
   the boost applies there too; inject `chroma_where(scope)` into the query.
 * The inherited test suite is still Hasunosora-shaped (needs chromadb to even
