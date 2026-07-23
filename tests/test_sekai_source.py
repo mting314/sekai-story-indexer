@@ -18,6 +18,7 @@ from sekai_story_indexer.source.nicknames import (
 from sekai_story_indexer.source.transform import (
     align_en_to_jp,
     arc_slug,
+    build_card_parent_map,
     en_sidecar_path,
     episode_filename,
     focus_character_id,
@@ -66,6 +67,37 @@ def test_scenario_to_lines_extracts_speaker_and_body():
         ]
     }
     assert scenario_to_lines(scenario) == [("こはね", "おはよう みんな"), ("", "……")]
+
+
+def test_build_card_parent_map_links_and_falls_back():
+    cards_by_id = {
+        10: {"id": 10, "characterId": 1, "cardRarityType": "rarity_4"},   # event-linked
+        20: {"id": 20, "characterId": 2, "cardRarityType": "rarity_4"},   # multi-event
+        30: {"id": 30, "characterId": 3, "cardRarityType": "rarity_birthday"},  # birthday
+        40: {"id": 40, "characterId": 4, "cardRarityType": "rarity_1"},   # permanent/other
+    }
+    event_cards = [
+        {"cardId": 10, "eventId": 5, "isDisplayCardStory": True},
+        # card 20 appears in two events: the earlier (3) has no story flag, the
+        # later (9) does -> the story-displaying event wins the tie-break.
+        {"cardId": 20, "eventId": 3, "isDisplayCardStory": False},
+        {"cardId": 20, "eventId": 9, "isDisplayCardStory": True},
+    ]
+    m = build_card_parent_map(event_cards, cards_by_id)
+    assert m[10] == {"kind": "event", "event_id": 5, "character_id": 1, "is_display_card_story": True}
+    assert m[20]["kind"] == "event" and m[20]["event_id"] == 9  # story-flag beats earlier id
+    assert m[30]["kind"] == "birthday" and m[30]["event_id"] is None and m[30]["character_id"] == 3
+    assert m[40]["kind"] == "other" and m[40]["event_id"] is None
+
+
+def test_build_card_parent_map_earliest_event_when_no_story_flag():
+    cards_by_id = {50: {"id": 50, "characterId": 1, "cardRarityType": "rarity_2"}}
+    event_cards = [
+        {"cardId": 50, "eventId": 12, "isDisplayCardStory": False},
+        {"cardId": 50, "eventId": 7, "isDisplayCardStory": False},
+    ]
+    m = build_card_parent_map(event_cards, cards_by_id)
+    assert m[50]["event_id"] == 7  # no story flag anywhere -> earliest event id
 
 
 def test_fetch_card_stories_writes_per_card_tree(tmp_path):

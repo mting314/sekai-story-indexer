@@ -181,6 +181,56 @@ def focus_character_id(event_card_ids: list[int], cards_by_id: dict[int, dict]) 
     return pool[0].get("characterId", 0)
 
 
+def build_card_parent_map(
+    event_cards: list[dict],
+    cards_by_id: dict[int, dict],
+) -> dict[int, dict]:
+    """Resolve each card's hierarchy parent, for nesting card side-stories under
+    their event.
+
+    The authoritative link is ``eventCards.json`` (``cardId`` -> ``eventId``). A
+    card reused across events (re-run / anniversary) is assigned its PRIMARY event:
+    rows flagged ``isDisplayCardStory`` win, then the earliest ``eventId``. Cards
+    with no ``eventCards`` row have no event parent and fall back to their
+    character, tagged ``"birthday"`` (``rarity_birthday``) or ``"other"``
+    (permanent / initial / gacha).
+
+    Returns ``{card_id: {"kind", "event_id", "character_id", "is_display_card_story"}}``
+    for every card in ``cards_by_id`` (callers filter to cards that actually have
+    side-stories). ``kind`` is ``"event" | "birthday" | "other"``; ``event_id`` is
+    ``None`` for the non-event kinds.
+    """
+    rows_by_card: dict[int, list[dict]] = {}
+    for row in event_cards:
+        cid = row.get("cardId")
+        if cid is not None:
+            rows_by_card.setdefault(cid, []).append(row)
+
+    out: dict[int, dict] = {}
+    for cid, rows in rows_by_card.items():
+        displayed = [r for r in rows if r.get("isDisplayCardStory")]
+        # Primary event: prefer a story-displaying row, then the earliest event id.
+        primary = min(displayed or rows, key=lambda r: r.get("eventId", 1 << 30))
+        out[cid] = {
+            "kind": "event",
+            "event_id": primary.get("eventId"),
+            "character_id": (cards_by_id.get(cid) or {}).get("characterId", 0),
+            "is_display_card_story": bool(displayed),
+        }
+
+    for cid, card in cards_by_id.items():
+        if cid in out:
+            continue
+        rarity = card.get("cardRarityType", "")
+        out[cid] = {
+            "kind": "birthday" if rarity == "rarity_birthday" else "other",
+            "event_id": None,
+            "character_id": card.get("characterId", 0),
+            "is_display_card_story": False,
+        }
+    return out
+
+
 def song_info(music: dict | None) -> dict:
     """Flatten a ``musics.json`` record into commissioned-song fields."""
     if not music:
