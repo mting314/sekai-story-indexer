@@ -40,6 +40,9 @@ async function boot() {
   state.units = units;
   state.events = events;
   state.meta = meta;
+  // Per-event card/area child counts (empty {} if the corpus isn't linked) — for
+  // the timeline's "nested under this event" affordance.
+  state.eventChildren = await fetch("/api/event-children").then((r) => r.json()).catch(() => ({}));
   state.commands = await fetch("/api/commands").then((r) => r.json()).catch(() => []);
   wireCommandMenu();
   buildEntityIndex();
@@ -659,6 +662,15 @@ function renderTimeline() {
     const fcInfo = state.meta.characters[e.focus_character_id];
     const focusName = (fcInfo && fcInfo.en) || e.focus_character;
     const focus = focusName ? `<div class="focus">★ ${focusName}</div>` : "";
+    // Nested content (card side-stories + area conversations) that belong to this
+    // event — surfaced as children of the event (see content_parents.json nesting).
+    const kids = (state.eventChildren || {})[e.arc_slug];
+    const childBadge = kids && (kids.cards || kids.area_talks)
+      ? `<div class="children">` +
+        (kids.cards ? `<span class="child-badge" title="${kids.cards} card side-stories nested under this event">🎴 ${kids.cards}</span>` : "") +
+        (kids.area_talks ? `<span class="child-badge" title="${kids.area_talks} area conversations nested under this event">🗺 ${kids.area_talks}</span>` : "") +
+        `</div>`
+      : "";
     const status = e.indexed
       ? '<span class="status-dot indexed" title="Queryable in chat now"></span>'
       : '<span class="status-dot pending" title="On the timeline; chat-answerable after the next ingest"></span>';
@@ -679,7 +691,7 @@ function renderTimeline() {
           <div class="top">${status}<span class="date">${fmtDate(e.started_at)}</span>${nick}
             ${e.is_key_story ? '<span class="key-badge">key</span>' : ""}</div>
           <div class="name">${e.name}</div>
-          ${focus}${song}
+          ${focus}${song}${childBadge}
         </div>
       </div>`;
     card.onclick = () => setScope(e);
