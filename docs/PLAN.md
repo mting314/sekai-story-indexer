@@ -201,6 +201,14 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   thinking, ~82% cheaper, and actually honored unlike `thinking_budget`), with a
   retry that drops `thinking_config` if a model rejects `thinking_level`.
   `query/generate.py`.
+* **"What's the conclusion?" quick-action just returns the summary (TODO).** The
+  scoped conclusion intent (`_scoped_event_intercept`, `_CONCLUSION_RE`) currently
+  answers with the summary's Overview + Continuity Facts — which reads as "just the
+  summary," not the event's actual ending/resolution. Give it a focused conclusion
+  instead: e.g. the final beat from the last Episode Index entry (+ the resolution
+  sentences of the Overview), or a dedicated short "how it ends" synthesis — not the
+  whole Overview. Keyless: derive from the summary's tail (last episode + closing
+  Continuity); with a key: synthesize a brief conclusion from the final scenes.
 * **Live transcript fetch on the deployed site — no corpus in the repo (TODO).**
   Now that `story/` is untracked (copyrighted prose isn't checked in), a deployed
   site must obtain verbatim quotes / direct story references by fetching lines
