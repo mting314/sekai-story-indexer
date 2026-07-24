@@ -76,6 +76,27 @@ def test_scoped_event_intercept_answers_from_summary(tmp_path, monkeypatch):
     assert srv._scoped_event_intercept(srv.QueryRequest(question="summarize this event"), None) is None
 
 
+def test_event_children_counts_from_content_parents(tmp_path, monkeypatch):
+    """Per-event card/area child counts are inverted from content_parents.json."""
+    import json as _json
+
+    from webapp import server as srv
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "content_parents.json").write_text(_json.dumps({
+        "cards": {"1": {"parent_arc_id": "0150-x"}, "2": {"parent_arc_id": "0150-x"},
+                  "3": {"parent_arc_id": ""}},  # no parent -> not counted
+        "areas": {"a": {"parent_arc_id": "0150-x"}, "b": {"parent_arc_id": "0002-y"}},
+    }), encoding="utf-8")
+    srv._event_children_cache.update(mtime=None, data={})  # reset the mtime cache
+    out = srv._event_children()
+    assert out["0150-x"] == {"cards": 2, "area_talks": 1}
+    assert out["0002-y"] == {"cards": 0, "area_talks": 1}
+    # absent file -> empty (graceful when the corpus isn't linked)
+    (tmp_path / "content_parents.json").unlink()
+    srv._event_children_cache.update(mtime=None, data={})
+    assert srv._event_children() == {}
+
+
 def test_health(client):
     r = client.get("/api/health")
     assert r.status_code == 200

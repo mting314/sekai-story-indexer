@@ -146,6 +146,38 @@ def events() -> list[dict]:
     return load_events()
 
 
+_event_children_cache: dict[str, Any] = {"mtime": None, "data": {}}
+
+
+def _event_children() -> dict[str, dict]:
+    """Per-event card/area child counts, inverted from ``content_parents.json``
+    (``{event_arc: {"cards": N, "area_talks": N}}``). Cheap (no disk scan) and
+    cached on the file's mtime. Returns ``{}`` when the corpus hasn't been linked
+    (`sekai link-content`) — so the timeline simply shows no children then."""
+    path = Path("content_parents.json")
+    mtime = path.stat().st_mtime if path.exists() else None
+    if mtime != _event_children_cache["mtime"]:
+        counts: dict[str, dict] = {}
+        if mtime is not None:
+            try:
+                cp = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                cp = {}
+            for kind, key in (("cards", "cards"), ("areas", "area_talks")):
+                for entry in (cp.get(kind) or {}).values():
+                    arc = entry.get("parent_arc_id")
+                    if arc:
+                        counts.setdefault(arc, {"cards": 0, "area_talks": 0})[key] += 1
+        _event_children_cache.update(mtime=mtime, data=counts)
+    return _event_children_cache["data"]
+
+
+@app.get("/api/event-children")
+def event_children() -> dict[str, dict]:
+    """Card/area child counts per event arc, for the timeline's nested affordance."""
+    return _event_children()
+
+
 # Per-region event windows (JP/EN/TW/KR). Release schedules are static once set,
 # so cache for a day. Best-effort: any failure -> no region data, never fatal.
 _REGION_TTL_SECONDS = int(os.environ.get("SEKAI_REGION_TTL", "86400"))
