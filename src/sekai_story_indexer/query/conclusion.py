@@ -80,13 +80,18 @@ def heuristic_conclusion(summary: str) -> tuple[int | None, str]:
 
     Picks the Episode Index beat with the strongest resolution signal (ties break
     toward the *later* episode, since the climax runs late — but not the epilogue).
-    Falls back to the Overview's closing sentences when there's no usable index."""
+    Falls back to the Overview's closing sentences when there's no usable index or
+    no beat carries a resolution signal."""
     beats = parse_episode_index(summary)
     if beats:
         # argmax on score; on ties prefer the later beat (higher episode number),
         # so a genuine late climax wins but a flat epilogue never outranks it.
         best_num, best_text = max(beats, key=lambda b: (_beat_score(b[1]), b[0]))
-        return best_num, best_text
+        # Only trust a beat with a POSITIVE resolution signal. With no signal the
+        # tie-break would hand back the last episode — the epilogue we're avoiding —
+        # so fall through to the Overview's resolution tail instead.
+        if _beat_score(best_text) > 0:
+            return best_num, best_text
 
     overview = extract_summary_sections(summary).get("Overview", "").strip()
     if overview:

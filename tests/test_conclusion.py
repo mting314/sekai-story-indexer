@@ -55,6 +55,24 @@ def test_heuristic_falls_back_to_overview_tail_without_index():
     assert "grow closer" not in text  # never Continuity Facts
 
 
+def test_heuristic_no_signal_index_falls_back_not_last_episode():
+    """An Episode Index with no resolution vocabulary must NOT default to the last
+    beat (the epilogue) — it should fall through to the Overview tail."""
+    summary = (
+        "Overview:\n"
+        "The unit plans a show. They rehearse. The show goes well and they resolve "
+        "to keep performing together.\n\n"
+        "Episode Index:\n"
+        "- Episode 1: They meet at the studio.\n"
+        "- Episode 2: They pick a setlist.\n"
+        "- Episode 3: They rehearse the choreography.\n"
+    )
+    climax, text = heuristic_conclusion(summary)
+    assert climax is None  # fell back to the Overview, not Episode 3
+    assert "keep performing" in text
+    assert "choreography" not in text  # not the last beat
+
+
 def test_derive_prefers_cache_entry_over_heuristic():
     entry = {"climax_episode": 6, "conclusion": "Ena forgives Mafuyu and the group reunites."}
     body = derive_conclusion(SUMMARY, name="Test Event", cache_entry=entry)
