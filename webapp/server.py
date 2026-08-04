@@ -263,6 +263,39 @@ def _conclusions_map() -> dict:
     return _conclusions_cache["map"]  # type: ignore[return-value]
 
 
+def _resonance_cache_path() -> Path:
+    env = os.environ.get("SEKAI_RESONANCE_CACHE")
+    candidates = (
+        [Path(env)] if env
+        else [Path("resonance_cache.json"), HERE.parent / "resonance_cache.json"]
+    )
+    return next((p for p in candidates if p.exists()), candidates[-1])
+
+
+_resonance_cache: dict[str, Any] = {"key": object(), "map": {}}
+
+
+def _resonance_map() -> dict:
+    """``{arc -> resonance entry}`` from ``resonance_cache.json`` (``EVENT|<arc>``
+    tier); {} when absent. Keyless serve of the offline `sekai resonance` pass (or the
+    Claude-subagent seed). Cached + mtime-invalidated like the other cache maps."""
+    path = _resonance_cache_path()
+    try:
+        key = (str(path), path.stat().st_mtime)
+    except OSError:
+        key = (str(path), None)
+    if _resonance_cache["key"] != key:
+        try:
+            cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        except Exception:
+            cache = {}
+        _resonance_cache["map"] = {
+            k.split("|", 1)[1]: v for k, v in cache.items() if k.startswith("EVENT|")
+        }
+        _resonance_cache["key"] = key
+    return _resonance_cache["map"]  # type: ignore[return-value]
+
+
 @app.get("/api/hierarchical-summaries")
 def hierarchical_summaries() -> dict:
     """Tiered event -> episode -> part summaries from the hierarchical cache
@@ -1014,6 +1047,18 @@ _CONCLUSION_RE = re.compile(
     r"\bend(?:ing)? of (?:this|the) (?:event|story|arc)\b",
     re.IGNORECASE,
 )
+# Lyric↔story resonance: "how does the (theme) song relate to the story", "what does
+# the song mean", "song and story", "lyrics … reflect the event", "resonance".
+_RESONANCE_RE = re.compile(
+    r"\bresonan(?:ce|t|tes?)\b"
+    r"|\b(?:theme\s+)?song(?:'s)?\b[^.?!]*\b(?:mean|meaning|message|significan|"
+    r"relate|relation|connect|reflect|represent|resonate|tie|about the (?:story|event))"
+    r"|\b(?:mean|meaning|message|significance|point) of the (?:theme\s+)?song\b"
+    r"|\blyrics?\b[^.?!]*\b(?:mean|meaning|message|relate|connect|reflect|"
+    r"about the (?:story|event)|and the (?:story|event))"
+    r"|\b(?:theme\s+)?song\s+and\s+(?:the\s+)?story\b|\bstory\s+and\s+(?:the\s+)?song\b",
+    re.IGNORECASE,
+)
 
 
 def _summarize_intercept(question: str) -> dict | None:
@@ -1066,7 +1111,8 @@ def _scoped_event_intercept(req: QueryRequest, prev: Focus | None) -> dict | Non
     want_sum = bool(_SUMMARIZE_RE.search(q))
     want_focus = bool(_FOCUS_CHAR_RE.search(q))
     want_concl = bool(_CONCLUSION_RE.search(q))
-    if not (want_sum or want_focus or want_concl):
+    want_reson = bool(_RESONANCE_RE.search(q))
+    if not (want_sum or want_focus or want_concl or want_reson):
         return None
     try:
         events = load_events()
@@ -1078,6 +1124,28 @@ def _scoped_event_intercept(req: QueryRequest, prev: Focus | None) -> dict | Non
         if not ev:
             return None  # no scoped event -> let the normal path handle it
         arc = ev.get("arc_slug")
+        name, nick = ev.get("name"), ev.get("nickname")
+
+        # Resonance is served from its OWN cache and doesn't need the summary; take it
+        # first when matched. No cached note -> fall through to normal retrieval rather
+        # than fabricate a song↔story reading.
+        if want_reson:
+            r = _resonance_map().get(arc)
+            if isinstance(r, dict) and r.get("resonance"):
+                body = r["resonance"]
+                return {
+                    "answer": body,
+                    "answer_parts": [{"type": "text", "text": body}],
+                    "characters": [],
+                    "citations": [{
+                        "ref": 1, "arc_id": arc, "label": f"{name} — song resonance",
+                        "episode_title": "Song resonance", "nickname": nick,
+                        "excerpt": r.get("attribution", ""),
+                    }],
+                    "intent": "resonance", "backend": "summary", "error": None,
+                }
+            return None
+
         path = _hierarchical_cache_path()
         cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
         entry = cache.get(f"EVENT|{arc}")
@@ -1088,7 +1156,6 @@ def _scoped_event_intercept(req: QueryRequest, prev: Focus | None) -> dict | Non
         from sekai_story_indexer.indexer.summary_sections import extract_summary_sections
 
         sections = extract_summary_sections(summary)
-        name, nick = ev.get("name"), ev.get("nickname")
         if want_focus and not want_sum:
             fc = (_characters_meta().get(str(ev.get("focus_character_id"))) or {}).get("en") \
                 or ev.get("focus_character") or "not clearly defined"

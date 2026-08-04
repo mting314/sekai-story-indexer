@@ -119,6 +119,69 @@ def test_assemble_prefers_cached_conclusion_and_arc_filter():
     assert inputs[0]["conclusion"] == "CACHED ENDING"  # cache wins over heuristic
 
 
+def test_resonance_regex_matches_and_rejects():
+    import importlib
+
+    from webapp import server as srv
+    importlib.reload(srv)
+    matches = [
+        "how does the theme song relate to the story?",
+        "what does the song mean?",
+        "what's the meaning of the song",
+        "how do the lyrics reflect the event",
+        "song and story",
+        "tell me about the resonance",
+    ]
+    rejects = [
+        "who sang the song?",       # needle, no relation word
+        "summarize this event",
+        "what's the conclusion?",
+        "what did Mizuki say?",
+    ]
+    assert all(srv._RESONANCE_RE.search(q) for q in matches)
+    assert not any(srv._RESONANCE_RE.search(q) for q in rejects)
+
+
+def test_intercept_serves_cached_resonance(monkeypatch):
+    import importlib
+
+    from webapp import server as srv
+    from webapp.sessions import Focus
+
+    importlib.reload(srv)
+    ev = {"event_id": 1, "arc_slug": "0001-a", "name": "Ameagari", "nickname": "leo1"}
+    monkeypatch.setattr(srv, "load_events", lambda: [ev])
+    monkeypatch.setattr(
+        srv, "_resonance_map",
+        lambda: {"0001-a": {"resonance": "Stella mirrors Saki's arc.",
+                            "attribution": "EN translation by X"}},
+    )
+
+    req = srv.QueryRequest(question="how does the theme song relate to the story?")
+    out = srv._scoped_event_intercept(req, Focus(arcs=("0001-a",)))
+    assert out and out["intent"] == "resonance" and out["backend"] == "summary"
+    assert out["answer"] == "Stella mirrors Saki's arc."
+    cit = out["citations"][0]
+    assert cit["label"] == "Ameagari — song resonance"
+    assert cit["excerpt"] == "EN translation by X"  # lyric source attribution
+
+
+def test_intercept_resonance_falls_through_without_cache(monkeypatch):
+    import importlib
+
+    from webapp import server as srv
+    from webapp.sessions import Focus
+
+    importlib.reload(srv)
+    ev = {"event_id": 1, "arc_slug": "0001-a", "name": "Ameagari"}
+    monkeypatch.setattr(srv, "load_events", lambda: [ev])
+    monkeypatch.setattr(srv, "_resonance_map", lambda: {})  # nothing cached
+
+    req = srv.QueryRequest(question="what does the song mean?")
+    # No fabricated song reading -> None (falls through to normal retrieval).
+    assert srv._scoped_event_intercept(req, Focus(arcs=("0001-a",))) is None
+
+
 def test_extract_writes_expected_entry_shape(tmp_path):
     cache = str(tmp_path / "r.json")
     with patch.object(ResonanceExtractor, "extract", ResonanceExtractor.extract):

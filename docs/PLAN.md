@@ -431,9 +431,13 @@ renamed. So:
    churn on a backend switch (verified: a Gemini run skips Claude's entries).
    Resumable, spend-cap-graceful. Notes paraphrase — never reproduce lyric lines.
    Seeded 3 events (0001 Stella / 0002 Jackpot Sad Girl / 0003 potato) via subagents.
-4. **Keyless serve (next):** a `_RESONANCE_RE` intent ("how does the song relate to
-   the story", "what does the theme song mean") + an event-view facet, answered from
-   `resonance_cache`. Raw lyrics never stored.
+4. **Keyless serve (DONE):** `_RESONANCE_RE` intent in `_scoped_event_intercept`
+   ("how does the theme song relate to the story", "what does the song mean",
+   "song and story", "resonance") + a "Song & story" quick-action button
+   (`webapp/static/app.js`). Answered keyless from `resonance_cache` for the scoped
+   event; the citation shows the lyric-source attribution. No cached note → falls
+   through to normal retrieval (no fabricated reading). Raw lyrics never stored.
+   Verified live: event 1 → the seeded Stella note, English song + event names.
 
 Scope: the resonance intent covers event theme songs (`music_by_event`); the map
 itself covers all songs.

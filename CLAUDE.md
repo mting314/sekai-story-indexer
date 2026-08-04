@@ -53,7 +53,7 @@ with any interpreter that has `pydantic`+`pyyaml`:
 ## Two CLIs / two query backends
 * `indexer` (cli.py) — full Google/Chroma RAG; needs deps + `GOOGLE_API_KEY`.
 * `sekai` (localcli.py) — dependency-light, no-API core: `fetch`,
-  `fetch-unit-stories`, `build-index`, `ask`, `serve`, `eval`. Uses the **local**
+  `fetch-unit-stories`, `build-index`, `build-lyric-map`, `ask`, `serve`, `eval`. Uses the **local**
   lexical engine (`query/local.py`): deterministic TF-IDF retrieval + unit/nickname
   (`kasa5`) scoping + indexed-only queryable contract. This is what makes the app
   runnable + evals stable anywhere.
@@ -66,6 +66,11 @@ with any interpreter that has `pydantic`+`pyyaml`:
     scenes) that writes a climax episode + "how it ends" into `conclusions_cache.json`
     (same fingerprint/resume/spend-cap semantics), served keyless by the conclusion
     intent. Run `summarize` first.
+  * `sekai resonance [--limit N]` derives a lyric↔story "resonance" note per event
+    into `resonance_cache.json` (fetches lyrics live from Sekaipedia, never rehosted;
+    content-only fingerprint so Gemini/Claude-subagent notes coexist). Provider-
+    agnostic; served keyless by the resonance intent. Needs `build-lyric-map` +
+    `summarize` first.
 * `/api/query` picks backend via `SEKAI_QUERY_BACKEND` (`local` default, `full`).
 
 ## Run / test locally (no keys)
@@ -100,6 +105,13 @@ No PyPI-egress? `PYTHONPATH=src <python-with-pydantic> -m pytest tests/`. The
     `sekai conclusions`), keyless; no cache → a heuristic that picks the resolution
     beat over the epilogue (Sekai events close on a coda after the climax, so "last
     episode" is the wrong pick). Replaces the old Overview + Continuity Facts dump.
+  - **Lyric↔story resonance** (`source/lyrics.py`, `indexer/resonance.py`,
+    `query`→server intercept): "how does the theme song relate to the story?" serves a
+    resonance note from `resonance_cache.json`, keyless. Lyrics are fetched **live**
+    from Sekaipedia (`sekai build-lyric-map` → `lyric_page_map.json` joins song_id→
+    pageid; parser reads `{{Lyrics line}}`) and **never rehosted** — only derived notes
+    are cached. Notes built by `sekai resonance` (Gemini) OR Claude subagents (same
+    content-only fingerprint). Use the wiki `english` song name, never the JP title.
 - **LLM Refine event summarizer**: runnable standalone via `sekai summarize
   [--limit N]` (`thinking_level=low`); **136/209 event summaries built** into
   `summaries_cache.json` (rest blocked on a Gemini spend cap — resume with
@@ -114,10 +126,10 @@ No PyPI-egress? `PYTHONPATH=src <python-with-pydantic> -m pytest tests/`. The
 - Fetch is resilient (retries IncompleteRead) + resumable (`--skip-existing`).
 
 ## Tests
-CI runs the **full** suite (`uv run pytest -q`) — **453 passing**. chromadb is
+CI runs the **full** suite (`uv run pytest -q`) — **478 passing**. chromadb is
 installed in CI, so the inherited linkura tests collect + run too; **run the full
 `uv run pytest` locally before pushing, not just a Sekai subset** (a subset-only
 run once missed a `test_database.py` break that CI caught). Sekai-specific files:
 `test_sekai_source test_local_query test_scoping test_eval_local test_webapp_api
 test_content_and_summaries test_sessions test_generate_config test_summarize_limit
-test_conclusion test_conclusions_extractor`.
+test_conclusion test_conclusions_extractor test_lyrics test_resonance`.
