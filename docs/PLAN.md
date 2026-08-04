@@ -371,3 +371,73 @@ even the filesystem sorted chronologically). Hand-authored content still uses
 * The inherited test suite is still Hasunosora-shaped (needs chromadb to even
   collect); Sekai tests are the `test_sekai_source/local_query/scoping/eval_local/
   webapp_api/content_and_summaries` files.
+
+## 6. Lyric ↔ story resonance (new feature, phased)
+
+**Goal.** Each Sekai event has a commissioned/theme song deliberately tied to its
+story. Surface *how the song echoes the event's arc/conclusion* — a short, grounded
+"resonance" note per event — as a keyless quick-action + event-view facet. Builds
+directly on the summaries + conclusions tiers.
+
+**Copyright stance (same as transcripts).** Lyric text is copyrighted. We **never
+rehost** it: fetch it **live at analysis time** where egress is allowed, and persist
+only our **derived** resonance notes (like `summaries_cache` / `conclusions_cache`)
+plus the id **mapping** (our data). Raw lyrics never touch the repo or the cache.
+
+**Source decision (spike: `scripts/probe_lyrics.py`, verified 2026-08-03).**
+* First-party (master DB / asset CDN) — metadata only (`lyricist` name); **no lyric
+  text**. Ruled out.
+* **Sekaipedia (primary).** MediaWiki + **Cargo** (structured template data). Song
+  pages carry `{{Infobox song}}` with `song id` == `musics.json.id` (declared
+  `Integer unique`), and a `{{Lyrics line}}` section with **japanese / romaji /
+  english** columns. PJSK-scoped → clean, deterministic matching.
+* **VocaDB (optional, later).** Has licensed text + translations, but matching is
+  unsolved (title `ステラ` → 49 collisions; producer field romanized `じん`→`JIN`;
+  artistId+title returned 0 → coverage gap). Use only for EN translations on songs
+  whose entity resolves confidently. Not a general fallback.
+
+**Matching = deterministic join on `song_id`, NOT title.** Titles collide on both
+sites (Sekaipedia `ステラ` → `Stella / NeedLe/Stella / Wandering Stella`) and can be
+renamed. So:
+* **`lyric_page_map.json`** (checked in, refreshable — like `story_order.yaml`):
+  `{ music_id: {pageid, title, english} }` — `title` is the wiki page name (often
+  romaji), `english` is the standardized English song name (infobox `english`), used
+  as the user-facing display name everywhere (never the JP title; cf. no-slugs-in-UI).
+  Built by one paginated Cargo query
+  (`action=cargoquery&tables=songs&fields=_pageID,_pageName,song_id&order_by=song_id
+  &offset=…`, ~500/page) joined against `musics.json.id`. `song_id` is unique wiki-
+  side, so it's a 1:1 join. Verified: song_id 1/2/3 → pageid 432/398/928 (Tell Your
+  World / Roki / Teo); song_id 64 → pageid 1289 (Stella).
+* Fetch lyrics live **by stable `pageid`** (`action=parse&pageid=NNN&prop=wikitext`),
+  immune to renames/collisions.
+* **Coverage:** a `musics.json` id with no Cargo row is recorded in the map build as
+  `missing` (logged, never a silent wrong-page grab). Rebuild anytime; diff-review
+  catches wiki restructures.
+
+**Pipeline (mirrors conclusions).**
+1. **Map build (this phase):** `sekai build-lyric-map` → `lyric_page_map.json`
+   (paginated Cargo + join). Network but no key. Pure join is unit-tested; the Cargo
+   fetch is a thin `source/` client fn.
+2. **Lyric fetch (next):** `source/lyrics.py` — map `music_id → pageid`, fetch page
+   wikitext, parse `{{Lyrics line}}` → `[{jp, romaji, en}]`. Keyless (egress only),
+   never persisted.
+3. **Resonance pass (DONE):** `indexer/resonance.py` + `sekai resonance [--limit N]`
+   — input = event summary Overview + conclusion (cached or keyless heuristic) +
+   live-fetched lyrics → short resonance note → `resonance_cache.json`. **Provider-
+   agnostic** (injected `generate`): runs on Gemini via the CLI, or — while waiting on
+   Google credits — via **Claude subagents** driven from the session (same cache
+   format). Fingerprint is **content-only** (Overview+conclusion+lyrics+prompt
+   version, NOT the model), so Claude- and Gemini-generated notes coexist and don't
+   churn on a backend switch (verified: a Gemini run skips Claude's entries).
+   Resumable, spend-cap-graceful. Notes paraphrase — never reproduce lyric lines.
+   Seeded 3 events (0001 Stella / 0002 Jackpot Sad Girl / 0003 potato) via subagents.
+4. **Keyless serve (DONE):** `_RESONANCE_RE` intent in `_scoped_event_intercept`
+   ("how does the theme song relate to the story", "what does the song mean",
+   "song and story", "resonance") + a "Song & story" quick-action button
+   (`webapp/static/app.js`). Answered keyless from `resonance_cache` for the scoped
+   event; the citation shows the lyric-source attribution. No cached note → falls
+   through to normal retrieval (no fabricated reading). Raw lyrics never stored.
+   Verified live: event 1 → the seeded Stella note, English song + event names.
+
+Scope: the resonance intent covers event theme songs (`music_by_event`); the map
+itself covers all songs.

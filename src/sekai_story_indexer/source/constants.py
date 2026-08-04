@@ -20,6 +20,12 @@ ASSET_CDN = "https://storage.sekai.best/sekai-jp-assets"
 # scenes; JP stays the source of truth (and the fallback) everywhere else.
 EN_ASSET_CDN = "https://storage.sekai.best/sekai-en-assets"
 
+# Sekaipedia (community wiki) MediaWiki API. Its {{Infobox song}} template stores
+# structured data via Cargo (table `songs`) keyed by `song_id` == musics.json id —
+# the deterministic join used to map a song to its wiki page for live lyric fetch.
+# Lyric text is copyrighted: fetch live, never rehost; store only derived notes.
+SEKAIPEDIA_API = "https://www.sekaipedia.org/w/api.php"
+
 # Canonical unit slugs. These are the Tier-1 grouping for the index and the
 # value of ``--unit`` query scoping.
 UNIT_SLUGS: tuple[str, ...] = (

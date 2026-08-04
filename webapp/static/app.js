@@ -916,6 +916,7 @@ const QUICK_ACTIONS = [
   { label: "Summarize this event", q: "Summarize this event." },
   { label: "What's the conclusion?", q: "What happens at the end of this event?" },
   { label: "Who's the focus character?", q: "Who is the focus character of this event, and what is their arc?" },
+  { label: "Song & story", q: "How does the theme song relate to the story?" },
 ];
 
 // Fill the composer with `q` and submit it through the normal ask flow (reuses

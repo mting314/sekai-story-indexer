@@ -107,6 +107,40 @@ def link_content_command(
     )
 
 
+@app.command("build-lyric-map")
+def build_lyric_map_command(
+    out: Path = typer.Option(Path("lyric_page_map.json")),
+    page_size: int = typer.Option(500, help="Cargo rows per query (Cargo caps ~500)."),
+):
+    """Build lyric_page_map.json — map each master-DB song id to its Sekaipedia page
+    (stable pageid) via a deterministic join on song_id (Cargo `songs` table).
+
+    Our id data, not lyric text — safe to commit. Refreshable; songs with no wiki
+    page are reported as `missing` (never a silent wrong-page grab). Network, no key.
+    Downstream, lyric text is fetched LIVE by pageid at analysis time, never rehosted."""
+    from .source import client
+    from .source.transform import build_lyric_page_map
+
+    known_ids = {m["id"] for m in client.musics() if isinstance(m.get("id"), int)}
+    cargo_rows = client.sekaipedia_song_pages(page_size=page_size)
+    result = build_lyric_page_map(cargo_rows, known_ids)
+
+    payload = {
+        "_meta": {
+            "master_songs": len(known_ids),
+            "mapped": len(result["mapping"]),
+            "missing": result["missing"],
+            "wiki_only": len(result["extra"]),
+        },
+        "map": {str(k): result["mapping"][k] for k in sorted(result["mapping"])},
+    }
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    typer.echo(
+        f"Mapped {len(result['mapping'])}/{len(known_ids)} songs -> {out} "
+        f"({len(result['missing'])} missing, {len(result['extra'])} wiki-only)"
+    )
+
+
 @app.command("build-index")
 def build_index_command(
     story_root: Path = typer.Option(Path("story")),
@@ -384,6 +418,82 @@ def conclusions(
 
     have = sum(1 for k in final if k.startswith("EVENT|"))
     typer.echo(f"Done. {have}/{total} conclusions cached in {cache}.")
+
+
+@app.command()
+def resonance(
+    events_index: Path = typer.Option(Path("events_index.json")),
+    summaries: Path = typer.Option(Path("summaries_cache.json")),
+    page_map: Path = typer.Option(Path("lyric_page_map.json")),
+    conclusions: Path = typer.Option(Path("conclusions_cache.json")),
+    cache: Path = typer.Option(Path("resonance_cache.json")),
+    limit: int = typer.Option(0, help="Generate at most N NEW resonance notes (0 = all)."),
+    skip_existing: bool = typer.Option(False),
+    model: str = typer.Option("", help="Generation model (overrides SEKAI_INGEST_MODEL)."),
+):
+    """Derive a lyric↔story 'resonance' note per event — how the theme song mirrors
+    the story's arc/ending — into resonance_cache.json. Fetches lyrics live from
+    Sekaipedia (never rehosted), reuses summaries + (heuristic or cached) conclusions.
+    Needs GOOGLE_API_KEY + generation deps; fingerprint-cached, resumable. (While
+    waiting on credits, notes can also be populated via Claude subagents — same cache
+    format, content-only fingerprint.)"""
+    import os
+
+    if model:
+        os.environ["SEKAI_INGEST_MODEL"] = model
+    try:
+        from .database import (
+            create_generation_text_agent,
+            get_generation_model_name,
+            initialize_ingest_settings,
+        )
+        from .indexer.resonance import (
+            RESONANCE_SYSTEM_INSTRUCTIONS,
+            ResonanceExtractor,
+            assemble_resonance_inputs,
+        )
+        from .source.lyrics import load_page_map
+    except ImportError as exc:
+        typer.secho(
+            f"`sekai resonance` needs the generation deps: {exc}\nInstall with `uv sync`.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1) from exc
+
+    if not summaries.exists() or not page_map.exists():
+        typer.secho(
+            "Need summaries_cache.json (run `sekai summarize`) and lyric_page_map.json "
+            "(run `sekai build-lyric-map`).",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    initialize_ingest_settings()
+    typer.echo(f"generation: model={get_generation_model_name()}")
+    evidx = json.loads(events_index.read_text(encoding="utf-8"))
+    summ = json.loads(summaries.read_text(encoding="utf-8"))
+    concl = json.loads(conclusions.read_text(encoding="utf-8")) if conclusions.exists() else None
+    inputs = assemble_resonance_inputs(evidx, summ, load_page_map(page_map), conclusions=concl)
+    typer.echo(f"{len(inputs)} events with summary + fetchable lyrics · limit={limit or 'all'}")
+
+    def generate(prompt: str) -> str:
+        return create_generation_text_agent(RESONANCE_SYSTEM_INSTRUCTIONS).run_sync(prompt).output
+
+    extractor = ResonanceExtractor(generate, model=get_generation_model_name())
+    try:
+        final = extractor.extract(inputs, cache_file=str(cache), limit=limit, skip_existing=skip_existing)
+    except Exception as exc:
+        msg = str(exc)
+        if not any(s in msg for s in ("429", "RESOURCE_EXHAUSTED", "spend", "quota")):
+            raise
+        typer.secho(
+            f"\nStopped early (API limit): {msg[:200]}\nProgress saved; re-run to resume.",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1) from exc
+
+    have = sum(1 for k in final if k.startswith("EVENT|"))
+    typer.echo(f"Done. {have} resonance notes cached in {cache}.")
 
 
 @app.command("eval")

@@ -21,6 +21,7 @@ from sekai_story_indexer.source.transform import (
     build_area_event_map,
     build_card_parent_map,
     build_content_parents,
+    build_lyric_page_map,
     en_sidecar_path,
     episode_filename,
     focus_character_id,
@@ -295,6 +296,57 @@ def _story():
             {"episodeNo": 1, "title": "One", "scenarioId": "ev_151_01"},
         ],
     }
+
+
+def test_build_lyric_page_map_joins_on_song_id():
+    cargo_rows = [
+        {"song_id": 1, "pageid": 432, "title": "Tell Your World", "english": "Tell Your World"},
+        {"song_id": 62, "pageid": 900, "title": "Jackpot Sad Girl", "english": "Jackpot Sad Girl"},
+        {"song_id": 999, "pageid": 5000, "title": "Wiki-only", "english": ""},  # not in master DB
+    ]
+    result = build_lyric_page_map(cargo_rows, known_music_ids={1, 62, 77})
+    assert result["mapping"] == {
+        1: {"pageid": 432, "title": "Tell Your World", "english": "Tell Your World"},
+        62: {"pageid": 900, "title": "Jackpot Sad Girl", "english": "Jackpot Sad Girl"},
+    }
+    assert result["missing"] == [77]   # master-DB song with no wiki page
+    assert result["extra"] == [999]    # wiki song absent from master DB
+
+
+def test_build_lyric_page_map_ignores_bad_rows_and_dupes():
+    rows = [
+        {"song_id": 5, "pageid": 10, "title": "First", "english": "First EN"},
+        {"song_id": 5, "pageid": 11, "title": "Dupe (ignored)"},  # unique key: first wins
+        {"song_id": None, "pageid": 12, "title": "No id"},        # skipped
+    ]
+    result = build_lyric_page_map(rows, known_music_ids={5})
+    assert result["mapping"] == {5: {"pageid": 10, "title": "First", "english": "First EN"}}
+
+
+def test_sekaipedia_song_pages_paginates_and_normalizes(monkeypatch):
+    from sekai_story_indexer.source import client
+
+    # Two Cargo pages of size 2, then empty. Cargo nests fields under "title";
+    # values are strings; a non-numeric row must be dropped.
+    pages = {
+        0: [{"title": {"song_id": "1", "pageid": "432", "title": "Tell Your World", "english": "Tell Your World"}},
+            {"title": {"song_id": "x", "pageid": "9", "title": "junk", "english": ""}}],  # dropped
+        2: [{"title": {"song_id": "64", "pageid": "1289", "title": "Stella", "english": "Stella"}},
+            {"title": {"song_id": "52", "pageid": "1290", "title": "Potato ni Natte iku", "english": "Becoming Potatoes"}}],
+        4: [],
+    }
+
+    def fake_fetch(url):
+        offset = int(url.split("offset=")[1].split("&")[0])
+        return {"cargoquery": pages[offset]}
+
+    monkeypatch.setattr(client, "fetch_json", fake_fetch)
+    rows = client.sekaipedia_song_pages(page_size=2)
+    assert rows == [
+        {"song_id": 1, "pageid": 432, "title": "Tell Your World", "english": "Tell Your World"},
+        {"song_id": 64, "pageid": 1289, "title": "Stella", "english": "Stella"},
+        {"song_id": 52, "pageid": 1290, "title": "Potato ni Natte iku", "english": "Becoming Potatoes"},
+    ]
 
 
 def test_resolve_unit_from_story_units_prefers_main_relation():
