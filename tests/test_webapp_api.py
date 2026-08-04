@@ -802,3 +802,28 @@ def test_attach_summary_sections_noop_on_plain_text():
     r = {}
     server._attach_summary_sections(r, "Summary of X (excerpts):\nEna: hi\nMizuki: yo")
     assert "sections" not in r  # extractive skim has no real sections -> no tabs
+
+
+def test_episode_raw_live_fallback_when_no_local_file(tmp_path, monkeypatch):
+    """When the corpus isn't on disk (public deploy / partial sample), episode-raw
+    fetches the scene LIVE via scene_sources instead of returning 'unavailable'."""
+    import importlib
+
+    from webapp import server as srv
+
+    importlib.reload(srv)
+    monkeypatch.setenv("SEKAI_STORY_ROOT", str(tmp_path))  # empty -> no on-disk match
+    monkeypatch.setattr(
+        srv, "_scene_sources",
+        lambda: {"0001-x/01-y": {"bundle": "b", "scenario_id": "s", "region": "jp"}},
+    )
+    monkeypatch.setattr(
+        srv, "_fetch_scene_live",
+        lambda coords, q="", fetch=None: {"title": "", "text": "Saki: hi", "quote": "", "region": "jp"},
+    )
+    out = srv.episode_raw("0001-x", "01-y")
+    assert out["text"] == "Saki: hi" and out["region"] == "jp"
+
+    # No coords for the scene -> genuinely empty (unchanged behavior).
+    monkeypatch.setattr(srv, "_scene_sources", lambda: {})
+    assert srv.episode_raw("0001-x", "01-y")["text"] == ""

@@ -360,6 +360,16 @@ def episode_raw(arc: str, episode: str) -> dict:
     root = Path(os.environ.get("SEKAI_STORY_ROOT", "story"))
     matches = list(root.glob(f"*/*/{arc}/{episode}.md"))
     if not matches:
+        # No on-disk prose (public deploy, or a partial local sample) -> fetch the
+        # scene LIVE from sekai.best via its coords (transient, never stored), so the
+        # sidebar still renders. On-disk wins when present (local dev); this is the
+        # fallback. Empty only when the scene has no coords either.
+        coords = _scene_sources().get(f"{arc}/{episode}")
+        if coords:
+            live = _fetch_scene_live(coords)
+            if live.get("text"):
+                return {"title": live.get("title") or episode,
+                        "text": live["text"], "region": live.get("region")}
         return {"title": episode, "text": "", "region": None}
     jp = matches[0]
     en = jp.with_name(jp.name + ".en")  # co-located official-EN sidecar
