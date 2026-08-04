@@ -151,12 +151,21 @@ def events() -> list[dict]:
 _event_children_cache: dict[str, Any] = {"mtime": None, "data": {}}
 
 
+def _content_parents_path() -> Path:
+    env = os.environ.get("SEKAI_CONTENT_PARENTS")
+    cands = (
+        [Path(env)] if env
+        else [Path("content_parents.json"), HERE.parent / "content_parents.json"]
+    )
+    return next((c for c in cands if c.exists()), cands[-1])
+
+
 def _event_children() -> dict[str, dict]:
     """Per-event card/area child counts, inverted from ``content_parents.json``
     (``{event_arc: {"cards": N, "area_talks": N}}``). Cheap (no disk scan) and
     cached on the file's mtime. Returns ``{}`` when the corpus hasn't been linked
     (`sekai link-content`) — so the timeline simply shows no children then."""
-    path = Path("content_parents.json")
+    path = _content_parents_path()
     mtime = path.stat().st_mtime if path.exists() else None
     if mtime != _event_children_cache["mtime"]:
         counts: dict[str, dict] = {}

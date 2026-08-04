@@ -91,8 +91,12 @@ def test_event_children_counts_from_content_parents(tmp_path, monkeypatch):
     import json as _json
 
     from webapp import server as srv
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "content_parents.json").write_text(_json.dumps({
+
+    # Point at an isolated file via the env override (the repo's real
+    # content_parents.json sits at HERE.parent, so don't rely on CWD alone).
+    cp = tmp_path / "content_parents.json"
+    monkeypatch.setenv("SEKAI_CONTENT_PARENTS", str(cp))
+    cp.write_text(_json.dumps({
         "cards": {"1": {"parent_arc_id": "0150-x"}, "2": {"parent_arc_id": "0150-x"},
                   "3": {"parent_arc_id": ""}},  # no parent -> not counted
         "areas": {"a": {"parent_arc_id": "0150-x"}, "b": {"parent_arc_id": "0002-y"}},
@@ -102,7 +106,7 @@ def test_event_children_counts_from_content_parents(tmp_path, monkeypatch):
     assert out["0150-x"] == {"cards": 2, "area_talks": 1}
     assert out["0002-y"] == {"cards": 0, "area_talks": 1}
     # absent file -> empty (graceful when the corpus isn't linked)
-    (tmp_path / "content_parents.json").unlink()
+    cp.unlink()
     srv._event_children_cache.update(mtime=None, data={})
     assert srv._event_children() == {}
 
