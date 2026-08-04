@@ -20,6 +20,7 @@ import json
 import os
 import re
 import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -408,32 +409,66 @@ def _scene_sources() -> dict:
     return _scene_sources_cache["map"]  # type: ignore[return-value]
 
 
-def _fetch_scene_live(coords: dict, q: str = "", fetch=None) -> dict:
-    """Fetch + render one scene from sekai.best (transient). Prefers the official-EN
-    CDN, falling back to JP when the scene isn't localized. When ``q`` is given, also
-    pick the exact best-matching source line as ``quote`` (over the transient text —
-    nothing stored). ``fetch`` injectable for tests (used verbatim, region = coords)."""
+# Small bounded cache of rendered scene text keyed by (bundle, scenario_id), so a
+# citation clicked repeatedly (or via both /api/scene and /api/episode-raw) only hits
+# sekai.best once. Only successful fetches are cached (never pin a transient failure);
+# `q`-dependent quote-matching stays per-call over the cached text. Text is derived,
+# not the stored corpus — this is a runtime memo, consistent with never-rehost.
+_scene_text_cache: OrderedDict[tuple, tuple[str, str | None]] = OrderedDict()
+_SCENE_TEXT_CACHE_MAX = 256
+
+
+def _scene_text(bundle: str, sid: str) -> tuple[str, str | None]:
+    """``(text, region)`` for a scene from sekai.best (official-EN first, JP fallback),
+    memoized. ``("", None)`` when neither CDN has it."""
+    key = (bundle, sid)
+    hit = _scene_text_cache.get(key)
+    if hit is not None:
+        _scene_text_cache.move_to_end(key)  # LRU touch
+        return hit
+
     from sekai_story_indexer.source import client
     from sekai_story_indexer.source.transform import scenario_to_lines
 
+    scenario = client.en_event_scenario(bundle, sid)  # {} when not localized
+    region: str | None = "en" if scenario else None
+    if not scenario:
+        try:
+            scenario, region = client.event_scenario(bundle, sid), "jp"
+        except Exception:
+            scenario, region = {}, None
+    if not scenario:
+        return ("", None)  # don't cache failures (may be transient)
+    lines = scenario_to_lines(scenario)
+    result = ("\n".join(f"{sp}: {t}" if sp else t for sp, t in lines), region)
+    _scene_text_cache[key] = result
+    if len(_scene_text_cache) > _SCENE_TEXT_CACHE_MAX:
+        _scene_text_cache.popitem(last=False)  # evict least-recently-used
+    return result
+
+
+def _fetch_scene_live(coords: dict, q: str = "", fetch=None) -> dict:
+    """Fetch + render one scene from sekai.best (transient, cached). Prefers the
+    official-EN CDN, falling back to JP when the scene isn't localized. When ``q`` is
+    given, also pick the exact best-matching source line as ``quote`` (over the
+    transient text — nothing stored). ``fetch`` injectable for tests (bypasses the
+    cache; used verbatim, region = coords)."""
+    from sekai_story_indexer.source.transform import scenario_to_lines
+
     bundle, sid = coords.get("bundle"), coords.get("scenario_id")
-    if fetch is not None:  # test injection
+    if fetch is not None:  # test injection: no cache, no network
         try:
             scenario, region = fetch(bundle, sid), coords.get("region")
         except Exception:
             scenario, region = {}, None
-    else:  # official EN first, JP fallback
-        scenario = client.en_event_scenario(bundle, sid)  # {} when not localized
-        region = "en" if scenario else None
         if not scenario:
-            try:
-                scenario, region = client.event_scenario(bundle, sid), "jp"
-            except Exception:
-                scenario, region = {}, None
-    if not scenario:
-        return {"title": "", "text": "", "quote": "", "region": None}
-    lines = scenario_to_lines(scenario)
-    text = "\n".join(f"{sp}: {t}" if sp else t for sp, t in lines)
+            return {"title": "", "text": "", "quote": "", "region": None}
+        lines = scenario_to_lines(scenario)
+        text = "\n".join(f"{sp}: {t}" if sp else t for sp, t in lines)
+    else:
+        text, region = _scene_text(bundle, sid)
+        if not text:
+            return {"title": "", "text": "", "quote": "", "region": None}
     quote = _best_supporting_line(text, q) if q else ""
     return {"title": "", "text": text, "quote": quote, "region": region}
 

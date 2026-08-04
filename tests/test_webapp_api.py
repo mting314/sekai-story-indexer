@@ -35,6 +35,16 @@ def client():
     return TestClient(server_module.app)
 
 
+@pytest.fixture(autouse=True)
+def _clear_scene_text_cache():
+    """The live-scene memo is module-global; clear it before each test so a cached
+    (bundle, scenario_id) from one test can't leak into another's monkeypatched fetch."""
+    from webapp import server
+
+    server._scene_text_cache.clear()
+    yield
+
+
 def test_scoped_event_intercept_answers_from_summary(tmp_path, monkeypatch):
     """Analytical quick-actions ('focus character' / 'conclusion' / 'summarize this
     event') are answered from the scoped event's summary + focus metadata — keyed off
@@ -827,3 +837,40 @@ def test_episode_raw_live_fallback_when_no_local_file(tmp_path, monkeypatch):
     # No coords for the scene -> genuinely empty (unchanged behavior).
     monkeypatch.setattr(srv, "_scene_sources", lambda: {})
     assert srv.episode_raw("0001-x", "01-y")["text"] == ""
+
+
+def test_scene_text_caches_successful_fetch(monkeypatch):
+    """A repeated scene fetch hits sekai.best once (LRU memo)."""
+    from sekai_story_indexer.source import client
+    from webapp import server as srv
+
+    srv._scene_text_cache.clear()
+    calls = {"n": 0}
+
+    def fake_en(bundle, sid):
+        calls["n"] += 1
+        return {"TalkData": [{"WindowDisplayName": "Saki", "Body": "hi"}]}
+
+    monkeypatch.setattr(client, "en_event_scenario", fake_en)
+    assert srv._scene_text("b", "s") == ("Saki: hi", "en")
+    assert srv._scene_text("b", "s") == ("Saki: hi", "en")
+    assert calls["n"] == 1  # second call served from cache
+
+
+def test_scene_text_does_not_cache_failures(monkeypatch):
+    """A failed fetch is NOT cached, so a transient error can be retried."""
+    from sekai_story_indexer.source import client
+    from webapp import server as srv
+
+    srv._scene_text_cache.clear()
+    calls = {"n": 0}
+    monkeypatch.setattr(client, "en_event_scenario", lambda b, s: {})
+
+    def raising_jp(bundle, sid):
+        calls["n"] += 1
+        raise RuntimeError("net")
+
+    monkeypatch.setattr(client, "event_scenario", raising_jp)
+    assert srv._scene_text("b", "s") == ("", None)
+    assert srv._scene_text("b", "s") == ("", None)
+    assert calls["n"] == 2  # retried, not pinned
