@@ -19,7 +19,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -348,6 +350,19 @@ def hierarchical_summaries() -> dict:
 _SLUG_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
+def _episode_title(arc: str, episode: str) -> str:
+    """Official-EN display title for a scene from its event's ``episode_titles_en``
+    ({episodeNo: title}); episode number is the ``NN_`` slug prefix. ``''`` when
+    unresolved (e.g. not localized) — callers fall back to the slug/citation label."""
+    m = re.match(r"(\d+)", episode)
+    if not m:
+        return ""
+    epno = int(m.group(1))
+    ev = next((e for e in load_events() if e.get("arc_slug") == arc), None)
+    titles = (ev or {}).get("episode_titles_en") or {}
+    return titles.get(epno) or titles.get(str(epno)) or ""
+
+
 @app.get("/api/episode-raw")
 def episode_raw(arc: str, episode: str) -> dict:
     """Raw episode transcript (H1 title + scene text) for the sidebar, read from the
@@ -360,6 +375,16 @@ def episode_raw(arc: str, episode: str) -> dict:
     root = Path(os.environ.get("SEKAI_STORY_ROOT", "story"))
     matches = list(root.glob(f"*/*/{arc}/{episode}.md"))
     if not matches:
+        # No on-disk prose (public deploy, or a partial local sample) -> fetch the
+        # scene LIVE from sekai.best via its coords (transient, never stored), so the
+        # sidebar still renders. On-disk wins when present (local dev); this is the
+        # fallback. Empty only when the scene has no coords either.
+        coords = _scene_sources().get(f"{arc}/{episode}")
+        if coords:
+            live = _fetch_scene_live(coords)
+            if live.get("text"):
+                return {"title": _episode_title(arc, episode) or episode,
+                        "text": live["text"], "region": live.get("region")}
         return {"title": episode, "text": "", "region": None}
     jp = matches[0]
     en = jp.with_name(jp.name + ".en")  # co-located official-EN sidecar
@@ -398,32 +423,70 @@ def _scene_sources() -> dict:
     return _scene_sources_cache["map"]  # type: ignore[return-value]
 
 
-def _fetch_scene_live(coords: dict, q: str = "", fetch=None) -> dict:
-    """Fetch + render one scene from sekai.best (transient). Prefers the official-EN
-    CDN, falling back to JP when the scene isn't localized. When ``q`` is given, also
-    pick the exact best-matching source line as ``quote`` (over the transient text —
-    nothing stored). ``fetch`` injectable for tests (used verbatim, region = coords)."""
+# Small bounded cache of rendered scene text keyed by (bundle, scenario_id), so a
+# citation clicked repeatedly (or via both /api/scene and /api/episode-raw) only hits
+# sekai.best once. Only successful fetches are cached (never pin a transient failure);
+# `q`-dependent quote-matching stays per-call over the cached text. Text is derived,
+# not the stored corpus — this is a runtime memo, consistent with never-rehost.
+_scene_text_cache: OrderedDict[tuple, tuple[str, str | None]] = OrderedDict()
+_scene_text_lock = threading.Lock()  # endpoints are sync -> served in a threadpool
+_SCENE_TEXT_CACHE_MAX = 256
+
+
+def _scene_text(bundle: str, sid: str) -> tuple[str, str | None]:
+    """``(text, region)`` for a scene from sekai.best (official-EN first, JP fallback),
+    memoized (thread-safe). ``("", None)`` when neither CDN has it."""
+    key = (bundle, sid)
+    with _scene_text_lock:  # lock only the O(1) dict ops, never the network fetch
+        hit = _scene_text_cache.get(key)
+        if hit is not None:
+            _scene_text_cache.move_to_end(key)  # LRU touch
+            return hit
+
     from sekai_story_indexer.source import client
     from sekai_story_indexer.source.transform import scenario_to_lines
 
+    scenario = client.en_event_scenario(bundle, sid)  # {} when not localized
+    region: str | None = "en" if scenario else None
+    if not scenario:
+        try:
+            scenario, region = client.event_scenario(bundle, sid), "jp"
+        except Exception:
+            scenario, region = {}, None
+    if not scenario:
+        return ("", None)  # don't cache failures (may be transient)
+    lines = scenario_to_lines(scenario)
+    result = ("\n".join(f"{sp}: {t}" if sp else t for sp, t in lines), region)
+    with _scene_text_lock:
+        _scene_text_cache[key] = result
+        _scene_text_cache.move_to_end(key)  # MRU (a racing writer may have re-added it)
+        while len(_scene_text_cache) > _SCENE_TEXT_CACHE_MAX:
+            _scene_text_cache.popitem(last=False)  # evict least-recently-used
+    return result
+
+
+def _fetch_scene_live(coords: dict, q: str = "", fetch=None) -> dict:
+    """Fetch + render one scene from sekai.best (transient, cached). Prefers the
+    official-EN CDN, falling back to JP when the scene isn't localized. When ``q`` is
+    given, also pick the exact best-matching source line as ``quote`` (over the
+    transient text — nothing stored). ``fetch`` injectable for tests (bypasses the
+    cache; used verbatim, region = coords)."""
+    from sekai_story_indexer.source.transform import scenario_to_lines
+
     bundle, sid = coords.get("bundle"), coords.get("scenario_id")
-    if fetch is not None:  # test injection
+    if fetch is not None:  # test injection: no cache, no network
         try:
             scenario, region = fetch(bundle, sid), coords.get("region")
         except Exception:
             scenario, region = {}, None
-    else:  # official EN first, JP fallback
-        scenario = client.en_event_scenario(bundle, sid)  # {} when not localized
-        region = "en" if scenario else None
         if not scenario:
-            try:
-                scenario, region = client.event_scenario(bundle, sid), "jp"
-            except Exception:
-                scenario, region = {}, None
-    if not scenario:
-        return {"title": "", "text": "", "quote": "", "region": None}
-    lines = scenario_to_lines(scenario)
-    text = "\n".join(f"{sp}: {t}" if sp else t for sp, t in lines)
+            return {"title": "", "text": "", "quote": "", "region": None}
+        lines = scenario_to_lines(scenario)
+        text = "\n".join(f"{sp}: {t}" if sp else t for sp, t in lines)
+    else:
+        text, region = _scene_text(bundle, sid)
+        if not text:
+            return {"title": "", "text": "", "quote": "", "region": None}
     quote = _best_supporting_line(text, q) if q else ""
     return {"title": "", "text": text, "quote": quote, "region": region}
 
@@ -438,7 +501,10 @@ def scene_live(arc: str, episode: str, q: str = "") -> dict:
     coords = _scene_sources().get(f"{arc}/{episode}")
     if not coords:
         return {"title": episode, "text": "", "quote": ""}
-    return _fetch_scene_live(coords, q=q)
+    res = _fetch_scene_live(coords, q=q)
+    if res.get("text"):
+        res["title"] = _episode_title(arc, episode) or episode
+    return res
 
 
 class QueryRequest(BaseModel):

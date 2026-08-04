@@ -35,6 +35,16 @@ def client():
     return TestClient(server_module.app)
 
 
+@pytest.fixture(autouse=True)
+def _clear_scene_text_cache():
+    """The live-scene memo is module-global; clear it before each test so a cached
+    (bundle, scenario_id) from one test can't leak into another's monkeypatched fetch."""
+    from webapp import server
+
+    server._scene_text_cache.clear()
+    yield
+
+
 def test_scoped_event_intercept_answers_from_summary(tmp_path, monkeypatch):
     """Analytical quick-actions ('focus character' / 'conclusion' / 'summarize this
     event') are answered from the scoped event's summary + focus metadata — keyed off
@@ -802,3 +812,120 @@ def test_attach_summary_sections_noop_on_plain_text():
     r = {}
     server._attach_summary_sections(r, "Summary of X (excerpts):\nEna: hi\nMizuki: yo")
     assert "sections" not in r  # extractive skim has no real sections -> no tabs
+
+
+def test_episode_raw_live_fallback_when_no_local_file(tmp_path, monkeypatch):
+    """When the corpus isn't on disk (public deploy / partial sample), episode-raw
+    fetches the scene LIVE via scene_sources instead of returning 'unavailable'."""
+    import importlib
+
+    from webapp import server as srv
+
+    importlib.reload(srv)
+    monkeypatch.setenv("SEKAI_STORY_ROOT", str(tmp_path))  # empty -> no on-disk match
+    monkeypatch.setattr(
+        srv, "load_events",
+        lambda: [{"arc_slug": "0001-x", "episode_titles_en": {1: "Alone in the Rain"}}],
+    )
+    monkeypatch.setattr(
+        srv, "_scene_sources",
+        lambda: {"0001-x/01-y": {"bundle": "b", "scenario_id": "s", "region": "jp"}},
+    )
+    monkeypatch.setattr(
+        srv, "_fetch_scene_live",
+        lambda coords, q="", fetch=None: {"title": "", "text": "Saki: hi", "quote": "", "region": "jp"},
+    )
+    out = srv.episode_raw("0001-x", "01-y")
+    assert out["text"] == "Saki: hi" and out["region"] == "jp"
+    assert out["title"] == "Alone in the Rain"  # official-EN title, not the slug
+
+    # No coords for the scene -> genuinely empty (unchanged behavior).
+    monkeypatch.setattr(srv, "_scene_sources", lambda: {})
+    assert srv.episode_raw("0001-x", "01-y")["text"] == ""
+
+
+def test_episode_title_resolution(monkeypatch):
+    from webapp import server as srv
+
+    monkeypatch.setattr(
+        srv, "load_events",
+        lambda: [{"arc_slug": "0001-x", "episode_titles_en": {2: "Together With Everyone"}},
+                 {"arc_slug": "0002-y", "episode_titles_en": {"3": "Str Key Title"}}],
+    )
+    assert srv._episode_title("0001-x", "02_minna") == "Together With Everyone"  # int key, zero-padded slug
+    assert srv._episode_title("0002-y", "03_z") == "Str Key Title"               # str key
+    assert srv._episode_title("0001-x", "99_none") == ""                          # no such episode
+    assert srv._episode_title("nope", "02_x") == ""                              # no such arc
+    assert srv._episode_title("0001-x", "Overview") == ""                        # non-numeric slug
+
+
+def test_scene_text_caches_successful_fetch(monkeypatch):
+    """A repeated scene fetch hits sekai.best once (LRU memo)."""
+    from sekai_story_indexer.source import client
+    from webapp import server as srv
+
+    srv._scene_text_cache.clear()
+    calls = {"n": 0}
+
+    def fake_en(bundle, sid):
+        calls["n"] += 1
+        return {"TalkData": [{"WindowDisplayName": "Saki", "Body": "hi"}]}
+
+    monkeypatch.setattr(client, "en_event_scenario", fake_en)
+    assert srv._scene_text("b", "s") == ("Saki: hi", "en")
+    assert srv._scene_text("b", "s") == ("Saki: hi", "en")
+    assert calls["n"] == 1  # second call served from cache
+
+
+def test_scene_text_does_not_cache_failures(monkeypatch):
+    """A failed fetch is NOT cached, so a transient error can be retried."""
+    from sekai_story_indexer.source import client
+    from webapp import server as srv
+
+    srv._scene_text_cache.clear()
+    calls = {"n": 0}
+    monkeypatch.setattr(client, "en_event_scenario", lambda b, s: {})
+
+    def raising_jp(bundle, sid):
+        calls["n"] += 1
+        raise RuntimeError("net")
+
+    monkeypatch.setattr(client, "event_scenario", raising_jp)
+    assert srv._scene_text("b", "s") == ("", None)
+    assert srv._scene_text("b", "s") == ("", None)
+    assert calls["n"] == 2  # retried, not pinned
+
+
+def test_scene_text_thread_safe(monkeypatch):
+    """Concurrent fetches of the same scene (sync endpoints run in a threadpool) must
+    not raise and must all agree — no torn LRU state."""
+    import threading
+    import time
+
+    from sekai_story_indexer.source import client
+    from webapp import server as srv
+
+    srv._scene_text_cache.clear()
+
+    def slow_en(bundle, sid):
+        time.sleep(0.01)  # widen the race window
+        return {"TalkData": [{"WindowDisplayName": "S", "Body": "x"}]}
+
+    monkeypatch.setattr(client, "en_event_scenario", slow_en)
+    results, errors = [], []
+
+    def worker():
+        try:
+            results.append(srv._scene_text("b", "s"))
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(12)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors
+    assert results == [("S: x", "en")] * 12
+    assert ("b", "s") in srv._scene_text_cache
