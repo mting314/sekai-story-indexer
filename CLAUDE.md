@@ -57,11 +57,15 @@ with any interpreter that has `pydantic`+`pyyaml`:
   lexical engine (`query/local.py`): deterministic TF-IDF retrieval + unit/nickname
   (`kasa5`) scoping + indexed-only queryable contract. This is what makes the app
   runnable + evals stable anywhere.
-  * `sekai summarize [--limit N]` is the one command that needs `GOOGLE_API_KEY` +
-    generation deps: it runs the LLM Refine event-tier summarizer into
-    `summaries_cache.json` (fingerprint-cached, resumable, continuity-threaded;
-    `--limit N` generates at most N new summaries; `thinking_level=low` for cost).
-    Graceful stop on a spend-cap 429.
+  * `sekai summarize [--limit N]` and `sekai conclusions [--limit N]` are the two
+    commands that need `GOOGLE_API_KEY` + generation deps. `summarize` runs the LLM
+    Refine event-tier summarizer into `summaries_cache.json` (fingerprint-cached,
+    resumable, continuity-threaded; `--limit N` caps new summaries;
+    `thinking_level=low` for cost; graceful stop on a spend-cap 429). `conclusions`
+    is a cheap second pass over each summary's Overview + Episode Index (not full
+    scenes) that writes a climax episode + "how it ends" into `conclusions_cache.json`
+    (same fingerprint/resume/spend-cap semantics), served keyless by the conclusion
+    intent. Run `summarize` first.
 * `/api/query` picks backend via `SEKAI_QUERY_BACKEND` (`local` default, `full`).
 
 ## Run / test locally (no keys)
@@ -91,6 +95,11 @@ No PyPI-egress? `PYTHONPATH=src <python-with-pydantic> -m pytest tests/`. The
   - Cross-lingual glossary bridge; quote-grounded answers + excerpt sidebar;
     official-EN episode titles in citation labels (`_episode_title` +
     `episode_titles_en` serve-time overlay, JP H1 fallback).
+  - **Focused conclusions** (`query/conclusion.py`): "what's the conclusion?" serves
+    a climax-episode + "how it ends" from `conclusions_cache.json` (built keyed by
+    `sekai conclusions`), keyless; no cache → a heuristic that picks the resolution
+    beat over the epilogue (Sekai events close on a coda after the climax, so "last
+    episode" is the wrong pick). Replaces the old Overview + Continuity Facts dump.
 - **LLM Refine event summarizer**: runnable standalone via `sekai summarize
   [--limit N]` (`thinking_level=low`); **136/209 event summaries built** into
   `summaries_cache.json` (rest blocked on a Gemini spend cap — resume with
@@ -105,9 +114,10 @@ No PyPI-egress? `PYTHONPATH=src <python-with-pydantic> -m pytest tests/`. The
 - Fetch is resilient (retries IncompleteRead) + resumable (`--skip-existing`).
 
 ## Tests
-CI runs the **full** suite (`uv run pytest -q`) — **417 passing**. chromadb is
+CI runs the **full** suite (`uv run pytest -q`) — **453 passing**. chromadb is
 installed in CI, so the inherited linkura tests collect + run too; **run the full
 `uv run pytest` locally before pushing, not just a Sekai subset** (a subset-only
 run once missed a `test_database.py` break that CI caught). Sekai-specific files:
 `test_sekai_source test_local_query test_scoping test_eval_local test_webapp_api
-test_content_and_summaries test_sessions test_generate_config test_summarize_limit`.
+test_content_and_summaries test_sessions test_generate_config test_summarize_limit
+test_conclusion test_conclusions_extractor`.

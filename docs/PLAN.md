@@ -201,14 +201,28 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   thinking, ~82% cheaper, and actually honored unlike `thinking_budget`), with a
   retry that drops `thinking_config` if a model rejects `thinking_level`.
   `query/generate.py`.
-* **"What's the conclusion?" quick-action just returns the summary (TODO).** The
-  scoped conclusion intent (`_scoped_event_intercept`, `_CONCLUSION_RE`) currently
-  answers with the summary's Overview + Continuity Facts — which reads as "just the
-  summary," not the event's actual ending/resolution. Give it a focused conclusion
-  instead: e.g. the final beat from the last Episode Index entry (+ the resolution
-  sentences of the Overview), or a dedicated short "how it ends" synthesis — not the
-  whole Overview. Keyless: derive from the summary's tail (last episode + closing
-  Continuity); with a key: synthesize a brief conclusion from the final scenes.
+* **"What's the conclusion?" quick-action — focused ending, not the summary (DONE).**
+  The scoped conclusion intent (`_scoped_event_intercept`, `_CONCLUSION_RE` in
+  `webapp/server.py`) used to answer with the summary's Overview + Continuity Facts —
+  which read as "just the summary," and worse, the Overview leads with the *setup*, so
+  "how it concludes" opened on the beginning. Fixed with a focused conclusion, keeping
+  the app's generate-offline / serve-keyless split:
+  * **Build-time (keyed):** `sekai conclusions [--limit N]` runs a cheap second LLM
+    pass over each event's **Overview + Episode Index only** (~a dozen lines, not the
+    full scenes — so it sidesteps the summary-regen spend cap) and writes a climax
+    episode + short "how it ends" into `conclusions_cache.json`. Fingerprint-cached on
+    the summary content, resumable, spend-cap-graceful — mirrors `sekai summarize`.
+    `indexer/conclusions.py`.
+  * **Query-time (keyless):** `query/conclusion.py::derive_conclusion` serves that
+    cached conclusion with no API call. When there's no cache entry it falls back to a
+    keyless **heuristic** that scores the Episode Index beats and picks the *resolution*
+    beat, not the last one — because Sekai events almost always close on an epilogue
+    (a live, an afterparty, a Sekai reward scene) *after* the climax, so "last episode"
+    is systematically the wrong pick (e.g. Leo/need ep1 resolves in ep7; ep8 is the
+    planetarium coda). Labelled-approximate; the cache is the real answer.
+  * **Next:** run `sekai conclusions` wherever a key + egress exist to populate the
+    cache for the 136 built summaries; consider baking `climax_episode` into the
+    citation/UI so the "how it ends" links to the right episode.
 * **Live transcript fetch on the deployed site — no corpus in the repo (TODO).**
   Now that `story/` is untracked (copyrighted prose isn't checked in), a deployed
   site must obtain verbatim quotes / direct story references by fetching lines

@@ -230,6 +230,39 @@ def _event_summaries_map() -> dict:
     return _event_summaries_cache["map"]  # type: ignore[return-value]
 
 
+def _conclusions_cache_path() -> Path:
+    env = os.environ.get("SEKAI_CONCLUSIONS_CACHE")
+    candidates = (
+        [Path(env)] if env
+        else [Path("conclusions_cache.json"), HERE.parent / "conclusions_cache.json"]
+    )
+    return next((p for p in candidates if p.exists()), candidates[-1])
+
+
+_conclusions_cache: dict[str, Any] = {"key": object(), "map": {}}
+
+
+def _conclusions_map() -> dict:
+    """``{arc -> conclusion entry}`` from ``conclusions_cache.json`` (``EVENT|<arc>``
+    tier); {} when the cache is absent. The keyless serve of the offline `sekai
+    conclusions` pass. Cached + mtime-invalidated like the summaries map."""
+    path = _conclusions_cache_path()
+    try:
+        key = (str(path), path.stat().st_mtime)
+    except OSError:
+        key = (str(path), None)
+    if _conclusions_cache["key"] != key:
+        try:
+            cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        except Exception:
+            cache = {}
+        _conclusions_cache["map"] = {
+            k.split("|", 1)[1]: v for k, v in cache.items() if k.startswith("EVENT|")
+        }
+        _conclusions_cache["key"] = key
+    return _conclusions_cache["map"]  # type: ignore[return-value]
+
+
 @app.get("/api/hierarchical-summaries")
 def hierarchical_summaries() -> dict:
     """Tiered event -> episode -> part summaries from the hierarchical cache
@@ -1064,8 +1097,14 @@ def _scoped_event_intercept(req: QueryRequest, prev: Focus | None) -> dict | Non
                     + f" is {fc}.\n\nCharacter Trajectories:\n{traj}")
             label, intent = f"{name} — focus character", "focus_character"
         elif want_concl and not want_sum:
-            chunks = [c for c in (sections.get("Overview"), sections.get("Continuity Facts")) if c]
-            body = (f"How {name} concludes:\n\n" + "\n\n".join(chunks)) if chunks else summary
+            from sekai_story_indexer.query.conclusion import derive_conclusion
+
+            # Prefer the pre-built semantic conclusion (offline `sekai conclusions`);
+            # else a keyless heuristic picks the resolution beat over the epilogue.
+            # NOT the old Overview + Continuity Facts dump (that read as the summary).
+            body = derive_conclusion(
+                summary, name=name, cache_entry=_conclusions_map().get(arc)
+            )
             label, intent = f"{name} — conclusion", "conclusion"
         else:  # summarize this (scoped) event
             body, label, intent = summary, f"{name} — event summary", "summarize"
