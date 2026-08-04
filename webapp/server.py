@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
@@ -415,17 +416,19 @@ def _scene_sources() -> dict:
 # `q`-dependent quote-matching stays per-call over the cached text. Text is derived,
 # not the stored corpus — this is a runtime memo, consistent with never-rehost.
 _scene_text_cache: OrderedDict[tuple, tuple[str, str | None]] = OrderedDict()
+_scene_text_lock = threading.Lock()  # endpoints are sync -> served in a threadpool
 _SCENE_TEXT_CACHE_MAX = 256
 
 
 def _scene_text(bundle: str, sid: str) -> tuple[str, str | None]:
     """``(text, region)`` for a scene from sekai.best (official-EN first, JP fallback),
-    memoized. ``("", None)`` when neither CDN has it."""
+    memoized (thread-safe). ``("", None)`` when neither CDN has it."""
     key = (bundle, sid)
-    hit = _scene_text_cache.get(key)
-    if hit is not None:
-        _scene_text_cache.move_to_end(key)  # LRU touch
-        return hit
+    with _scene_text_lock:  # lock only the O(1) dict ops, never the network fetch
+        hit = _scene_text_cache.get(key)
+        if hit is not None:
+            _scene_text_cache.move_to_end(key)  # LRU touch
+            return hit
 
     from sekai_story_indexer.source import client
     from sekai_story_indexer.source.transform import scenario_to_lines
@@ -441,9 +444,11 @@ def _scene_text(bundle: str, sid: str) -> tuple[str, str | None]:
         return ("", None)  # don't cache failures (may be transient)
     lines = scenario_to_lines(scenario)
     result = ("\n".join(f"{sp}: {t}" if sp else t for sp, t in lines), region)
-    _scene_text_cache[key] = result
-    if len(_scene_text_cache) > _SCENE_TEXT_CACHE_MAX:
-        _scene_text_cache.popitem(last=False)  # evict least-recently-used
+    with _scene_text_lock:
+        _scene_text_cache[key] = result
+        _scene_text_cache.move_to_end(key)  # MRU (a racing writer may have re-added it)
+        while len(_scene_text_cache) > _SCENE_TEXT_CACHE_MAX:
+            _scene_text_cache.popitem(last=False)  # evict least-recently-used
     return result
 
 

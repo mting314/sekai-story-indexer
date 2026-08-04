@@ -874,3 +874,38 @@ def test_scene_text_does_not_cache_failures(monkeypatch):
     assert srv._scene_text("b", "s") == ("", None)
     assert srv._scene_text("b", "s") == ("", None)
     assert calls["n"] == 2  # retried, not pinned
+
+
+def test_scene_text_thread_safe(monkeypatch):
+    """Concurrent fetches of the same scene (sync endpoints run in a threadpool) must
+    not raise and must all agree — no torn LRU state."""
+    import threading
+    import time
+
+    from sekai_story_indexer.source import client
+    from webapp import server as srv
+
+    srv._scene_text_cache.clear()
+
+    def slow_en(bundle, sid):
+        time.sleep(0.01)  # widen the race window
+        return {"TalkData": [{"WindowDisplayName": "S", "Body": "x"}]}
+
+    monkeypatch.setattr(client, "en_event_scenario", slow_en)
+    results, errors = [], []
+
+    def worker():
+        try:
+            results.append(srv._scene_text("b", "s"))
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(12)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors
+    assert results == [("S: x", "en")] * 12
+    assert ("b", "s") in srv._scene_text_cache
