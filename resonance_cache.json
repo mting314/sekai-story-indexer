@@ -1,8 +1,8 @@
 {
   "EVENT|0001-ameagari-no-ichiban-hoshi": {
     "schema_version": "1",
-    "fingerprint": "566e3ebf504e925e964212f5edbb3608e1bb7046534e950b95626c2d7970de99",
-    "resonance": "Stella's opening image of tears dissolving into a dark, sealed-off night maps onto Saki's dread that her hospitalized years are lost time she can never recover, while the stars that \"see through\" a worn, deformed heart echo the bandmates who cut past her secrecy and confront the fever she hid. The song's turn—that the wings needed to fly had already sprouted long ago—rhymes with the story's core reassurance: Saki never had to race, because her bond with Leo/need was already secure and permanent. And its close, where the night sky patiently waits for its light and dawn rises softly, resolves exactly as the event does—Shiho's apology and the promise to make memories at a comfortable, steady pace, celebrated under the artificial planetarium sky they raise together in the Sekai.",
+    "fingerprint": "07919aaae8bb3c60eb57da7deefc879184bb8bc4e487ebe930e1fe9eb95cff01",
+    "resonance": "\"Stella\" saturates itself in night-sky imagery—a timid heart that locks itself away, a nightjar yearning to soar, and flight feathers that \"had already sprouted long ago\"—which mirrors Saki's fear that her lost hospital years have clipped her wings for good. The song's dread that \"tomorrow will become yesterday\" if you let your guard down is exactly the desperation that drives her to hide her fever and race to catch up. Its resolution—insisting this is \"the story of not giving up today\" while the night sky waits patiently for a dawn that finally rises softly—lands on the same note as the ending, where Saki's bond is affirmed as permanent and the band jams together under their own artificial night sky.",
     "model": "claude-opus-4-8-subagent",
     "attribution": "English translation by Thai1210, with edits by Violet and Aquatheories. Retrieved from [[mh:vocaloidlyrics:ステラ (Stella)/Jin|Vocaloid Lyrics Wiki]]."
   },
@@ -19,5 +19,901 @@
     "resonance": "The song's refrain of everything — plans, futures, ambitions — dissolving and boiling down into shapeless \"potatoes\" mirrors Rui's spiral after the naraku accident, where his fear of harming his cast melts his bold direction into safe, mushy compromises. Its lone plea wondering whether anyone will trust him lands exactly on the rift with Tsukasa, who accuses Rui of holding back and refusing to trust his cast. The track's turn — booing reframed as medals of honor — tracks Rui confronting the childhood peers who abandoned his unconventional ideas, and its closing invitation to all get gleefully \"crumpled\" together voices the resolution: the troupe embracing itself as \"show fools\" who share his passion, freeing Rui to design the high-flying climax.",
     "model": "claude-opus-4-8-subagent",
     "attribution": "English translation by Mes, with minor edits by [[User:Tsuyuki|Tsuyuki]], retrieved from the [https://youtu.be/Dun11cIEo9s official music video]."
+  },
+  "EVENT|0005-kokokara-re-start": {
+    "schema_version": "1",
+    "fingerprint": "2346e7e722cac74b84a63edb6a7dc0edf48485f126aa5ed7949b7d8bf29df977",
+    "resonance": "\"More! Jump! More!\" turns its title into the event's thesis: the refrain about grabbing a hand and never letting go maps onto Airi and the group refusing to leave beginner Minori behind, walking out on any agency that would split them. The song's relentless upward drive—jump higher, close the distance, raise your voice to reach the listener directly—mirrors the pivot from gatekept agency debuts to connecting with fans face-to-face through their own streams. Its defiant \"we can't let it end like this\" is the exact spirit of the ending, where the four unite to forge their own path as independent idols.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by MeaningfulUsername and Violet. Retrieved from the [[mh:vocaloidlyrics:モア！ジャンプ！モア！ (More! Jump! More!)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0006-itsuka-senaka-awaseno-ririkku-wo": {
+    "schema_version": "1",
+    "fingerprint": "d107371a1ac6e56a48f08810fc638e3331fdd3c4e0edc54473774e5cc72c3b4a",
+    "resonance": "\"Forward\" is built on the image of taking each other's hands and moving ahead together rather than one member carrying another, which is precisely the lesson An must learn after she breaks the group's harmony by over-protecting Kohane instead of trusting her. Its insistence that they carry \"the same dream\" and that no one is alone anymore echoes An's apology and request to stand as a true equal partner. The song's \"shoulder to shoulder\" forward motion is literally Kohane's closing pledge to sing side-by-side with everyone as the group chooses its next stage.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://docs.google.com/document/d/1kTF2d80Oe2K-XF_WLO-8ud85ydpJnYhTKaM_4OzyGaw/edit _akatsukki_#2217], minor alterations by Mellodyne."
+  },
+  "EVENT|0008-hijiri-naru-yoru-ni-kono-utagoe-wo": {
+    "schema_version": "1",
+    "fingerprint": "8e521f2fd11e10b02d8c76f2641eb20c9968c6a771851556c99e5f928abbf359",
+    "resonance": "\"Rainbow-Colored Stories\" opens on a timid heart locked shut and tears that fall and burst into a small rainbow—the image of the voices \"singing beside me\" pushing a fearful back forward and granting wings maps directly onto Nene thawing her rigid technique once she reconnects with her bandmates and her joyful younger self. The song's central idea that \"one smile becomes everyone's smile\" is the animating principle of the Smiling Christmas show. Its close, where a scooped-up self starts \"walking its own story,\" resonates with Nene rediscovering the joy of performing and carrying the snowfall-blessed show to first place.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Serene_Snowfall. Retrieved from and used in accordance with the [https://magenetratranslations.tumblr.com/Terms  restrictions] stated on their [https://magenetratranslations.tumblr.com/ blog]."
+  },
+  "EVENT|0010-yure-rumama-demo-kun-ha-mae-he": {
+    "schema_version": "1",
+    "fingerprint": "e8be5cdff56cc7682dc5ce04d585068e2108b2e500ffc982fbe97af912108cf6",
+    "resonance": "\"Awaiting Clear Skies\" is a restrained, questioning song—its speaker waits for \"just a moment of clear weather\" and keeps asking whether passive niceness is really \"a kindness\"—which mirrors Honami's core struggle that people-pleasing once got her branded a double-dealer and isn't the same as true kindness. The lyric's \"one thing I can't yield\" maps onto the courage MEIKO teaches her: the sincere plea that finally unites her divided class. The melancholy, unresolved ache lingering under the surface fits the event's bittersweet coda, where the gold-prize triumph is immediately shadowed by STANDOUT's approach to Shiho.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by MeaningfulUsername. Retrieved from [[mh:vocaloidlyrics:霽れを待つ (Hare o Matsu)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0011-color-of-myself": {
+    "schema_version": "1",
+    "fingerprint": "d567e22313d0a00d305224b79a5486bbc16f1c1986b130ac2cfb7d49bdc8d299",
+    "resonance": "\"Color of Drops\" dramatizes the event almost literally—its speaker has spent years \"wearing the colors someone gave me\" and pretending to be someone else, exactly Shizuku's agency-manufactured flawless persona. The turn to pressing a hand to the chest and declaring \"this is myself,\" refusing borrowed colors that can't truly shine, mirrors her choice to stream her raw, mistake-filled practice instead of pre-edited perfection. The vow to color a monochrome world with honest colors and chase \"the rainbow after the rain\" lands on the ending, where her authenticity finally earns warm, genuine fan acceptance.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by RainyRaspberry. Retrieved from the [[mh:vocaloidlyrics:Color of Drops|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0012-period-of-nocturne": {
+    "schema_version": "1",
+    "fingerprint": "17836b8462e4ded9056bfa88ba27d5f2ad4cd0772556de4dd70e658bad1c59ef",
+    "resonance": "\"RAD DOGS\" is all swagger and self-reinvention—its \"rad and bad underdog,\" its repeated cries to \"restart,\" and its boast of defying fate's rules \"without needing a reason\" mirror Toya breaking out of the rigid classical mold his father imposed to sing with new freedom. The image of a \"top dog hiding its fighting spirit\" captures Toya's constrained, technically precise but stifled performance before the breakthrough. The song's close—riding the tailwind and pushing forward without looking back—matches his triumphant live and the quiet first step toward reconciliation when his father admits he came to watch.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:RAD_DOGS|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0014-mita-sarenai-peirukaraa": {
+    "schema_version": "1",
+    "fingerprint": "56d93cea7a8e8ed9fb046d19e626ef1113a6ceacafc98987d0db9ce6fcaece79",
+    "resonance": "\"Infinitely Gray\" lives in Ena's exact despair: a speaker convinced she has \"no talent\" and doomed to cry forever, envious of others' brilliance, her worth dulled to a borrowed, ashen gray—echoing the online jibe that her art only matters because of the music. The rainy imagery and futile efforts washed away mirror her breakdown, while the pivotal \"someone's voice\" insisting her life isn't over and to just \"do the things you can do\" maps onto Kanade's melody reaching her. The light breaking through a gap in the clouds and lifting the weight off is the ending, where she accepts her struggle and keeps drawing.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiopaca. Retrieved from the [[mh:vocaloidlyrics:限りなく灰色へ (Kagirinaku Haiiro e)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0015-sumairuobudoriimaa": {
+    "schema_version": "1",
+    "fingerprint": "971fc9a14b00a817a05a45d0245ea6bce6c9452ec6543c599239749c63e61950",
+    "resonance": "\"Once Upon a Dream\" frames Phoenix Wonderland as a place that is itself a dream one can't imagine waking from, and its promise that \"magic\" is \"waiting right beside you, tired of waiting\" mirrors Emu's fight to preserve her grandfather's philosophy of simple, heartfelt smiles against a corporate demolition. The song's reassurance that wishes can come true imperfectly—that the world is more within reach than you think if you just extend a hand—maps onto the team rallying around her. Its determination to hold an \"indelible melody\" and keep the long dream alive is the ending's vow to prove the park's worth through an extraordinary show.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by MeaningfulUsername and ElectricRaichu, retrieved from the [https://vocaloidlyrics.miraheze.org/wiki/%E3%83%AF%E3%83%B3%E3%82%B9%E3%82%A2%E3%83%9D%E3%83%B3%E3%82%A2%E3%83%89%E3%83%AA%E3%83%BC%E3%83%A0_(Once_Upon_a_Dream) Vocaloid Lyrics wiki]."
+  },
+  "EVENT|0017-todoke-hopeful-stage": {
+    "schema_version": "1",
+    "fingerprint": "4ae28be77b98cf75ba1f43b64c59a2c0345be9d73f734d3f5f80297882f131ba",
+    "resonance": "\"Angel's Clover\" hinges on the refrain that \"even if these wings break, if you're there I can try again\"—the precise emotional shape of Minori tripping and falling on camera yet finding resolve through a single supportive fan. Its confession of an \"unreliable, awkward love\" she desperately wants to deliver to someone maps directly onto her realization that her very relatability, not polish, is what conveys genuine hope. The image of grabbing the angel's clover tight and pushing forward on \"the stage we dreamed of\" lands on the ending, where her fan's joyful comment gives her true confidence in her role.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie. Retrieved from the [[mh:vocaloidlyrics:天使のクローバー (Tenshi no Clover)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0019-shiikurettodisutansu": {
+    "schema_version": "1",
+    "fingerprint": "bdc867476bda85c6d06a480f9e0c703bf15a1833a4c948ad2ab5cb342d334d5e",
+    "resonance": "\"IDSMILE\" aches over guarding a treasured but dangerous identity—its repeated \"can we stay just as we are?\" and its speaker keeping distance behind an \"indifferent face\" while vowing not to \"let the secret slip\" map exactly onto Mizuki freezing at the word \"next year,\" terrified that revealed secrets will inevitably isolate her. The tension of sewing and mending versus cutting off and smiling captures the cheerful facade Ena sees through. The song's unresolved \"which would I choose—to hurt or stay\" mirrors the deliberately open climax, softened only by the cherry blossom that is beautiful precisely because it's shared.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://x.com/kizudarakeni Tsuyuki]. May only be used in accordance with the restrictions stated on her [[User:Tsuyuki|user page]]."
+  },
+  "EVENT|0020-resonate-with-you": {
+    "schema_version": "1",
+    "fingerprint": "18b1b98a121f31cc7fc02aa7f99a84b1df38224b24845486e31fb686cd7b3e96",
+    "resonance": "\"1\" turns its title into the event's answer: the refrain that there is \"only 1 future for us to picture\" and that any scenery is \"meaningless if I'm alone\" mirrors Ichika, Saki, and Honami realizing they cannot lose Shiho and must commit to going professional together. The song's insistence that \"hidden words won't be transmitted\" unless spoken maps onto them finally declaring their resolve at STANDOUT's venue. Its closing dare to \"confirm it with our own eyes\" in \"a world we've never seen\" is the opening-act performance that convinces Shiho to stay and chase the dream as a group.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by MeaningfulUsername . Retrieved from [[mh:vocaloidlyrics:「1」|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0021-stray-bad-dog": {
+    "schema_version": "1",
+    "fingerprint": "f0425fa1fa0296faab58b36c25366611792c8afd20c995b548f06b778ac92d54",
+    "resonance": "\"Cinema\" runs on a film metaphor—life as a \"nonsense scenario\" in which the speaker keeps asking \"when will I get to be the leading star?\"—which mirrors Akito's insecure, self-punishing drive to prove individual brilliance and surpass RAD WEEKEND alone. The repeated \"this isn't it, I'm not suited\" captures his back-to-back solo defeats against Arata. The turn from that self-doubt to \"then just rewrite the script\" and claiming \"this is my story\" made \"all the way from the bottom\" maps onto the ending, where he stops carrying the burden solo, forces a draw alongside his teammates, and commits to relying on Vivid BAD SQUAD.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Pupleon. Retrieved from the [[mh:vocaloidlyrics:シネマ (Cinema)|Vocaloid Lyrics Wiki]], with edits by Mellodyne."
+  },
+  "EVENT|0023-ganbaru-anatani-break-time": {
+    "schema_version": "1",
+    "fingerprint": "d6888544bc0c2ca7fc71594324c111de6aa434fd0579285c2de549660abbdf97",
+    "resonance": "\"Love material\" frames affection as something concrete you can hold out and offer, echoing Shizuku's mission to make Haruka finally feel supported rather than useful. Its lyrics keep circling a girl who hides her strain behind a smile and insists she'll just try harder, mirroring Haruka's reflexive workaholism that worries the group. The song's quiet plea to lean on and depend on others lands exactly where the story does in Episode 7, when Haruka admits she can't unwind because she loves the work and Shizuku asks her to share her own desires. Its \"jump into tomorrow\" refrain captures a solitary striver learning to accept care.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:アイノマテリアル (Ai no Material)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0025-wandaamajikarushoutaimu": {
+    "schema_version": "1",
+    "fingerprint": "48282c5d8fc8dff250cb2c7d30be91b9491e9c1ded6c7582d019233a888eef28",
+    "resonance": "\"Unthinkable Wonders\" is a manifesto of childlike defiance against adults' profit-minded calculations, precisely the corporate takeover Wonderlands x Showtime resists to protect the park's smile-first spirit. The song's insistence on loving every success and failure alike, and its phoenix image of rising no matter how many times it falls, mirror the troupe abandoning the contest to stage a risky park-wide surprise show. Its refusal to let happiness or failure be \"erased\" resonates with the ending, where the performers' genuine passion converts Jean Riley into a partner who preserves the park's original identity instead of rebranding it away.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Releska, retrieved from and used in accordance with the [https://releska.com/ restrictions] stated on [https://releska.com/2021/07/10/tondemo-wonderz/ his blog]."
+  },
+  "EVENT|0026-kaaneeshonrikorekushon": {
+    "schema_version": "1",
+    "fingerprint": "1f71db040385f549751f9e62a389252e5739dffa39a6fc6729271c00f90ed7cd",
+    "resonance": "\"Music to Light the Sky\" turns on memories that nearly crush the singer and a music-maker groping through darkness for direction, dramatizing Luka's warning that Kanade's song will leave its listener wandering endlessly. The lyric about composing melodies from imagery found in unknown worlds, and finally finding \"this melody right here,\" tracks Kanade's walk with Mizuki to the fountain flowerbed where her buried childhood memory resurfaces. The song's paradox that precisely because she has nothing she finds the melody maps onto the climax, where recalling her father's guitar reframes her purpose from merely saving Mafuyu to wanting her to smile, and the finished song at last lights that warmth.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://x.com/kizudarakeni Tsuyuki]. May only be used in accordance with the restrictions stated on her [[User:Tsuyuki|user page]]."
+  },
+  "EVENT|0027-unnamed-harmony": {
+    "schema_version": "1",
+    "fingerprint": "710ad501a051b7c018aaf85a2168036569a2b7507448fccda4187197de2c2716",
+    "resonance": "\"From Tokyo\" opens in nothing but uncertainty and self-doubt, the exact headspace of Saki, who feels useless beside her bandmates and buries herself in churning out melodies. Its rejection of the tidy \"friendship times effort equals victory\" formula, confessing they never could solve it, mirrors Saki's realization, sparked by Rin's deliberately chaotic song, that technical output is empty without genuine feeling. The closing wish that \"the us from that day\" grow into a new us in this town captures the ending, where Saki resolves to write a song to encourage the group and Leo/need begins building its first original together.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from [[mh:vocaloidlyrics:フロムトーキョー (From Tokyo)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0028-awakening-beat": {
+    "schema_version": "1",
+    "fingerprint": "13d616619b11e3e745d7dcd82ef56dc00f9fc83e83623be43f2afaa939a7f9c3",
+    "resonance": "\"Beat Eater\" is pure restless forward motion, a narrator who is \"rollin'\" and refuses to stop, matching Kohane shedding her solo crutch to seize her own momentum at STAY GOLD. Its repeated flips of perspective, asking how things look \"from there\" and seeing through the \"demon,\" echo the stranger's charge that Kohane lacks the eyes to see herself and MEIKO's cafe push to recognize her own strengths. The song's claim that a split road and even grief aren't all mistakes, and its drive to keep dancing till the end, mirror Kohane converting childhood inferiority into a dominating performance, even as An's unease about the talent gap shadows the win.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:Beat Eater|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0031-happiiraburiieburidei": {
+    "schema_version": "1",
+    "fingerprint": "8ebd406c4461aee4c1bd36802a98f00d2b5fddc433f698948c0d5202314bf110",
+    "resonance": "\"icedrop\" begins submerged, sinking into a deep sea, unable to see who she really is, the very self-doubt Airi's buried QT past drags back up. The song's turn from that descent toward reaching out a hand and a \"magic\" that can change the world tracks Airi's arc from distance to embracing her full identity. Its image of melting the rusted last page and illuminating even the wrong path lands on the ending, where a young fan reveals the \"Happy Everyday\" persona brought her comfort, letting Airi finally accept both her past and present as an idol.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from [[mh:vocaloidlyrics:アイスドロップ (Ice Drop)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0032-maameido-niakogarete": {
+    "schema_version": "1",
+    "fingerprint": "f50805082302365f69a57f45e48b5e7dff7aa84c6feb6fec641b4bbbde902744",
+    "resonance": "\"Glory Steady Go!\" pairs boundless \"even more!\" ambition with a steady, step-by-step insistence on cherishing the feelings you'd otherwise let spill, the exact tension Nene faces between chasing the DIVA she longs to be and staying with Wonderlands x Showtime. Its vow that \"our footprints won't disappear\" and that they'll keep stepping forward even if it rains echoes Yuka's revelation that pursuing global dreams meant parting from her original troupe. The song's close, naming the longed-for DIVA while still advancing one pace at a time, mirrors Nene's resolution to treasure her present with the troupe rather than sacrifice it for the future.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by che-seri#7469, proofread by anthystan#4632. Retrieved from the translator's [https://docs.google.com/document/d/1ncvT0JiG0hsELmPy5MRl_aPfFTFknwaYkANE6YZIV4w/view original source]."
+  },
+  "EVENT|0034-knock-the-future": {
+    "schema_version": "1",
+    "fingerprint": "ca456752afff9b2eb7a5f3733639c0e6237ce71026ac8cbc819a3026a103b82e",
+    "resonance": "\"Pulse of the Meteor\" is a song about wanting to speak plainly, lamenting that she couldn't say things \"in her own way\" or cherish the nonchalant words that spilled out, precisely Ichika's struggle as she forces sophisticated phrasing into her drafts. Its turn toward simply conveying true feelings now and becoming \"a ray of light that streams on\" maps onto Iori's counsel that sincere, unadorned words carry the emotional message. The lyric's determination to seize the inescapable \"now\" and keep climbing even while still weak captures the ending, where Leo/need's heartfelt first original wins the crowd and Ichika resolves to keep writing forward.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edit from Violet. Retrieved from [[mh:vocaloidlyrics:流星のパルス (Ryuusei no Pulse)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0035-tomoshibi-no-miraaju": {
+    "schema_version": "1",
+    "fingerprint": "453def8b0de285d8f9178dbf6625e538c10da759e4adacd2c09765a4348fe262",
+    "resonance": "\"Reborn\" is voiced from inside Mafuyu's numbness, a withered heart and days with no taste, asking why a warmth in her chest won't cool down. That unexplained warmth is the story's engine: Kanade's song stirs a feeling Mafuyu can't yet name, and the lyric's ache to return to \"distant, distant days\" mirrors the resurfacing memory of her mother's rabbit-shaped apple slices. The song's shallow-dream imagery and the words spilling out of it map onto the climax, where Mafuyu finally channels that faint warmth into lyrics of her own, a first tentative rebirth of feeling.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://x.com/kizudarakeni Tsuyuki]. May only be used in accordance with the restrictions stated on her [[User:Tsuyuki|user page]]."
+  },
+  "EVENT|0037-bout-for-beside-you": {
+    "schema_version": "1",
+    "fingerprint": "e2675f14d7931196120562e682b9baf863a9917fc091d81db34151a7c4d97fd9",
+    "resonance": "\"Awake Now\" opens in a rainy, sulking mood over a rhythm that \"runs ahead,\" a near-literal rendering of An's anxiety as Kohane's talent surges past her. Its recurring plea not to forget she is right next to you, and its vow that even if their touching backs separate this won't end with longing alone, mirror An's fear of losing the partnership and her resolve to keep refining herself to stay Kohane's equal. The song's refusal to be undone by the gap in their strides lands on the ending, where Kohane promises to sing beside An no matter how far she goes, waking An's determination to keep moving forward.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet and 25239x. Retrieved from the [[mh:vocaloidlyrics:Awake_Now|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0038-revival-my-dream": {
+    "schema_version": "1",
+    "fingerprint": "d5b37e6805d34d40f9e10d509e7f9d4a968b07d1d075a5d94dd0e25fb9ab7486",
+    "resonance": "\"Showtime Ruler\" casts Rui as the master of the audience's emotions, orchestrating falling chandeliers, cues, and stunts to pull everyone into one shared feeling, the exact childhood dream of a boy whose eccentric vision once isolated and frightened his classmates. Its \"amp up\" escalation and spectacle of leaps and drops mirror the revived forest show and the tree-leap his troupe now trusts him to stage. The song's climactic line, that he'll never be lonely again because a shared heartbeat connects them all, is precisely the ending's revelation, where an overwhelmed Rui realizes he has finally found companions to fulfill the dream he'd sealed away.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:ショウタイム・ルーラー (Showtime Ruler)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0039-boku-noashiato-kimi-noyukusaki": {
+    "schema_version": "1",
+    "fingerprint": "85bfa10d02fb1d0d87adddffaf007981a6dcfffad953172905f833cb3ab26378",
+    "resonance": "\"lower one's eyes\" is steeped in withheld truth, words almost spoken that vanish and a heart's desire bottled up until it clogs the chest like old dregs, the exact guilt of Mizuki guarding her secret. The song's bargaining wish to get out \"before everything unravels\" and its refrain of reconnecting or escaping time and time again mirror Mizuki's terror of change and Ena's promise to wait until she's ready. Its treasuring of etched-in moments, weeping and laughing and singing with you, while murmuring \"how long will it continue?\" captures the bittersweet ending, where Mizuki tells a preserving lie to hold onto the present bond a little longer.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://x.com/kizudarakeni Tsuyuki]. May only be used in accordance with the restrictions stated on her [[User:Tsuyuki|user page]]."
+  },
+  "EVENT|0040-yuru-ganu-omoi-imakotoba-nishite": {
+    "schema_version": "1",
+    "fingerprint": "389481f01db88ca222db6a1c528dfcf6fb09586f8f6c31aad32f768d10ac6895",
+    "resonance": "\"STAGE OF SEKAI\" repeats the reassurance that \"here is the place where you can shine\" and refuses to let someone grow strong only to end up all alone, the emotional core of Honami refusing to let Shiho shoulder the ticket quota by herself. Its admission that she isn't strong enough to sing about her present self yet must voice the words held in her chest mirrors the Sekai lesson, drawn from Len and Rin's overwork argument, that honest communication is vital. The song's closing drive to run up the stage \"all together\" and deliver the song to your future self lands on the ending, where the band resolves to handle every future quota as a complete unit.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edit from Violet. Retrieved from [[mh:vocaloidlyrics:STAGE OF SEKAI|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0043-moremoremakingxmas": {
+    "schema_version": "1",
+    "fingerprint": "5df989defd60a872699f83ead430ca1fe941ac34229e7b4d4cf5fde4b36e3a6c",
+    "resonance": "\"Worldwide Wander\" runs on the same frantic, understaffed adrenaline as MOREMOREMakingXmas itself, its \"capacity over,\" emergency-mode, warning-siren energy mirroring the venue-staffing scramble, while its key turn reframes fear as fuel (hope measured by the number of one's anxieties) exactly as Haruka moves from dreading the backstage reality to trusting her fans. The recurring vow to escort and come see \"you\" no matter the distance echoes the idols crossing the stage barrier to meet fans in person, landing on the reaffirmed idol-fan bond that closes the event.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:ワールドワイドワンダー (Worldwide Wander)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0044-same-dreams-same-colors": {
+    "schema_version": "1",
+    "fingerprint": "8232c21a547203181f7e9ca780ef7edab37803649a06f5ef7d8b102a35141a31",
+    "resonance": "\"Future\" is built on repeatedly envisioning a new tomorrow and searching for \"a place where we can laugh,\" which mirrors Toya's quest to broaden his horizons beyond pure theory on the camping trip. The song's imagery of reflected scenery deepening in color and remembering \"the place where we walked together\" maps onto the forest trek and campfire reunion, and its closing shift from searching to \"I finally found it\" tracks the team's improved harmony and Toya's realization that lived experience enriches both his music and his bonds.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from [[mh:vocaloidlyrics:ミライ (Mirai)/Yuukisan|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0046-pop-in-my-heart": {
+    "schema_version": "1",
+    "fingerprint": "499d9e1230923566455b75d2c021f1b32405a98dcdcfcf6653dcbfa2deab7325",
+    "resonance": "The playful \"Theme of Niccori Survey Team\" turns WxS's overseas study trip into its literal conceit — exploration, passport checks, going \"worldwide\" to catalog the world's smiles — matching the event's journey to Riley Dream Park. Its refrain that one day the dream will come true and that the group can \"turn the impossible into a possibility\" voices Emu's arc precisely, carrying her from doubting her practical skills to reclaiming her boundless power to dream as the engine that keeps everyone smiling.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by CoolMikeHatsune22, proofread by Violet. Retrieved from [https://coolmikehatsune22.wordpress.com/2022/03/03/wonopo-niccori-survey-team-theme/ their website] and used in accordance with the [https://coolmikehatsune22.wordpress.com/about-me/ restrictions] stated on their blog."
+  },
+  "EVENT|0047-itsuka-zetsubou-no-soko-kara": {
+    "schema_version": "1",
+    "fingerprint": "556e95808e8e03e5bffff7e2ce38b260689333b28a1dd04db0631e171db6a686",
+    "resonance": "\"Tricologe\" makes willingly wearing a cast-off, light-less jewel forever and depending on \"hopeful despair\" into something beautiful, mirroring how Kanade turns her own despair into a self-imposed duty to save others and how Mafuyu clings to K's dark music as her one spark of feeling. The parade of dulled, mismatched gems sinking into the abyss yet dressing up in their own way reflects the two teenagers recognizing a shared darkness, and the closing \"you're a prisoner too\" seals the mutual bond the present-day gratitude scene affirms.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "Official English translation by Niru Kajitsu. Retrieved from the [https://youtu.be/BPh4m2VnfNo original music video]."
+  },
+  "EVENT|0049-legend-still-vivid": {
+    "schema_version": "1",
+    "fingerprint": "bfe3ea72ec0cd6a9ab98fc2bc372d6b0131d2f1fb5c2ff8e3465db0a96e8bf32",
+    "resonance": "\"Flyer!\" is a pure statement of the resolve Legend still vivid builds toward — its insistence on not merely yearning for the high wall but climbing over it voices Kohane's response to the intimidating legend of RAD WEEKEND. The flight-and-updraft imagery, especially the line that the dream dreamed \"that day\" becomes the strongest updraft, mirrors how confronting the secret DVD footage becomes the lift for Kohane's visible growth, and the \"clear skies tomorrow\" refrain matches the hopeful forward push of the ending.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by KEL!. Retrieved from the [[mh:vocaloidlyrics:Flyer!|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0050-ano-nichi-sora-ha-tooka-tta": {
+    "schema_version": "1",
+    "fingerprint": "37864eb9b95dad3e9c906fb6a084ab293ab971fd5e9d3cf7f9ed90a77896cd5c",
+    "resonance": "\"Peaky Peaky\" rejects cozy, friendly small talk in favor of clashing honestly to reach the dream, which maps directly onto Shiho's ejection from the casual light-music band over her uncompromising standards. Its admission that it's \"alright if we don't understand each other\" and its images of knowing loneliness yet still making a burning sound resound to the world reflect her arc from deliberate isolation to pouring everything into performing with the childhood friends she truly chose.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie. Retrieved from [[mh:vocaloidlyrics:Peaky Peaky|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0052-cast-spell-on-you": {
+    "schema_version": "1",
+    "fingerprint": "16082f936d357887a4417d4d4f10460f7d728d70d4412cc70779ddf1433088b3",
+    "resonance": "\"Metamo Re:born\" is essentially Shizuku's design thesis set to music — costumes as a \"magical trick\" and a metamorphosis that reborns the wearer into a sparkling, capable self, exactly the lesson Miku teaches her and the confidence-casting spell she wants to give MORE MORE JUMP!. The \"with each of our own colors\" and \"Made in All\" refrains echo the collaborative \"Magic\" concept and the finale where bandmates and fans add her personal dewdrop motif to complete the design.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Pupleon. Retrieved from [[mh:vocaloidlyrics:メタモリボン (Metamo Re:born)|Vocaloid Lyrics Wiki]], with minor edits by [[User:BianryCoding|BinaryCoding]]."
+  },
+  "EVENT|0053-kuuhaku-no-kyanbasu-ni-egaku-watashi-ha": {
+    "schema_version": "1",
+    "fingerprint": "7b6c634d04330c97df2ffb5d333003aa1e64e1198167d7f46b138f8e39b39ac4",
+    "resonance": "\"Nomad\" voices Ena's stagnation from the inside: time ridiculously slipping away, this place being neither utopia nor the future she envisioned, and the struggle at the bottom of her dreams all mirror her inferiority beside Kanade and Mafuyu's expanding range. The plea to \"stay by my side till you've had enough of my idiocy\" reflects Niigo reaching out at her lowest point, and the resolve to keep living in the moment and walking through the pain matches her decision to re-enroll and endure the art school's harsh critique.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://x.com/kizudarakeni Tsuyuki]. May only be used in accordance with the restrictions stated on her [[User:Tsuyuki|user page]]."
+  },
+  "EVENT|0055-mabayui-hikari-no-suteeji-de": {
+    "schema_version": "1",
+    "fingerprint": "582241b3262015f2a2ba24abadd6fdd36be32f0011e7ca7177e4bd8e6939ceb0",
+    "resonance": "\"Eighty-Eight☆彡\" climbs \"up towards those 88 stars\" with foolish, undiscouraged hope, directly voicing Tsukasa's breakthrough that Tolpe's stargazing is an act of holding onto hope rather than fleeing despair. The pierrot \"who never gets discouraged\" is Tsukasa himself pushing past his limits, and the tender wish that happiness will come to a numbed \"you\" mirrors the empathy he finally channels into the star-like performance that moves the audience.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie and edited by Violet. Retrieved from the [[mh:vocaloidlyric:88☆彡|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0056-live-with-memories": {
+    "schema_version": "1",
+    "fingerprint": "d46d22491e8e1dfb1f87b50f52819da0169cddb66da9adcdb414b07cd16683c9",
+    "resonance": "\"Made to Order\" pivots from asking \"for whose sake\" one sings weaknesses and hopes to a decisive \"for your sake,\" mirroring Ichika's realization that she is writing this song specifically for the grieving siblings Yota and Kano. The made-to-order framing and the wish that \"these words reach someone\" echo her composing a custom song so that cherished memories can sustain the pair through their painful separation — the exact insight that breaks her lyric-writing block.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie. Retrieved from [[mh:vocaloidlyrics:オーダーメイド (Order Made)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0057-tsunagu-painful-hope": {
+    "schema_version": "1",
+    "fingerprint": "c5ba02b07ca18590293d8ea70d448bb0951fdcc7ecf284791166beece79bf32f",
+    "resonance": "\"If\" wrestles with the title's \"painful hope\" directly — walking umbrella-less while believing in sun that may not come, haunted by every \"if\" and \"what-if\" — mirroring the shared trauma Haruka and Riho carry. Its confession that \"singing won't save your life… but I want to sing for you\" captures Haruka offering unconditional support through Riho's harassment and block, and the closing turn that the world is beautiful so \"let's live on\" matches Riho reclaiming her ability to make hopeful music.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "Official English translation retrieved from [https://youtu.be/Xt1x1s2eAno the original music video]."
+  },
+  "EVENT|0059-the-power-of-unity": {
+    "schema_version": "1",
+    "fingerprint": "662a9d55c6344b123395697caa961a7ba3595d9a152acda84557dfd7802f0c12",
+    "resonance": "\"Moonlight\" aches over being a \"replica\" chasing an unreachable moon, never becoming the admired other and left with a thirsty, unsatisfied heart — the exact anxiety of VBS still falling short of the legendary RAD WEEKEND standard while tracing what came before. Yet its resolution, that after chasing the never-ending dream \"I'll find my own light,\" mirrors THE POWER OF UNITY's breakthrough where the acts stop merely imitating the legend and forge their own synergy and lasting alliance.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "Official English translation retrieved from the [https://youtu.be/SaX0By61S3U original music video]."
+  },
+  "EVENT|0061-mayoi-ko-no-te-wo-hiku-sonosakiha": {
+    "schema_version": "1",
+    "fingerprint": "0606a164d0740bb9866342a950712b22a4adb8c115eff5d7c3911d7adda93af3",
+    "resonance": "\"Bug\" sonifies Mafuyu's collapse as a glitching, paranoia-ridden system — a lost child spinning in place while emotions are pruned and peeled away — matching her buckling under her mother's pressure and surrendering her synthesizer. The venomous flood of \"good girl, good girl\" and the \"administra-traitor\" pun mirror the mother's suffocating praise-as-control and the ice-cold-hands memory, while the frozen, drowning refrains set up the contrast with Kanade's warm grasp that finally lets Mafuyu choose warmth over obedience.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by mecanorose, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:バグ (Bug)/Kairiki Bear|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0062-zettaizetsumei-airandopanikku": {
+    "schema_version": "1",
+    "fingerprint": "461cadadc34980afe807a19bcbb1af844d19c84efc365c1d99078629cc191d82",
+    "resonance": "\"Starry Sky Melody\" builds its refrain around wishing on stars that light up the darkness, an image that lands on the castaways' campfire night huddled around a small bonfire against the island dark. Its lines about a bond that couldn't be protected alone turning into hope, threaded into an \"unbreakable\" melody, mirror Nene's resolution that even as their dreams will one day pull them toward separate stages, the connection they forged surviving together is the thing worth treasuring. The recurring \"promise we once made\" that never ends underscores the ending's acceptance of eventual divergence while cherishing every present show.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Anonymous from the [https://youtu.be/VznMASce0CM original MV], heavily revised by [[User:ゟ|ゟ]]"
+  },
+  "EVENT|0064-the-vivid-old-tale": {
+    "schema_version": "1",
+    "fingerprint": "e3f4eee5f3b5f9f2b31ef787f872741c1f91d1582b08ac93557c08d3d502bd57",
+    "resonance": "\"City\" is literally an ode to the street—laughing days and tearful homecomings all lived \"with this street on my side\"—which is exactly the lesson Vivid BAD SQUAD reaches by rewatching RAD WEEKEND and hearing An's flashback: understanding Vivid Street and its people is the missing key. The image of a needle dropping onto memories from long ago maps onto the extended childhood flashback and An's rainy-night rescue by Nagi. The bond that joins hands and \"stretches to the future\" echoes the ending's realization that community love is inseparable from their music.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from the [[mh:vocaloidlyrics:街 (Machi)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0065-no-seek-no-find": {
+    "schema_version": "1",
+    "fingerprint": "936a618fde6bba30a2c52ad6094967e65d2bd28748ee6a5a14b4d35cb6675bf5",
+    "resonance": "\"SHOW OFF\" is built on a defiant refusal to sync up with borrowed, overused words—warning that syncing them means the heart loses sight of where to go—which mirrors Saki's fight to write something genuinely resonant rather than merely \"cute\" after Saku's dismissal. Its repeated cry of being \"nowhere to be found\" and its call to sing where not a soul is in sight channel the loneliness Saki excavates from her hospital diary at the climax, along with her buried fear of being left behind. The jab about not rating dreams by a review site's star count matches the arc's rejection of that external dismissal.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by  mecanorose, with edits by Violet. Retrieved from [[mh:vocaloidlyrics:てらてら (Teratera)|Vocaloid Lyrics Wiki]], with minor edits by [[User:Mellodyne|Mellodyne]]."
+  },
+  "EVENT|0067-aozora-no-saki-kagayaki-wo-oi-kakete": {
+    "schema_version": "1",
+    "fingerprint": "bb25f446123b124615c10c13029dfb050dd676e98a2e0f63a49e71829f9122d2",
+    "resonance": "\"Parasol Cider\" is all seaside brightness—waves washing worries away, feelings soaring, a beat that can't be hidden—imagery that maps directly onto the camp's variety-show drills, right down to the weighted banana boat. Its reassurances (\"even if I'm not lucky I still want to laugh,\" \"it's alright, I believe in you\") echo Airi checking on an anxious Minori during secret practice and coaching her to project rather than despair over her lack of innate aura. The refrain that there's nothing to fear and that hearts overlap and connect mirrors the camp cementing their teamwork ahead of the first one-man live.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:パラソルサイダー (Parasol Cider)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0068-soshiteima-ribon-wo-musun-de": {
+    "schema_version": "1",
+    "fingerprint": "f11aea36d354172133fc9c700f12720c64de81bb352a6bc8fa462ac4ec5cbc52",
+    "resonance": "\"Give Me Your Night\" opens by finally speaking of lost nights and insisting the memory isn't sad, only a little lonely—exactly Mizuki's mood as she recounts the origin of Nightcord and her middle-school descent into isolation. The imagery of dropping a needle on a borrowed record to dance with \"pathetic steps,\" and city lights that suddenly seem gentler, mirrors how K's music pulled her and Ena out of despair. The closing shift from cold coffee and dimmed lights to sleeping \"embraced in warmth\" reflects the ending, where Mizuki accepts Kanade's invitation and reaffirms her present happiness with the group.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Luna Amatista. Retrieved from the [[mh:vocaloidlyrics:君の夜をくれ (Kimi no Yoru o Kure)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0069-don-t-lose-faith": {
+    "schema_version": "1",
+    "fingerprint": "576a07ac5f9eedb447739d881b5ec8cbebdc97c4897859737fffbc28780f9a15",
+    "resonance": "\"Voices\" runs on the image of gears that start spinning and won't stop and \"six sceneries\" (the six performers) blazing, with everything bet on a moment that will never return—matching Leo/need turning harsh criticism into relentless practice. Its promise that entrusted voices, familiar tears, and pain \"become strength\" on these sixteen measures mirrors Saki's painful new song and Ichika's lyrics drawn from past struggle. The vow that the wish \"will never change\" and will keep reverberating in the world echoes the climactic resolve to prove their music's worth on stage.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, retrieved from [https://vocaloidlyrics.miraheze.org/wiki/Voices/Yuyoyuppe Vocaloid Lyrics Wiki]."
+  },
+  "EVENT|0071-walk-on-and-on": {
+    "schema_version": "1",
+    "fingerprint": "ba12458ccedd488d572b5ba131ef7d999f4353d78099ed839c7945a61ae114e4",
+    "resonance": "\"Hollow\" returns again and again to \"the siren of a flightless bird\" chewing through its bindings and quietly destroying its own cage—a perfect figure for Toya feeling boxed in by precise but emotionally hollow classical training while his bandmates fly. The plea to get his body moving and to close the gap between his heartbeat and what he's staking echoes his longing to stay an equal partner to Akito, the same hidden drive he hears in Soma's unfinished track. The ending, where he breaks through and completes his own track, matches the song's turn from staring up at a void toward refusing to lose hope.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by mecanorose. Retrieved from the [[mh:vocaloidlyrics:虚ろを扇ぐ (Utsuro o Aogu)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0073-haikei-ano-gorono-watashihe": {
+    "schema_version": "1",
+    "fingerprint": "a6210c7aaf774a31919f1e5d5a49bc9646a1c38025265aad06ad322bc7c2d203",
+    "resonance": "\"DREAM PLACE\" reaches ever skyward—higher and higher, beyond the dream, toward a radiant stage—mirroring the dream Minori first caught watching ASRUN's Haruka shine, the memory at the event's climax. Its lines about scattered hopes becoming a \"secret ingredient\" and wanting to shine a light on someone the way she was once saved map onto Minori's stumbling MC speech vowing to repay the hope given to her. The lyric marveling that the view from here is \"more beautiful than I thought\" echoes the ending, where post-concert she resolves to expand toward national tours and television.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from [[mh:vocaloidlyrics:DREAM PLACE|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0076-echo-my-melody": {
+    "schema_version": "1",
+    "fingerprint": "46922b120a7024d81929ee428ff6c5a650abf76599fd594a27daa08bb5a4e5b8",
+    "resonance": "\"the WALL\" centers on a commonplace melody that transcends and \"melts all walls,\" stitched from a tattered rhythm and \"blue scars\"—an apt figure for Ichika breaking through her DTM roadblocks to finish her song. Its confession that she once mistook never touching anyone's heart for strength, and is now scared but wants to sing \"with you,\" mirrors the gratitude and desire to stand beside her bandmates and Miku that drive the track. Kanade's climactic advice to trust decisive creative choices matches the song's arc from fearful isolation to a warm, distorted song made together.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Thai1210, with edits by CoolMikeHatsune22. Retrieved from the [[mh:vocaloidlyrics:The WALL|Vocaloid Lyrics Wiki]]"
+  },
+  "EVENT|0077-negai-ha-itsuka-asa-wokoete": {
+    "schema_version": "1",
+    "fingerprint": "2961a50ebbf9dbeef79a3200533c06c00d411a5e65a7827261153ebcbf50e1bc",
+    "resonance": "\"I am you\" insists all life is absurdly adorable yet \"unable to be whatever we please,\" a conflict with no escape from one's own choices—mirroring Mafuyu trapped under her mother's surveillance yet unable to stop making music. Its imagery of shattering out—rising from the ashes, raising a voice in the night, the rain finally clearing after a futile struggle—echoes Ena's \"Hatching\"-themed artwork about breaking one's shell and embracing the future. The climax, where Ena urges Mafuyu to pursue her own happiness, lands on the song's closing turn where the \"screw-up\" becomes brilliance and \"that is what love is.\"",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://x.com/kizudarakeni Tsuyuki]. May only be used in accordance with the restrictions stated on her [[User:Tsuyuki|user page]]."
+  },
+  "EVENT|0078-ano-nichi-no-yume-no-kanata-mukou-he": {
+    "schema_version": "1",
+    "fingerprint": "f054e880405015982f0c9bb8a242a47922c08c1010da281b09603e1686f66b78",
+    "resonance": "\"Float Planner\" casts itself as a \"planner\" wanting to fly to a spectacular tomorrow, chafing that its stable beat feels stiff and that one wall is too high to climb alone—mirroring MORE MORE JUMP! outgrowing their comfort zone to set the ambitious top-idol, dome-sized goal. Its wish to be quietly present at the very beginning of the hope someone finds echoes Haruka's memory of the idol who once gave her hope and her worry over reaching people through mass media. The refrain of floating up to \"a new world,\" higher and higher, matches the ending's decision to accept the TV appearance and widen their reach.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:フロート・プランナー (Float Planner)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0079-find-a-way-out": {
+    "schema_version": "1",
+    "fingerprint": "d655280b6709d9a56beb155b8315a44885271d37ae7bc035aa661d6d90c2e22b",
+    "resonance": "\"Suspended Animation\" oscillates violently—a first cry into the world, wanting to live yet wanting to vanish, pouring the wish to die into lyrics and singing \"while appearing dead\"—mirroring the buried humiliation Akito carries from flopping at Crawl Green. Its refusal to cling to past or future because \"the present is everything,\" and its demand that the heart keep beating however unsteadily, echoes Ken's counsel to keep singing through hardship and Akito's relentless, present-focused drive in the street battle. The ending, where his growth earns Crawl Green's owner's interest, matches the song's turn where once-hated light now shines on him and hope and despair alike fuel his pulse.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from the [[mh:vocaloidlyrics:仮死化 (Kashika)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0082-yume-no-tochuu-kagayaku-hoshi-tachihe": {
+    "schema_version": "1",
+    "fingerprint": "edd30fe2f105b7cf1be244a68dcfa5169f4ac5d9f052ec5e644179e1315551c3",
+    "resonance": "\"Starry Sky Orchestra\" promises the group will \"always be one\" and stay by each other's side forever, resonating through pop melodies—directly voicing Emu's dread that the troupe's individual ambitions will pull them apart. Its image of looking at the same moon from different windows while each member shines \"one by one\" mirrors the tension between Tsukasa's outside acting pursuits and the wish to stay together. The ending, where Emu watches families enjoy the park they saved and resolves to support her friends' dreams, matches the lyric's turn toward treasuring shared time and joining hands to step toward tomorrow—reunited for a joint stage.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by PhoenixMesmer. Retrieved from the [[mh:vocaloidlyrics:星空オーケストラ (Hoshizora Orchestra)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0083-little-bravers": {
+    "schema_version": "1",
+    "fingerprint": "915309b85134f7357f251c60a15f9b1a76195a674155a559f667a7f1d0b68a3a",
+    "resonance": "\"Flyway\" runs on the image of a young bird whose feathers whiten while the heart stays \"still pure,\" mirroring Leo/need's leap toward a professional-caliber one-man show without shedding their sincerity. Its refusal to \"preen as society dictates\" and sink into a \"different colour\" is Honami's climactic rejection of the marketable high-school-girl-band gimmick. The migrating bird fluttering across the world, transcending words, country, colours and blood so the band can \"become one,\" tracks their unification through delegated support and the resolve to move audiences on pure musical intent.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Violet Lights, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:Flyway|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0085-hodokareta-ito-nosono-sakini": {
+    "schema_version": "1",
+    "fingerprint": "551cd4b771392a1843ca0b43e11077ad1f4490f5a3d8140aeb9def0f3e309829",
+    "resonance": "The refrain of \"I am, We are\" — \"I am who I am, so I'll never be lost,\" even when wounded by someone's words — is Shizuku holding composed under Alisa's unscripted, probing questions on live TV. Its rejection of needing \"proof of existence\" or a special persona answers her old Cheerful*Days struggle with the forced \"perfect and mysterious\" image. Vowing to sing out the \"answers to my anguish\" rather than hide tears matches her resolution: owning both past and present selves as sincere and reconciling with Alisa.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits from Tapewormreverie and MeaningfulUsername. Retrieved from [[mh:vocaloidlyrics:私は、私達は (Watashi wa, Watashitachi wa)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0086-kick-it-up-a-notch": {
+    "schema_version": "1",
+    "fingerprint": "2ea151f2ddacf3b614cafc8ad159fd99d855afb2066cdc64f68ec29d449f07cc",
+    "resonance": "\"One Sheep\" frames the solitary singer — the \"lone sheep\" told to \"tear the darkness to pieces\" — which is Kohane's assignment to face the venue crowd alone as a solo opening act. Its push toward a \"solitary one\" to \"go far beyond them\" mirrors Taiga's final challenge before America and his recognition that the new generation is overtaking RADder. The song's tension between wanting to be left alone and being urged to let her voice be heard tracks Kohane shedding her nerves in the Sekai jam session to sing with relaxed, authentic emotion.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits from Tapewormreverie. Retrieved from [[mh:vocaloidlyrics:ひつじがいっぴき (Hitsuji ga Ippiki)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0088-ten-no-hate-no-fenikkusu-he": {
+    "schema_version": "1",
+    "fingerprint": "2a5de78eb5c3a5067cb9651e63c2e3d817ec57635ad9c9f6c25aaf6d23050e49",
+    "resonance": "\"Mr. Showtime\" runs on the gap between a floundering performer (\"my thoughts are in disorder,\" stuck at a \"dead-end\") and the vow to \"soar to stardom,\" which is Tsukasa's audition arc — outclassed by Sakurako yet refusing to quit. The song's lonely-stage monologue and its ache to \"aim for the stars\" match Tsukasa confronting the vast distance between himself and true star Seiichi Tenma. Its insistence that \"the show must go on,\" reckless bluffing turned into a raw star turn, lands on the climactic performance that wins him the role of Lio.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Ahirutama, with revisions by [[User:Tsuyuki|Tsuyuki]]. Retrieved from the [https://youtu.be/4NhL6mqkMWY original MV]."
+  },
+  "EVENT|0089-imishiburudisukoodo": {
+    "schema_version": "1",
+    "fingerprint": "f93c9c32933e6c14df45d3afb75e0aca33006cdac9724ca9b73382621534b930",
+    "resonance": "\"Samsa\" borrows Kafka's transforming-into-vermin imagery and the thrown apples — a family that wounds its own — which maps onto Mafuyu's mother weaponizing \"love\" and control against her music. Its defiant plea, \"don't say you've had enough of reality,\" is Kanade refusing to let Mafuyu be severed or to give up on her. The vow that even a pain-throbbing \"shadow of my former self\" will \"someday become a lovely song,\" sung alongside \"I'm right here,\" is Kanade's climactic promise to stay by Mafuyu's side and keep a refuge open.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Melanchoeddie, Violet330, and Kelvin525. Retrieved from the [[mh:vocaloidlyrics:ザムザ (Samsa)|Vocaloid Lyrics Wiki]], with minor edits by [[User:Tsuyuki|Tsuyuki]]."
+  },
+  "EVENT|0091-get-over-it": {
+    "schema_version": "1",
+    "fingerprint": "730d92126b856ff3fbac3ee695154fc10dff967df138e358a0e09b582b35a554",
+    "resonance": "The whimsical vows of \"Growing Up Together\" — that through alien invasions or a move to Mars the band will \"remain together\" and \"walk together beyond our dreams\" — voice exactly Saki's fear and its resolution: that going professional need not cost the friendship that is her highest priority. Its warm insistence on delivering \"more of my thank-yous\" for \"a hundred years\" matches the gratitude driving their captivating one-man show. Shindo's lesson that a band's strength lies in balancing friendship and career is the song's promise that these feelings \"will never change for eternity.\"",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from [[mh:vocaloidlyrics:相生 (Aioi)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0092-re-tie-friendship": {
+    "schema_version": "1",
+    "fingerprint": "3855a7833b090c6a155aa96bbb26524d84476ff4bb676694fcfd252eb82f7640",
+    "resonance": "The title \"The Peachy Key\" and the recurring image of unlocking a rusted-but-unfading door is Airi reopening her estranged friendship with Ayumi. The song's crossroads that feel like a distant diorama, and turning one's head to find oneself \"growing distant,\" mirror how Airi's idol schedule once alienated her from peers. Its reassurance — a childish voice asking \"are you crying?\" answered by \"I'm not alone\" and hands warming numb fingers — resolves as the group confirms genuine bonds survive schedule changes, freeing all four to commit to the credit-based system.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Violet Lights, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:ももいろの鍵 (Momoiro no Kagi)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0093-boku-tooru-no-seizon-tousou": {
+    "schema_version": "1",
+    "fingerprint": "ebfd2bb9a6dd59aa91818cec400f553528829ef7e4dac991deeed40fd870a636",
+    "resonance": "\"Kitty\" literally poses the event's thesis — weighing \"running away\" against \"averting my eyes\" — and answers it by urging one to \"flee\" and pour it into a song, validating Mizuki's counsel that escape is a legitimate way to survive and protect oneself. The refrain that \"the answer lies within the song, and therefore within me\" tracks Mizuki's climactic self-realization that running away was how she guarded her own heart. Its portrait of lonely fools still plotting harmony matches Nightcord improvising lunch-break refuge so an isolated Mafuyu can still belong.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from the [[mh:vocaloidlyrics:キティ (Kitty)/Tsumiki|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0095-kanaria-ha-kyuukyou-ni-utau": {
+    "schema_version": "1",
+    "fingerprint": "88484cd8c246e4fec8a23d0c952f25850336be989488aebcbd42234192528065",
+    "resonance": "The drowning imagery of \"Coral of the Miniature Garden\" — sinking to the sea floor, \"unable to sing this song,\" reaching for what she lacks — voices Nene's crisis when her singing is judged to float apart from her acting. Its repeated question, \"can I keep moving forward while singing this song?\", is her self-doubt under the director's critique and her drive to master the Cowardly Canary role. The turn to \"I'll sing this song and smile\" as the miniature-garden coral finally dazzles matches her climactic, integrated performance and resolve to seek out wider stages.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English Translation by Luna Amatista, retrieved from the [[mh:vocaloidlyrics:箱庭のコラル (Hakoniwa no Coral)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0097-light-up-the-fire": {
+    "schema_version": "1",
+    "fingerprint": "a09abcf6e99a619ec04eb937e1d9fa2a9f4ecced8e7899cdf97e6f03446538f1",
+    "resonance": "\"Overthrow\" is pure defiance — \"crawl back up again and again,\" lick your wounds \"with a smile, so bring on the fight\" — which is Vivid BAD SQUAD refusing to stay crushed after Taiga's devastating defeat. Its \"vivid bad fervor\" that crosses out \"all those regretful days,\" and the vow to keep flipping the record over rather than kneel or surrender, is An overcoming her grief once she learns Nagi entrusted the future to her. The song's embrace of change (\"it'll be alright to let things change\") matches the group reaffirming its vow to surpass RAD WEEKEND together.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Luna Amatista. Retrieved from the [[mh:vocaloidlyrics:下剋上 (Gekokujou)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0098-step-by-step": {
+    "schema_version": "1",
+    "fingerprint": "880658029f4cccf3fa96b70e71a691d9a704ec2db36cfd93362c23c12977251d",
+    "resonance": "\"Teammates\" turns on the unbreakable \"knot between us\" and the confessed fear \"I'm afraid to take that first step,\" which is exactly Minori weighing a transfer that could distance her from friends against the group's dome-concert dream. Its lines about being unable to smile or move forward alone, and wanting to share \"even the pain,\" mirror Shiho, Kohane, and her bandmates rallying behind her decision. The hand-taking invitation to \"enjoy our adventure ahead\" and the hope that \"maybe tomorrow will be a good day\" lands on her parents' proud approval and her step forward.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:チームメイト (Teammate)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0100-kamen-no-watashi-nisayonarawo": {
+    "schema_version": "1",
+    "fingerprint": "271f5e804bc31055d673ff9e065af9276d974ccab72dbb4ee206304bac80396c",
+    "resonance": "\"Theater\" is built on the mask-and-role metaphor of a girl who \"played my role desperately, forgetting to breathe\" to please others — Mafuyu's entire performed self under her mother's control. Its cry to \"end this joke of a play,\" the plea \"give me a name — I no longer know mine,\" and the voice on an audienceless stage sobbing \"I'm here, notice me\" (revealed to be her own) mirror her collapse when her mother denies her feelings and blames Kanade. The song resolves as she runs toward \"that little light to break the curse,\" matching her flight from home into refuge with Kanade.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "Translation by mecanorose, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:演劇 (Engeki)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0101-tsunagu-hoshi-no-uta": {
+    "schema_version": "1",
+    "fingerprint": "569e5ac15f7ce44ef73b7123242835f86336bb67eb7c553b61f0554b0c8c38bf",
+    "resonance": "\"Connecting the Stars\" makes the event's gratitude explicit — past disagreements \"born out of kindness\" now cherished memories, and everyone who helped becoming part of a \"constellation\" — which is Ichika reflecting on the fans, mentors, and Virtual Singers behind their pro debut. Its image of connecting stars into a line to \"retrace\" when darkness threatens, and of a song reaching \"even someone's heart weeping in the corner of this wide world,\" drives her gratitude live and the choice to bring Miku's voice into the finale. The closing \"there's still a road ahead\" fits the band watching the meteor shower and reaffirming their bond.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie. Retrieved from [[mh:vocaloidlyrics:星を繋ぐ (Hoshi o Tsunagu)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0103-on-your-feet": {
+    "schema_version": "1",
+    "fingerprint": "9e78b6adfbc34b6f54a3baf2e09174a037dfbafb9d5379c654cd60f58e218fbc",
+    "resonance": "\"Realize\" turns Vivid BAD SQUAD's post-Taiga defeat into fuel exactly as the event does: its refrain about never forgetting the sting of frustration and looking forward mirrors Kohane's Sekai realization that her bitter helplessness is proof she has grown into a singer with real pride. The song's images of stretching toward an unreachable future again and again and of repainting a miracle into a vivid world track the climactic airport confrontation, where the unit vows to surpass Taiga and RAD WEEKEND rather than let their admiration end as a mere ideal.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from the [[mh:vocaloidlyrics:リアライズ (Realize)/Hiiragi Magnetite|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0104-atashitachino-happiiendo": {
+    "schema_version": "1",
+    "fingerprint": "92efec74f848368fe034ef103b300ab4fc5e7770a72ee7d209a67c2592eb17df",
+    "resonance": "\"Twinkle-di-ding★Twinkle-sparkle\" insists there is no single right answer and that every choice, tear, and stumble is itself an answer worth celebrating, which reframes Wonderlands x Showtime's painful parting as a happy ending rather than a loss. Its most pointed beat, where one story is declared over so the next can begin \"right now,\" maps directly onto Emu's nighttime breakdown and her brothers' blessing to travel, sending the troupe off smiling into freelance life like the song's endless, playful journey.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:キラピピ★キラピカ (Kirapipi★Kirapika)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0109-burn-my-soul": {
+    "schema_version": "1",
+    "fingerprint": "fddc9264d0816dd0013511bf851fea657d1327e208fbbbd2e1c734d634df13f0",
+    "resonance": "\"CRAZY\" is built around a manic refusal to arrange \"fine sound\" politely and a demand to raise one's own roaring, one-of-a-kind tune, which is precisely the block Akito must break through. The event's climax, Luka's duet coaxing his bottled joy, frustration, and passion out into his voice, is the song's whole thesis in motion, so its closing insistence on playing \"my own tune, not someone else's\" is the exact permission Akito needs before torching the street crowd's skepticism.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by mirapaint, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:CR詠ZY (CRaZY)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0110-stick-to-your-faith": {
+    "schema_version": "1",
+    "fingerprint": "3b306713d0a7017bf53b55a537317b7d9ac23d3b9575f96fe8f3d8523aded85e",
+    "resonance": "\"Purpose\" frames a wish to strum harder and harder for a sound \"full of certainty\" that resonates in others, echoing Shiho's search for what her music should ultimately do. The lyric's yearning-into-resolve arc, watching someone you admire and vowing to shake hearts with the same conviction, mirrors her flashback to Iolite's bassist Sumire, and its emphasis on a certain, driving sound lands on her closing decision to take up bass and eventually move listeners the same way.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie, proofread by Violet. Retrieved from the [[mh:vocaloidlyrics:Purpose/doriko|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0111-sono-te-michibiku-nukumoriha": {
+    "schema_version": "1",
+    "fingerprint": "f284410802b0135a2dac95886c461f9bbbb0b4b69602cdf824985fe6344b4270",
+    "resonance": "\"Hug\" is literally about giving a small embrace to the feelings that can't be spoken aloud, which is the emotional core of MORE MORE JUMP!'s reach toward Saito and her buried, family-bound dream. The song's gentle reassurances, that looking down for a day is only human and that simply breathing and starting to walk is already enough, mirror Shizuku drawing on her own Cheerful*Days regrets to free Saito, and the climactic acceptance of the manager role is the shared loneliness of the lyric finally warmed into belonging.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Relapse, proofread by Violet. Retrieved from the [[mh:vocaloidlyrics:はぐ (Hug)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0113-kun-ga-shuyaku-no-monogatari-wo": {
+    "schema_version": "1",
+    "fingerprint": "0e8e00240e248da9a30552e5177cec28f09338eb941bc9432c3d68eeaf63a508",
+    "resonance": "\"Filament Fever\" hinges on a single \"moment of resonance\" where a filament lights up the whole world, the perfect image for Tsukasa breathing a full lived history into the three-line bit-part Nakayama. Its contrast between a gaudy, novel spectacle and what a \"real show\" should be echoes Director Kato's demand for mundane realism over dramatic flash, and the lyric's insistence that anyone can be the hero who makes you smile becomes Reki's revelation that every passerby is the protagonist of their own life, spurring him to finally accept a starring role.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:SunnySkiesTLs|SunnySkiesTLs]]. Can only be used in accordance to the restrictions stated on her [https://rentry.co/SunnySkiesTLs Rentry]."
+  },
+  "EVENT|0116-ano-nichi-kanade-ta-neiro-wo": {
+    "schema_version": "1",
+    "fingerprint": "8f56e7d71940591b636e9dff6de538c655395057ded9214347c8d6fa9fa69012",
+    "resonance": "\"Passion of 25 O'clock\" repeatedly asks whether the singer can love happiness earnestly and truly save others, the exact double-bind pinning Kanade between self-sacrifice and her own desires. The song's reminders that the world still shines and that one is never alone answer Ena and KAITO's climactic confrontation over her guilt, and its refusal to let go of the 25:00 passion mirrors Kanade's resolution to keep saving others through music while finally permitting herself to wish for her father's recovery and her own joy.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Thai1210 with edits by Wafflesia. Retrieved from the [[mh:vocaloidlyrics:25時の情熱 (25-ji no Jounetsu)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0119-gyakukou-no-renzufurea": {
+    "schema_version": "1",
+    "fingerprint": "0c927fbda684a943e8438d8f2190221f2bd7203513b05afc34b4806c5e1ad5f2",
+    "resonance": "\"Cyberpunk Dead Boy\" is a furious tirade against hollow, view-chasing music and its refrain demanding to know what happened to the thing you actually wanted to say, which is the artistic question Rui wrestles into during the film shoot. Its scorn for numbers over artistry and its cry against disguising yourself map onto Rui's breakthrough, that the airport farewell failed because novel-optimized lines betrayed the actor's truth, resolved by stripping the scripted words so Bakuno's raw breath and expression carry the real, un-faked emotion.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://youtube.com/@igloo8531 igloo], with edits by Wafflesia, CoolMikeHatsune22 and Thai1210. Retrieved from the [[mh:vocaloidlyrics:サイバーパンクデッドボーイ (CYBERPUNK DEAD BOY)|Vocaloid Lyrics wiki]]."
+  },
+  "EVENT|0121-michibiku-yuuki-yasashi-sawo-mune-ni": {
+    "schema_version": "1",
+    "fingerprint": "f3115a71387c31281a6d5e6fd0c51776fb4b95abd1b7607c254397250a0e6886",
+    "resonance": "\"Regulus\" opens on scattered, cloud-hidden stars and resolves into a first-magnitude star in the dark that lets the group stop getting lost, an arc that traces Honami's journey from bandmates pulling in different directions to a unified sound. Its imagery of stars illuminating each other and being bound by interwoven threads matches her role as conductor, and the lyric's plea to a guiding light becomes literal in the climax, where her drumming leads every part's timing and feeling into one powerful performance.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Wafflesia, with edits by Thai1210. Retrieved from [[mh:vocaloidlyrics:レグルス (Regulus)/Yuuyu|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0122-kizama-reta-kizu-ha-yagate": {
+    "schema_version": "1",
+    "fingerprint": "6de948c34b86204625cbe060e15e60651f1f98aadf38784f78301a1125c864ce",
+    "resonance": "\"JUMPIN' OVER !\" builds its refrain around leaping over puddles and white lines that will someday become fond, distant memories, mirroring MORE MORE JUMP!'s obstacle-strewn scramble toward the MORE MORE HOUSE. The song's promise that sadness waits ahead but is worth wiping away into a smile, and its prayer for morning after the rain, echoes Minori's low point, consoled after learning 40 minutes went unrecorded, resolving that even as mere stand-ins they can still deliver hope and leave their own marks behind.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by lunari162, proofread by Violet330. Retrieved from [[mh:vocaloidlyrics:JUMPIN' OVER !|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0125-the-first-concerto": {
+    "schema_version": "1",
+    "fingerprint": "ed68540416062c52002f16582133588039595bed56953c376cecf49e476ce9e9",
+    "resonance": "\"Blender\" names its own thesis in the final lines, connecting past and present, hope and future, through the act of blending, which is exactly how Toya resolves the shame of his classical-piano childhood. The song's movement from a cold, ice-desert city and torn-up scores toward everything \"blended together\" so he can finally play mirrors his breakthrough after his father calls those twelve years a beautiful achievement, letting Toya fold his prodigy past into the RAD WEEKEND feeling of his first completed track.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Thai1210. Retrieved from the [[mh:vocaloidlyrics:Blender|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0127-knowing-the-unseen": {
+    "schema_version": "1",
+    "fingerprint": "e957ce5cca8eb4a4b675936ecf012be444d70cce1f15652644d31ab8636fb965",
+    "resonance": "\"I'm the Rain\" casts its singer as a single raindrop that can never resemble anyone else yet aches to know the pain that troubles the whole world, capturing Ena's paralysis before her untouchable painter father. The lyric's turn from wanting to stay distant to wanting to understand that greater pain mirrors her climactic study of \"A Peony Blooming in the Night,\" where she senses his hidden despair and hope, and its rain \"guided by the dawn\" tracks her resolve to own her own path and keep drawing.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by JaysAndRavens47, with edits by Thai1210. Retrieved from the [[mh:vocaloidlyrics:私は雨 (Watashi wa Ame)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0128-parallel-harmonies": {
+    "schema_version": "1",
+    "fingerprint": "5657108184ae3e7d34a22f9e2d88653da7e9cd993d563db2a3ea0c56fa106efd",
+    "resonance": "\"On the Verge\" lives in the agonizing near-miss of two hearts that are \"so close they're almost touching, but apart,\" the exact fault line between Ichika and Saki as their co-writing collapses into a fight. Its confession that they keep making mistakes by longing for the other to be in the same place, paired with the plea to stop hiding tears and just tell me your pain, mirrors the SEKAI reconciliation where they admit they stopped listening, and Ichika's line about the more she learns the less she understands resolves into her choosing to turn Saki's feelings into music.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from the [[mh:vocaloidlyrics:すれすれ (Suresure)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0129-whip-the-wimp-girl": {
+    "schema_version": "1",
+    "fingerprint": "90dd702f5f65a9ddb972924b158e992151a764de7cfaf487f8421e7057f53fd6",
+    "resonance": "\"Inferno\" opens by insisting you can't hold onto anything by faking strength and urging you to cast off ambiguous feelings, which is exactly An's arc of quitting her pretend-toughness and confronting the buried fear that Kohane will find her \"lame.\" Its burning imagery of singing oneself to ashes and igniting the heart's fire mirrors An settling her doubt the way Nagi would have, in a fiery street battle. The refrain about a wish she still won't surrender and feelings engraved into someone's eyes tracks her resolution to always stay ahead so she can remain the partner Kohane looks up to.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by _zui_ and Thai1210. Retrieved from the [[mh:vocaloidlyrics:烈火 (Rekka)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0131-perspective-for-smile": {
+    "schema_version": "1",
+    "fingerprint": "ccbfb87edbefb1fe667bc7f799f532bb844c7835cf7c7c31e3080e226b5eea17",
+    "resonance": "\"Opera! Space Opera!\" is built on hurling one's feelings outward across a vast distance to reach \"you\" and be picked up by the listener's antenna, which is precisely the lesson Emu must learn: to project her character's joy to the audience rather than feeling it only inwardly. The song's own line that a tiny star sees tragedy while the same scene from space is comedy literally is Kijima's \"perspectives\" teaching. Its emphasis on the feelings actually being received matches Emu's turning point of gathering everyone's reactions and realizing the audience wasn't responding as she'd intended.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Thai1210. Retrieved from [[mh:vocaloidlyrics:オペラ！スペースオペラ！ (Opera! Space Opera!)|Vocaloid Lyrics Wiki]], with edits by [[User:ゟ|ゟ]]."
+  },
+  "EVENT|0133-lead-to-shine-more": {
+    "schema_version": "1",
+    "fingerprint": "c356d129699fd788f2f9cbe82ae5212fb80fd8aeef3b1c2b489fdc9a2953ce91",
+    "resonance": "\"Supernova\" keeps affirming that crooked, \"not correct but maybe perfect\" steps are what matter, echoing MORE MORE JUMP!'s discovery that their special quality is simply being themselves and connecting closely with people. Its refrain that love has to be put into song or nothing ever starts fits Haruka finding the missing piece and the group choosing sincere, unscripted hard work over polished exposure. The closing turn toward betting on the unknown mirrors Haruka accepting the producer role and the group stepping onto a new path.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from [[mh:vocaloidlyrics:Supernova/Yunosuke×haruno|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0134-tomoshibi-wo-taguri-yosete": {
+    "schema_version": "1",
+    "fingerprint": "9d6e2fbfe63710d421302145bc4606225a0f2d937225fc19d2d6e6dc747437b7",
+    "resonance": "\"Empurple\" voices a self stuck in the throat and a heart that stays broken and incomplete, mapping directly onto Mafuyu, who has lost her sense of taste to stress and cannot force out the truth about the night she left. The song's ache to live with her feelings upfront and its repeated plea for forgiveness track her fear of disappointing her father and her eventual confession. Its image of holding hands so someone might \"fix\" what's broken resolves in the ending, when her father listens, apologizes, and vows to stand by her.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://x.com/kizudarakeni Tsuyuki]. May only be used in accordance with the restrictions stated on her [[User:Tsuyuki|user page]]."
+  },
+  "EVENT|0135-over-rad-squad": {
+    "schema_version": "1",
+    "fingerprint": "d4b612c6388f9bdd1d6ec34ebd7ac3f9da9705869f51beda85a5f4f834549f05",
+    "resonance": "\"ULTRA C\" is a song of awakening, booting up an \"update,\" and burning a revolution, matching Kohane's task to blast a hole in the moment RAD WEEKEND became legend. Its insistent hunger for more excitement and its cries to raise the crowd and make noise mirror the climax, where Kohane is drawn back by the band's singing and realizes her ego is loving the pull toward wanting more. The song's triumphant \"grandest finale\" of slipping through the thornbushes lands on the event's close, as the team finally surpasses RAD WEEKEND and everyone charts a new path.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Thai1210, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:ULTRA C|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0136-o-nawa-wo-choudai-tenma-torimonochou": {
+    "schema_version": "1",
+    "fingerprint": "fa31633b7fd46859aa20c96c2409ad882a1de9fc08c84bc09917eba56ceaf4e8",
+    "resonance": "\"I CAAAAAst Punishment Upon You!\" is a rowdy jidaigeki romp of sword-play \"Japanese heroes\" reforming the world and vowing punishment on anyone in their way, matching Tsukasa's detective role chasing down the disguised thief. Its goofy chaos of dango distractions and mixed-up cues captures the caper's tone, while the recurring vow to strike down troublemakers pays off in Tsukasa's climactic wall-jump takedown. The song's proud call to jump, laugh, and sing echoes Kijima's parting lesson that heart, technique, and fitness together make dreams real, sealed by Tsukasa performing the move on stage.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English Translation by Thai1210, with some edits by [[User:ゟ|ゟ]], retrieved from the [[mh:vocaloidlyrics:成敗いたAAAAAす！ (Seibai ItaAAAAAsu!)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0138-chase-my-ideal-idol": {
+    "schema_version": "1",
+    "fingerprint": "7dd3c20c70f5fb487930399aebf07978676da45b2cf27f5bcd6a71802d560db0",
+    "resonance": "\"Killer\" is pure relentless forward drive, a drifter who only hits the accelerator and never learns how to stop, which mirrors Airi shedding her variety-idol limits to chase becoming a super idol. Its boast of turning even tears into entertainment and keeping the camera rolling matches her inspired commitment after witnessing ReLight's total devotion to spreading hope. The refrain about having overcome the unending rain, night, and wounds and refusing to give up until the end lands on Airi's recommitment at the festival's peak.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Thai1210. Retrieved from the [[mh:vocaloidlyrics:キラー (KILLER)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0143-this-moment-with-you": {
+    "schema_version": "1",
+    "fingerprint": "f45cca101930f6a915f67c62d4dba48944a4d9c94ba2998634a3930b2c8107c9",
+    "resonance": "\"Even So, We Won't Stop Singing\" wrestles with ideals diverging from reality and a self that blurs under half-coerced choices, exactly Ichika's discomfort at being asked to promise a Miku version of every future song. Its insistence on not deceiving one's own heart and on having a clear reason to sing voices her unease, while the declaration that \"we chose us\" and won't compromise or bend maps onto her decision to decline the blanket promise. The song's refusal to quit singing while staying true resolves as she accepts the collaboration on her own terms and turns toward Jam Fest.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from the [[mh:vocaloidlyrics:それでも僕らは歌うことをやめない (Soredemo Bokura wa Utau Koto o Yamenai)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0145-ibara-no-michi-ha-doko-he": {
+    "schema_version": "1",
+    "fingerprint": "eddc6f761f7a8e7bcfcbf4552c59b303f5820cfce138783a09fc663450288fb9",
+    "resonance": "\"Flower of Transformation\" is haunted by a knowing look and a \"deceitful flower\" that has bloomed and can never return to a bud, which is Mizuki's dread that once the group knows who she really is, nothing can go back. Its contradictory cry to be left alone yet to have someone stay mirrors her fleeing in tears while Ena chases after her. The song's fixation on the gaze that changes everything matches her final confession that what she most cannot bear is the kindness that will inevitably arise once everyone knows, leaving the arc raw and unresolved.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://x.com/kizudarakeni Tsuyuki]. May only be used in accordance with the restrictions stated on her [[User:Tsuyuki|user page]]."
+  },
+  "EVENT|0146-rekindle-the-flame": {
+    "schema_version": "1",
+    "fingerprint": "1d368f82b7df3cd999afce2aac04236d4c7b43c40aa8a4652dccccbda0d6cfcd",
+    "resonance": "\"FUEL\" openly rejects hollow, superficial encouragement and the trap of being confined to the image of a weak self, which is exactly Akito's problem after RAD BLAST left his passion burnt out. Its craving to simply \"want to try\" and its image of someone knocking at the door mirror the twins Cedric and Slade arriving to provoke him back to full power. The chant that burning more is what he was born for tracks his rekindled fire and, with fuel being \"for going on,\" his resolve to see the world and travel to the States.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Thai1210. Retrieved via the [[mh:vocaloidlyrics:フューエル (FUEL)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0147-happy-enjoy-music": {
+    "schema_version": "1",
+    "fingerprint": "e77adfd3b66f9fda0d38adaa3c6aa0befd76d23b9a543b43e1924c142fc7162a",
+    "resonance": "\"If This Note Rings Out\" turns a run of bad days into the conviction that once the sound rings out, one can stand right here on stage, mirroring Leo/need drawing a sparse festival crowd in through sheer energy. Its wish to turn everything in the imagination into reality and to play it all out matches Saki reconnecting with music's purpose amid STANDOUT and anemone's talk of staying true to your own style. The refrain that the sound is heard resolves in the ending, when Saki plays what she loves and gets the whole cafe singing along, rediscovering how music brings people together.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from the [[mh:vocaloidlyrics:その音が鳴るなら (Sono Oto ga Naru Nara)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0149-the-power-of-regret": {
+    "schema_version": "1",
+    "fingerprint": "1b48070eb8c48615f7316845844c1ab9f2a3f746d1bdc9a60316c71f648cc7d6",
+    "resonance": "\"God of Mine\" is the in-story tragedy \"Luca\" itself, a tender farewell that vows to go on, return alone, and keep singing the beloved's song, which frames Nene's audition for the demanding male lead. Its ache to become stronger and to \"raise the signal\" mirrors Nene shedding her passive approach and committing wholeheartedly to Luca's final scene. The song's acceptance of parting and loss maps onto the event's title theme: Nene loses the role yet learns to hone her craft through regret, forging a rival's bond rather than clinging to pity.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Thai1210, retrieved from [https://vocaloidlyrics.miraheze.org/wiki/ぼくのかみさま_(Boku_no_Kamisama)/Hanyuu_Maigo Vocaloid Lyrics Wiki]"
+  },
+  "EVENT|0150-kizu-darakeno-tede-watashitachi-ha": {
+    "schema_version": "1",
+    "fingerprint": "89a6fd4f6322355ace69d46d5dabbcf9754ec5c1e172f48d70c6d0bfc1fb4571",
+    "resonance": "\"Admiring the Late Cherry Blossoms\" grieves a world that isn't kind and a heart so wounded there's no place left untouched, voicing both Ena's guilt and the vanished Mizuki's belief that staying apart is kinder. Its plea to be allowed to stay by someone's side and its vow to come to them right away, wanting them to cry openly, mirror Ena's desperate search and her declaration that her feelings are unchanged. The song's hope of two hearts drawing close enough to overlap and resonate resolves in the ending, as a broken world keeps moving yet the two are still breathing together and Mizuki chooses to stay.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://x.com/kizudarakeni Tsuyuki]. May only be used in accordance with the restrictions stated on her [[User:Tsuyuki|user page]]."
+  },
+  "EVENT|0151-grow-glorious-glow": {
+    "schema_version": "1",
+    "fingerprint": "3793b18cc278d5b4deca3327fc1cc57331b15cc43fe9c92ff9a48d74fa93298f",
+    "resonance": "\"Run! Go Far! Reach!\" externalizes Shizuku's arc back into the driver's seat: its refrain of chasing a distant goal and cutting the finish-line tape maps onto her fight to reclaim brilliance for the Gran Fleur shoot, while the recurring \"who's the lead role — fix your eyes on me\" taunt is exactly the resolve she rediscovers watching her old Cheerful*Days footage. The song's reframing of rejection as wings and mistakes as things to accept mirrors her admission that she'd grown soft, and its closing turn from \"someone find me\" to a commanding \"watch me\" tracks her ending vow to surpass her former self and pull attention back to MORE MORE JUMP!.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Seraphim. Retrieved from the [[mh:vocaloidlyrics:はしる! とおく! とどく! (Hashiru! Tooku! Todoku!)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0154-time-to-take-off": {
+    "schema_version": "1",
+    "fingerprint": "21970e3eac428e1aa68d2039eb3aa9542fc50dea06e7f2ec5a33e53b3592505a",
+    "resonance": "\"HAVEN\" carries Toya's central question about whether he can love a broken fantasy and an unfamiliar reality alike, which is precisely the reconciliation he reaches in New York as the walls between musical genres dissolve. The song's restless search for an elusive \"haven\" and its refusal to let go of a guiding voice resonate with Shuji's apologetic call and Toya's discovery that his rigid father once loved music without borders. Its arc from a doubtful \"where is it?\" to a resolved \"I'll find it for sure\" mirrors the ending, where Toya, buoyed by his brother's relief that he never quit, understands both meanings of the free path of music.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Tackmyn Y. from [https://tackmyn.livedoor.blog/haven_nilfruits his blog]."
+  },
+  "EVENT|0157-rise-and-strive": {
+    "schema_version": "1",
+    "fingerprint": "675ef96a87b50a17d67c8fe1b4ab7ee880cbef1a66a6232c415bde8609e2876f",
+    "resonance": "\"Anti You\" is a defiant answer song to the sneer that dreams have an expiry date — the exact taunt MORE MORE JUMP! faces from ReLight's aggressive producer Hiiragi. Its insistence on being \"the protagonist of this world\" who won't yield and refuses to call her past idol dream foolish tracks Haruka reliving her guilt over quitting yet reaffirming, with Luka, that a light once extinguished can still spread hope. The lyric's mountains-and-valleys, More-and-More resolve to raise oneself through trial matches the group's decision to lift their standards rather than despair — rewarded when landlady Hinako reveals herself and opens the Lumina Grand Prix door.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Hiraethie. Retrieved from the [[mh:vocaloidlyrics:アンチユー (Anti You)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0161-unreliable-notes": {
+    "schema_version": "1",
+    "fingerprint": "9bc45885440c3204910392851666511adced0ec98d2cae3b9d078ab949248688",
+    "resonance": "\"D/N/A\" turns Kanade's creative struggle into biology: its image of a warmth and love-hate scarred into one's very cells is the \"warmth\" she's chasing to write Mafuyu's song, and the mirror/upside-down reflection motif captures her inability to reconcile the remembered kindness with the cold mother she actually met. The refrain that D/N/A alone can't fool or explain everything echoes her admission that she still doesn't trust the mother. The song's persistent \"can I still find it?\" over the sound she couldn't grasp maps onto the ending resolve, shared with Ena and Mafuyu, to go see the truth for themselves.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://x.com/kizudarakeni Tsuyuki]. May only be used in accordance with the restrictions stated on her [[User:Tsuyuki|user page]]."
+  },
+  "EVENT|0162-find-the-dream-view": {
+    "schema_version": "1",
+    "fingerprint": "79d3afef736e51efaae6d7bad0265d57a61a9796b9dab0f391fd02fbb05a89dd",
+    "resonance": "\"Sympathy\" frames Leo/need's opening slot as the reassurance that their past selves \"weren't mistaken,\" turning individual pain and loneliness into music that connects — the very honesty Naruse praises before teaching them staging. Its plea to hear a voice shouting \"I'm here\" and not let go of a joined hand mirrors the band tearing down the wall between stage and Free Cluster's crowd. The \"we're not done — this is overtime\" defiance and the childhood-hero imagery track Shiho steeling against dismissive comments and, at the end, voicing her dream to headline such an arena through the band's own power.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from the [[mh:vocaloidlyrics:Sympathy/Eve|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0164-choices-for-the-future": {
+    "schema_version": "1",
+    "fingerprint": "de3083ced2ff7282f40792923b34c0d76fb9dc752dd089292e65097ba4101064",
+    "resonance": "\"All Save Challenge\" pairs the resolve to save someone by breaking free of hazy, stagnant days with Emu's pledge to rescue Kikyogumi from disbandment. Its refrain of sewing up burst-open ideals and taking pride in failure — better shot down than stagnating — is the bold, openly experimental show format Emu and Suzu propose to a skeptical board. The lyric's insistence that nothing ripens in an instant yet \"it's impossible for it not to come true\" mirrors their turnaround gamble; the song's plea about forgiveness and unshakable belief underscores Suzu's hidden double life as chairman's granddaughter revealed at the climax.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English Translation by Thai1210. Retrieved from the [[mh:vocaloidlyrics:オールセーブチャレンジ (All-Save Challenge)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0165-soshite-hari-ha-ugoki-dasu": {
+    "schema_version": "1",
+    "fingerprint": "65353a4e6ea8bac2847e64040083914efa3b11557ebdf9a240df8919c5fff905",
+    "resonance": "\"Mx.Nihil\" is Mafuyu's numbness set to music: its coming-apart-at-the-seams emptiness and endless internal debate over expectations, test scores, and a love that hurts even when well-meant trace her slide back into pain as her mother relapses into control. The bitterly warm memory of the sponge-like shortcake that hurts to recall mirrors the remembered maternal warmth she can never quite reach. Its unresolved cry to just be loved without expectations, ending on \"it hurts,\" matches the event's bleak coda — the mother catching herself, apologizing, yet privately agonizing as the painful cycle begins anew and Mafuyu returns to Nightcord's care.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [https://x.com/kizudarakeni Tsuyuki]. May only be used in accordance with the restrictions stated on her [[User:Tsuyuki|user page]]."
+  },
+  "EVENT|0168-cheer-with-my-heart": {
+    "schema_version": "1",
+    "fingerprint": "e3e0ca7734e2530a77d6236642f7613b01b4ddf7e99fb9bc9c4eb3d5c68f252b",
+    "resonance": "\"Eleventh\" builds around a slanting clock hand and endless emotions that keep resounding — an image of persistent, unfading feeling that matches Arisawa's teaching that a \"true idol\" spreads hope simply by being herself. Its refusal to run from kindness and its note that brilliant things always sit beside sadness resonate with Airi's recollection of failed auditions, the bully she inspired, and Hiyori's lesson about putting others' smiles first. The refrain \"it all starts from here\" and the love she ascertained track Airi discovering Hiyori's motto traces back to Arisawa herself, deepening her resolve to give the Lumina Grand Prix everything.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Violet Lights, with edits by MeaningfulUsername. Retrieved from the [[mh:vocaloidlyrics:イレヴンス (Eleventh)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0169-aim-higher-and-higher": {
+    "schema_version": "1",
+    "fingerprint": "e63ad01df97c1fd4a5a155b0df8d18346cc51dae9db316bdeb41c714ef1c39fa",
+    "resonance": "\"Voice of The Beam\" is a beam of light meant to outshine the stars and pierce the world — the literal \"top of the world\" Vivid BAD SQUAD is chasing at SONIC NOTES. Its vow that there'll be no more days of giving up or singing head-down, and no more singing alone into a \"BAD in the sky,\" mirrors the group finally grasping that the \"world\" means setting a global audience's hearts ablaze. The lyric's call to rise unafraid and start a \"new legend,\" shining higher than that star, matches the ending where RaveN announces Lasting ECHO Fest and VBS vows to win RUSH BEATS onto that stage.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Violet Lights, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:光線歌 (Kousenka)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0172-deeper-and-deeper": {
+    "schema_version": "1",
+    "fingerprint": "ad4faf1aaae44e781d7589776ac2b234563c586d2d6f2ec3008fc53e6f3cb085",
+    "resonance": "\"Eyelid\" burns with the resolve to use up the whole body and set oneself ablaze chasing an unknown, unseen beauty — Rui's hunger to close the nameless gap between his crowd-pleasing craft and Tom Gray's emotional depth. Its confession of not wanting to let any of it slip away, and the ghost of a taken role watching from above, mirror Rui confronting how he'd suppressed his own raw feelings to please the widest audience. The lyric's ache to reach a place \"where I won't feel the cold\" and to share a burden maps onto his monster show — a lonely creature who accepts himself yet asks to stay among the humans who accept him, winning Tom's praise.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:souburin|souburin]]."
+  },
+  "EVENT|0173-unsteady-still-steady-step": {
+    "schema_version": "1",
+    "fingerprint": "75aa3c4614338e07774d562825b80dd9212a62042f5d80161dc7624e40904782",
+    "resonance": "\"Transparent Palette\" reframes indecision as grace: a palette still translucent that is \"beautiful in its own way\" and days of one-step-forward, one-step-back directionlessness capture Honami's paralysis between the solo show and the Fan Festival. The lyric's detour \"on the way to the best days of our lives\" and its refusal to settle for a stage someone else prepared echo her exhaustive research and desire to lead well. When the Fan Festival offer is rescinded and a future slot promised, the song's tender resolve to remember every feeling and take the longer way around mirrors Honami turning her flash of relief into a vow to grow decisive.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from the [[mh:vocaloidlyrics:透明なパレット (Toumei na Palette)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0174-start-rolling-stars-crossing": {
+    "schema_version": "1",
+    "fingerprint": "2b25be4b2ed9007954d864acaadcae2cbb516c926a89e21aa7027df2dd48e9da",
+    "resonance": "\"Our Story As It Is\" is a manifesto for unadorned sincerity — weaving \"our story as it is\" and discarding a lying mask because \"I'm alright being myself\" — which is exactly the lesson Minori learns after overtrying and stumbling on the Grand Prix's first day. Its wish to make someone's smile bloom and its embrace of staying clumsy track Haruka nominating her to represent the group \"purely.\" The song's promise that together they can overcome the impossible and light a flame of hope mirrors the climax, where Minori's tearful, heartfelt praise turns the crowd around for the heckled Hikarin and wins her over.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:MK The Misery Kid|MK The Misery Kid]], with edits by MeaningfulUsername. May only be used in accordance to the restrictions stated on their [[User:MK The Misery Kid#Translation TOS|user page]]."
+  },
+  "EVENT|0175-competitive-fire": {
+    "schema_version": "1",
+    "fingerprint": "d6f8fb7c8d2e1f47f91efe4e09f204f9ba7de5b9df2838c34fb00629454f0b29",
+    "resonance": "\"Accelerate\" pushes past \"the crown of victory\" with wings spread wide, learning to ride frustration for fun rather than resist it — the exhilarated momentum Vivid BAD SQUAD rides after watching RADder and setting their sights on RUSH BEATS. Its refusal to hold back because otherwise \"both dreams and reality would get boring\" and its belief in a never-before-seen blue sky far ahead mirror the group and their new rival teams igniting each other. The recurring image of a place they belong \"tied together with singing voices\" matches the ending, where An finds a true rival and illys and Embers rush to the airport, all vowing to reunite and compete.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:souburin|souburin]]."
+  },
+  "EVENT|0177-hodokenu-ashita-ni-te-wo-nobashi-te": {
+    "schema_version": "1",
+    "fingerprint": "9687dd23d58a9dfbf4ee6221c40221590e0d11509790a9c685e0e7a2eb0519d6",
+    "resonance": "\"Embellish\" runs on the double meaning of dressing up: adorning one's sorrows and \"atonements\" so a heart can finally be filled, which mirrors Mizuki drifting without a dream while everyone around chases theirs. The song's turn from wounds left behind becoming \"precious marks\" to becoming someone who can love those wounds tracks Mizuki's arc from feeling left behind to glimpsing a purpose in protecting others' feelings. Its closing repetition of the title over an ordinary, accepted morning lands exactly where the story ends — with Yuki's gifted dress helping the hesitant customer reclaim a buried wish, and Mizuki finding that quiet, self-honoring beauty radiant.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Rouse01. Retrieved from the [[mh:vocaloidlyrics:飾って (Kazatte)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0178-deep-dark-for-light": {
+    "schema_version": "1",
+    "fingerprint": "80c9d07f59f3d8ec32589499c1826f5da4b660f55d510bac1cf2aaadd38be898",
+    "resonance": "\"Goodbye Heaven, Come Back to Hell\" voices Prince Bless's despair as a swirl of unanswerable questions — devil or angel, heaven or hell — matching Tsukasa's struggle to feel a hopelessness he can't otherwise imagine. The recurring vow to protect even a clumsy, awkward weakness and grow stronger through shed tears frames his breakthrough: reaching genuine despair by picturing a world that rejects shows and smiles. The song's refusal to say a real \"goodbye,\" swallowing the twisted shape instead, echoes the ending where the audience's cries pull Bless back and WxS earns its own stage rather than a clean defeat.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:souburin|souburin]]."
+  },
+  "EVENT|0182-kun-to-tsunagu-heart-beat": {
+    "schema_version": "1",
+    "fingerprint": "140900f5f0cf20c53ec532ce6c5adfe3a00c870398573bdb6b24eaf6426e425c",
+    "resonance": "\"Star\" reframes the act of being saved as also saving others — \"I've been saved and also saved\" — which is precisely what WITH becomes for Ichika as her thank-you to Miku ripples outward. The lyric's wish to be not a highlight in the darkness but a star in the middle of the world captures her realizing music's power to build community. The closing image of everyone holding stars \"shining equally\" matches the ending, where the viral song draws cover singers, illustrators, and classmates together into one connected world.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru, retrieved from the [[mh:vocaloidlyrics:スター (Star)/Daibakuhashin|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0183-majiwa-ru-iro-haano-nichi-nomamani": {
+    "schema_version": "1",
+    "fingerprint": "cca1649d7eca2492553cb4e6eced0e8bf27a0588f69b5794abc86333b3c83a59",
+    "resonance": "\"If Your Sky Should Weep\" is built on the plea to carry \"half\" of another's burden — to twine their chain and storm around oneself — which is exactly Shizuku's selfless move to coach the very rivals who once resented her. The lyric's ache to embrace the gloom that sneers at you maps onto her overhearing Cheerful*Days' lingering bitterness yet choosing to help anyway. Its image of sharing an umbrella's half resolves in the ending, where Alisa accepts Shizuku's help and old wounds heal into a respectful rivalry.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by MeaningfulUsername. Retrieved from the [[mh:vocaloidlyrics:あなたの空が泣くのなら (Anata no Sora ga Naku no Nara)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0184-colors-of-pure-sense": {
+    "schema_version": "1",
+    "fingerprint": "78766bf694a1def9c6cb04f4dfbd96aef15ba3a7d431252c7ef7724a837e0658",
+    "resonance": "\"The Name of That Painting is\" turns a dream crushed under \"the shadows of ideals\" into something detested, mirroring Ena's block when safe, correct technique earns her last place. The insistence that there's no single correct answer and that she can paint over it \"again and again\" tracks her discovery that every attempt to ruin the Nightcord piece only deepens it. The song's final resolve to paint this SEKAI true to herself even if it isn't beautiful lands on the climax, where her real failure is failing to express — and her flawed, honest worldview becomes her weapon.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from the [[mh:vocaloidlyrics:その絵の名前は (Sono E no Namae wa)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0185-choukoku-no-purotagonisuta": {
+    "schema_version": "1",
+    "fingerprint": "86257f5c35784cc0f37d515d351c62bde67cdd8e388d05d2d02cbe5b8eaa3b20",
+    "resonance": "\"GO FORTH\" stages a battle between a haunting past hidden \"deep within fate\" and the command to face ahead — the exact shape of Nene's stage trauma versus the curtain she must walk through. The repeated cry that a wound-covered heart is \"not weak anymore\" and that damaged courage is enough mirrors Rui's tough-love gamble and the trust behind it. The song's driving chant of \"go forth\" under a watching world resolves in her stellar turn as Princess Heart, courage reclaimed precisely because her friends demanded it.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Violet Lights, proofread by ElectricRaichu. Retrieved from the [[mh:vocaloidlyrics:征け (Yuke)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0187-overcome-one-s-limits": {
+    "schema_version": "1",
+    "fingerprint": "422d9c4c2240541e52d007cbb629c3119f2f14d857d550c4ac45fefabfbb35cc",
+    "resonance": "\"Fighter\" is all forward momentum — fire out your passion or it means nothing, disregard everything that says \"impossible\" — which is Akito's mandate to win over a hostile New York crowd in two weeks. The lyric's blunt \"no time for complaining, go and struggle\" and its shifting into high gear track his push through the language barrier via a bilingual song structure. The demand to walk the talk with real resolution rather than just words pays off in the ending, where his limit-breaking performance secures the No.9 Records contract.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Thai1210. Retrieved from the [[mh:vocaloidlyrics:ファイター (Fighter)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0188-aogu-yozora-ni-hoshi-ha-magire-te": {
+    "schema_version": "1",
+    "fingerprint": "ef52e61bf366a4260f6f93b706469aa1bbf25d28f863f09c15d5ed51d52d240f",
+    "resonance": "\"Flower Knot\" is a song of the unspoken — \"I can't say it,\" mouth kept shut for fear everything would crumble — which is Saki's exact predicament as her true wish clashes with the band's rise. Its tension between clinging to \"things that don't change\" and chasing \"more hope than now\" mirrors her fear that intimate, close-up connection can't coexist with ever-larger stages. The lyric's true heart still \"waiting for spring\" while she panics and pretends not to notice matches the ending, where she buries those feelings to keep her place in Leo/need.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "Official English translation retrieved from the [https://youtu.be/Wu8WtrTCX-Q original music video]."
+  },
+  "EVENT|0190-kono-monogatari-ha-kibou-wonosete": {
+    "schema_version": "1",
+    "fingerprint": "992a6c08c2a6fa07374b4bbd7ac4f841601cf3cfaf1577e1c8b93ebeb2e54e6e",
+    "resonance": "\"Polar Star\" opens on a lost compass in a blurred night sky — aimless drifting — which mirrors Haruka steering a randomly assembled team toward exam-stressed, depressed children with no obvious approach. The unfading star that always twinkles beside you, swallowing \"anxiety and curses,\" becomes the reassurance she reshapes the whole event around: vulnerability and connection over high-energy spectacle. Its plea \"find me, watch over me\" so no one gets lost lands on the ending, where MORE MORE JUMP! becomes the children's guiding light and secures second place into the finals.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:MK The Misery Kid|MK The Misery Kid]], with edits by [[User:Shiru-|Shiru]]. May only be used in accordance with the restrictions stated on their [[User:MK The Misery Kid#Translation TOS|user page]]."
+  },
+  "EVENT|0192-same-nai-gensou-wo-nokku-shite": {
+    "schema_version": "1",
+    "fingerprint": "5eff4a0e505d0a3d326bcfbbd1713e3a4cf0119d462a7806e450cecaba1cea02",
+    "resonance": "\"Love and Punishment\" fixates on tangled threads and whether tearing them apart would bring relief — the very question of codependency Luka forces on Kanade about saving Mafuyu. The lyric's \"barely believing we belong, emptily stroking each other's wounds\" names the fear of losing one's place that Kanade's grandmother describes, while \"if eventually our hands came undone\" voices the option of separation. Its closing spiral — whose sake, what is best for your sake — mirrors the climax, where Kanade must face all three uncomfortable truths at once to find a real way forward.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:Shiru-|Shiru]], with edits by Violet."
+  },
+  "EVENT|0193-go-all-out": {
+    "schema_version": "1",
+    "fingerprint": "c210a93d4eb232fc0266fb58afe0314b86f00e1e7b5a7ec5dee66ccf5cf76449",
+    "resonance": "\"Permeating Warmth\" trades in lukewarm, swaying temperature slowly overlapping into a shared heat — the wary, respectful heat that grows between Toya and his rival Slade. The lyric's refusal to say \"this is for you\" and its wish to be a fragment that melts the other's heart mirror Toya honoring Slade's demand for an unpitied, all-out battle and keeping his deafness secret. Its \"unrefined heat\" and voices echoing toward the future pay off in the ending, where Toya sings through a fever to give that limit-breaking performance and both teams leave with mutual respect.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Shiru. Retrieved from the [[mh:vocaloidlyrics:透過する温度 (Touka Suru Ondo)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0195-path-made-by-faith": {
+    "schema_version": "1",
+    "fingerprint": "1121d4762e56b8a26cf04406044f605dd29175bbc91fd6ea1ade5ad81a836fdf",
+    "resonance": "\"Let's go on, just like this\" reframes a long road — blistered feet, no need to rush, footprints accumulating with every worn-down step — as Shiho's journey from the bass Sumire first taught her to a televised battle against her. The lyric's shift from \"we believe\" to \"we want to believe,\" and its comfort that for every night of \"we can't go on\" they still met the morning, matches her intense preparation and growth. Its seeds sprouting even with no rainbow after the rain lands on the ending, where a fan letter reveals someone she inspired to pick up the bass — proof the path is real.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:Shiru-|Shiru]]."
+  },
+  "EVENT|0196-change-emuha-oujo-sama": {
+    "schema_version": "1",
+    "fingerprint": "ae5fb17c0c18485dd5c631a4f4ee3def3180dd208c45f6e262b82c7b4028cb96",
+    "resonance": "\"Beyond! Wonderpyoi\" bounces off the contrast between a cramped castle of endless lessons and hidden true feelings against the urge to selfishly play and adventure — exactly Princess El's stifled life versus her secret theme-park dream. The song literally sings \"swapping places, dreams come true\" and \"quit being a princess, I want to be myself,\" mirroring Emu's plan to trade identities so El can chase her goal. Its Cinderella imagery — throwing away the glass slipper, leaping from the pumpkin carriage — fits the ending where El stops playing her assigned role and boldly wins her father over to her own dream.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "Official English translation retrieved from [[mh:vocaloidlyrics:とびだせ！わんだぴょい (Tobidase! Wonderpyoi)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0198-open-up-new-horizons": {
+    "schema_version": "1",
+    "fingerprint": "64dffb6634032298054006752cb6557a0b38625d10313c6e3e08c6f1c954977b",
+    "resonance": "\"Colorful Foundation\" frames Airi's transformation into the timid Michiru as a \"bold foundation\" and an ever-shifting \"next phase\" — the song's insistence that shape-shifting at will is a weapon rather than a disguise mirrors her method-acting gamble that identity is malleable, not fixed. Its refusal of any tidy ending and its vow to leap forward carrying contradictions echo the title's open horizons and Airi accepting a role that is the opposite of herself. The climactic image of a single spark scattering inner darkness into hope lands on Episode 7's continuous run-through, where her genuine tears of joy convert Mao's early prejudice into praise.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:Treecar|Treecar]], proofread by MeaningfulUsername. Retrieved from the [[mh:vocaloidlyrics:カラフルファンデーション (Colorful Foundation)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0199-amid-the-wavering-light": {
+    "schema_version": "1",
+    "fingerprint": "38b55d59e51a22a4398c2ab9d48d7488946dcb2947a95da972bf86f0ef05d363",
+    "resonance": "\"CONFESSION\" carries the ache beneath Mizuki's private ultimatum with herself — its images of nurturing something that only wilts and measuring to exact specification only to have it \"leak\" mirror her grueling, deadline-bound attempt to draft and sew a dress while keeping up with Nightcord. The refrain that every step forward only hurts more yet resolving to keep walking maps onto the event's resolution, where Mafuyu and Miku tell her to pursue both fashion and music for as long as she can. Even its closing gratitude for a painful attachment echoes Mizuki choosing not to abandon either path despite the exhaustion.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Mafuyu, with edits by Violet. Retrieved from the [[mh:vocaloidlyrics:告白 (Kokuhaku)/Naisho no Pierced|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0200-zanshou-no-inside-direction": {
+    "schema_version": "1",
+    "fingerprint": "cdff9960d32958462955786368a8127a069e1666faa50efbec8f4cfe3ddf01ab",
+    "resonance": "\"The Puppet's Reality\" casts Rui as both puppeteer and director — its conceit of manipulating a performer like a spinning marionette to chase \"dreams, ideals, and reality\" mirrors his scheme to play off-camera antagonist and pull Nagamine's real anger into the role. The lyric where hidden, lied-about anger surfaces into darkness and is then reeled back by a thread tying two people together tracks Episode 7 exactly: Rui provokes the raw take, then apologizes and reconciles. The song's vow to breathe life into a \"wondrous world\" points to the ending's spark, with Director Ohara's praise leaving Rui inspired to build a bigger show for Wonderlands x Showtime.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:SunnySkiesTLs|SunnySkiesTLs]], proofread by [[mh:vocaloidlyrics:User:CoolMikeHatsune22|CoolMikeHatsune22]]. Can only be used in accordance to the restrictions stated on her [https://rentry.co/SunnySkiesTLs Rentry]."
+  },
+  "EVENT|0201-show-em-what-s-up": {
+    "schema_version": "1",
+    "fingerprint": "b5c311183dcf23690fdb85589043904f42816ffaa2e96759e07065440be89436",
+    "resonance": "\"CRASH THE PARTY\" is itself the breakthrough An finds — its constant code-switching between Japanese and swaggering English enacts the very fusion of childhood street-song rhythm with English flow that lets VBS trade rigid grammatical correctness for raw feeling. Its boasts about being the baddest crashing the party and paving one's own road answer Ways' taunt that the group only rose through Elena's connections. The song's closing image of an undying bond as hellfire underscores the ending, where An's emotionally charged English rap flips a hostile crowd and earns both the qualifier win and Ways' respect.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:Wreckka|Wreckka]]."
+  },
+  "EVENT|0202-yakusoku-no-passerelle": {
+    "schema_version": "1",
+    "fingerprint": "9d4c2087255a2a4ea69b275b6714ea0f3adebabae0afe25befe8e1befb9084b3",
+    "resonance": "\"Through the World\" turns the event's premise — disparate members walking unfamiliar Sekai to reach one grieving girl — into its refrain about walking worlds no one else has known and chasing answers you cannot see. Its questions of \"what will you write\" and \"where will it reach\" mirror the girl's abandoned composition notebook and the very song the members build and deliver into her heart. The lyric admitting wounds that never fully heal yet resolving to keep going embodies the story's aim to depict \"what lies beyond overcoming\" grief, and the final vow to change the future's past from here lands on her awakening and her new goal to write music that reaches her grandmother.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "Official English translation retrieved from the [[mh:vocaloidlyrics:世界の歩き方 (Sekai no Arukikata)|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0203-atatakana-omoide-wo-tadotsu-te": {
+    "schema_version": "1",
+    "fingerprint": "be7c211306c4688feebdac118cd03129a098ed81a10ba406d9d22bfa68911c51",
+    "resonance": "\"Where the Stars Are Closest\" is a childhood-memory song — its after-school \"Apollo program\" and footprints forming a constellation mirror the flashback Honami shares of the four girls first bonding as grade-schoolers on a lost-puppy hunt in the forbidden forest. Its refrain that once-unreachable stars are now right there captures how far Leo/need has grown between that memory and their WAVING-BOX success. The images of each instrument's sound becoming a guiding landmark resolve into the ending's pressure-free jam session, where they rediscover music made purely for themselves.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:Wreckka|Wreckka]]."
+  },
+  "EVENT|0204-stay-solid-no-fold": {
+    "schema_version": "1",
+    "fingerprint": "787586ca5a715a95ebc2c9e1f6d211cc953aed545332611a53811c6395b05b3e",
+    "resonance": "\"Soar\" is a declaration of self-authored identity — its insistence that the singing voice is a language spoken with bare feet planted on the ground, and that this voice cannot fall silent because the singer was thrust into the world \"as myself,\" mirrors VBS refusing to become Douglas's manufactured commodity. The lyric about casting off a stifling, hollow \"freedom\" to walk toward genuine hardship reframes the group's choice to reject a corporate shortcut and carve their own path. That philosophy is exactly what the team voices in Episode 7's climax, even as the song's battered-but-still-climbing imagery foreshadows Douglas privately branding their independence a threat.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:Wreckka|Wreckka]]."
+  },
+  "EVENT|0205-great-yell-for-dreamers": {
+    "schema_version": "1",
+    "fingerprint": "9d627f0f85b77b3f90e16da254efeb8569248da864ecc84e42b0b6ad0382974a",
+    "resonance": "\"Dreamer's Beat\" opens by lamenting how everything curdled into scores and results — the exact penalty-system, deadline-driven pressure crushing the dancer Raise — then pleads to be reminded of the joyful, self-forgetting days of pure creation. That plea is the story's engine: the four members help Raise recover the joy of dancing and the wish to make others want to dance too. The song's returning heartbeat rhythm and the \"initial impulse\" that still rings true mirror the ending, where Minato admits he wants Raise's genuine, infectious dance and the two rehearse as true equals.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:SunnySkiesTLs|SunnySkiesTLs]], proofread by [[mh:vocaloidlyrics:User:Violet330|Violet330]]. Can only be used in accordance to the restrictions stated on her [https://rentry.co/SunnySkiesTLs Rentry]."
+  },
+  "EVENT|0207-into-the-new-light": {
+    "schema_version": "1",
+    "fingerprint": "73fc236680f9cc5ec2f9a0b012c15d8e760e7a869dd486b905b74dd9d23d4c69",
+    "resonance": "\"Return to the road\" frames renewal as resuming a journey — its refrain of not leaving but going home, getting back to the trip, mirrors the video-club girl choosing not to give up but to return to filmmaking on her own terms. The song's charge to stop fearing change because \"that style itself is the answer\" tracks Mafuyu revealing her hidden self to convince the girl her own voice is worth pursuing. Its bittersweet lines urging a companion to change and keep walking even down a separate path land on the ending, where the girl quits the toxic club, founds her own, and her healed fragment blooms into a wholly new Sekai.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:MK The Misery Kid|MK The Misery Kid]], proofread by [[User:SunnySkiesTLs|SunnySkiesTLs]] and Violet330. May only be used in accordance to the restrictions stated on their [[User:MK The Misery Kid#Translation TOS|user page]]."
+  },
+  "EVENT|0208-phantom-maze-monster": {
+    "schema_version": "1",
+    "fingerprint": "30925b8fbd65a62caf9dbbc7aa490196f3c243e63ce5e25e6667305dfb3172c6",
+    "resonance": "\"All in One\" voices Tsukasa's breakdown from the inside — the beloved voice curdling into a curse, the inability to meet expectations, and the urge to disappear mirror the dissociation his method-acting descent into childhood resentment triggers. The turn where bandmates insist \"I'm here\" and he grabs the outstretched hand is Episode 7's intervention by Emu, Nene, and Rui reaffirming their eternal bond. Its thesis — embrace hope and despair alike, throw nothing away, and carry even the wounded self from back then — is exactly the integration that lets him deliver a balanced, powerful final performance.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by [[User:SunnySkiesTLs|SunnySkiesTLs]]. Can only be used in accordance to the restrictions stated on her [https://rentry.co/SunnySkiesTLs Rentry]."
+  },
+  "EVENT|0209-aidoru-hanazato-minori-yume-no-saizensen": {
+    "schema_version": "1",
+    "fingerprint": "f3de8d68b98cf43a2689fcbb8f02b43f1b2d1854940d2d457d284a96d5b1508f",
+    "resonance": "\"Gimme more!\" is a bright idol manifesto whose core promise — being your idol who will make you shine and bring another smile tomorrow — is precisely the hope-giving identity Minori grows into across her documentary week. The disarming line \"Me? Really? Is it okay for me to be your favorite?\" captures the humility beneath her charm, the same quality that wins over the film crew. Its fall-then-rise-again refrain and the sense of having grown stronger through others resolve at the ending, where she handles a swelling crowd of fans as One-day Police Chief with composure and realizes she is truly becoming an idol who delivers hope.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "Official English translation retrieved from the [https://youtu.be/p1BHscS8O5w Original MV]."
+  },
+  "EVENT|0210-ase-nai-ima-wo-sai-tte": {
+    "schema_version": "1",
+    "fingerprint": "7ceca90d68312907404f6d06c8ae3c59b2f2d75f4664bd1fc912163f0bd7df30",
+    "resonance": "\"Light\" aches with impermanence — its lines about time pressing on, an uncertain future, and one another's voices perhaps growing rarer name the very reason Ena and Mizuki plan the trip: their paths will eventually diverge, so they must treasure the now. The song's insistence that these clumsy, fleeting days all sparkle and are \"treasures\" worth remembering into an unseen future mirrors Ena filling her sketchbook to preserve each moment. Its resolve to keep living strongly and move toward tomorrow while gazing at that light matches both the title's coloring of an unfading present and the closing beach fireworks where the group reflects on their bond.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": ""
   }
 }
