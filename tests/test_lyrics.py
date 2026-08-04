@@ -81,6 +81,49 @@ def test_choose_version_prefers_full():
     assert lyrics.choose_version({}) is None
 
 
+RUBY_WIKITEXT = """\
+== Lyrics ==
+{{Lyrics head|columns=japanese,romaji,english}}
+{{Lyrics line
+| japanese = {{Lyric|Ichika|こぼれた涙{{ruby|一滴|ひとしずく}}が空へ}}
+| romaji = {{Lyric|Ichika|koboreta namida hitoshizuku ga sora e}}
+| english = {{Lyric|Ichika|a single spilled teardrop, toward the sky}}
+}}
+"""
+
+PLAIN_WIKITEXT = """\
+== Lyrics ==
+{{Lyrics head|columns=japanese,romaji,english}}
+{{Lyrics line
+| japanese = 形のない気持ち
+決まりきったレイアウト
+| romaji = katachi no nai kimochi
+kimarikitta reiauto
+| english = formless feelings
+a predetermined layout
+}}
+"""
+
+
+def test_ruby_furigana_resolved_not_truncated():
+    """{{ruby|base|reading}} must resolve to base and NOT truncate the line (the
+    nested }} used to cut it short)."""
+    seg = lyrics.parse_lyrics_wikitext(RUBY_WIKITEXT)["versions"]["default"][0]
+    assert seg["japanese"] == "こぼれた涙一滴が空へ"  # ruby -> base kanji, kana dropped, full line
+    assert "{{" not in seg["japanese"] and "ruby" not in seg["japanese"]
+
+
+def test_plain_text_columns_without_lyric_wrapper():
+    """Songs whose columns hold plain text (no {{Lyric|…}}) must still parse — this
+    silently dropped whole songs (e.g. Tell Your World) before."""
+    lines = lyrics.parse_lyrics_wikitext(PLAIN_WIKITEXT)["versions"]["default"]
+    assert len(lines) == 1
+    seg = lines[0]
+    assert seg["singer"] == ""  # no per-singer attribution in this format
+    assert seg["japanese"] == "形のない気持ち\n決まりきったレイアウト"
+    assert seg["english"] == "formless feelings\na predetermined layout"
+
+
 def test_no_lyrics_section():
     assert lyrics.parse_lyrics_wikitext("{{Infobox song|song id=1}}\n== Trivia ==\nx")["versions"] == {}
 

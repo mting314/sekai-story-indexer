@@ -29,16 +29,28 @@ from pathlib import Path
 from .client import fetch_json
 from .constants import SEKAIPEDIA_API
 
-# One {{Lyric|Singer|text}} call. Non-greedy to the first }} (lyric text has no }}).
-_LYRIC_TMPL = re.compile(r"\{\{Lyric\|([^|}]*)\|(.*?)\}\}", re.DOTALL)
 # Column separators inside a {{Lyrics line}} block (line-anchored | name =).
 _COLUMN_SPLIT = re.compile(r"\n\s*\|\s*(japanese|romaji|english)\s*=")
 # Translation/source attribution.
 _TAIL_TMPL = re.compile(r"\{\{Lyrics tail\|(.*?)\}\}", re.DOTALL)
 # The == Lyrics == section body, up to the next level-2 heading.
 _LYRICS_SECTION = re.compile(r"==\s*Lyrics\s*==(.*?)(?:\n==[^=]|\Z)", re.DOTALL)
+# Furigana: {{ruby|base|reading}} -> base (drop the pronunciation gloss).
+_RUBY_RE = re.compile(r"\{\{[Rr]uby\|([^|{}]*)\|[^{}]*\}\}")
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_REF_RE = re.compile(r"<ref[^>]*>.*?</ref>|<ref[^>]*/>", re.DOTALL | re.IGNORECASE)
 
 _COLUMNS = ("japanese", "romaji", "english")
+
+
+def _clean_text(text: str) -> str:
+    """Resolve {{ruby}} to its base + strip HTML comments/refs from a lyric fragment."""
+    text = _COMMENT_RE.sub("", text)
+    text = _REF_RE.sub("", text)
+    prev = None
+    while prev != text:  # ruby can nest shallowly; resolve to a fixed point
+        prev, text = text, _RUBY_RE.sub(r"\1", text)
+    return text.strip()
 
 
 def _iter_named_templates(text: str, name: str):
@@ -66,9 +78,22 @@ def _iter_named_templates(text: str, name: str):
         i = j
 
 
-def _lyric_calls(column_body: str) -> list[tuple[str, str]]:
-    """``[(singer, text)]`` from the {{Lyric}} calls in one column, in order."""
-    return [(m.group(1).strip(), m.group(2).strip()) for m in _LYRIC_TMPL.finditer(column_body)]
+def _column_segments(body: str) -> list[tuple[str, str]]:
+    """``[(singer, text)]`` for one column. Handles both formats: per-singer
+    ``{{Lyric|Singer|text}}`` calls (brace-matched, so nested {{ruby}} doesn't
+    truncate), OR — when a song has no {{Lyric}} wrappers — the whole column as one
+    unattributed segment."""
+    calls = []
+    for block in _iter_named_templates(body, "Lyric|"):  # marker distinguishes {{Lyrics}}
+        inner = block[len("{{Lyric|"):]
+        if inner.endswith("}}"):
+            inner = inner[:-2]
+        singer, _, text = inner.partition("|")
+        calls.append((singer.strip(), _clean_text(text)))
+    if calls:
+        return calls
+    cleaned = _clean_text(body)
+    return [("", cleaned)] if cleaned else []
 
 
 def _parse_lyrics_line(block: str) -> list[dict]:
@@ -79,7 +104,7 @@ def _parse_lyrics_line(block: str) -> list[dict]:
     parts = _COLUMN_SPLIT.split(inner)  # [pre, name, body, name, body, ...]
     columns: dict[str, list[tuple[str, str]]] = {}
     for idx in range(1, len(parts) - 1, 2):
-        columns[parts[idx]] = _lyric_calls(parts[idx + 1])
+        columns[parts[idx]] = _column_segments(parts[idx + 1])
     width = max((len(v) for v in columns.values()), default=0)
     segments = []
     for k in range(width):
