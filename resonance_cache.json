@@ -1,0 +1,23 @@
+{
+  "EVENT|0001-ameagari-no-ichiban-hoshi": {
+    "schema_version": "1",
+    "fingerprint": "566e3ebf504e925e964212f5edbb3608e1bb7046534e950b95626c2d7970de99",
+    "resonance": "Stella's opening image of tears dissolving into a dark, sealed-off night maps onto Saki's dread that her hospitalized years are lost time she can never recover, while the stars that \"see through\" a worn, deformed heart echo the bandmates who cut past her secrecy and confront the fever she hid. The song's turn—that the wings needed to fly had already sprouted long ago—rhymes with the story's core reassurance: Saki never had to race, because her bond with Leo/need was already secure and permanent. And its close, where the night sky patiently waits for its light and dawn rises softly, resolves exactly as the event does—Shiho's apology and the promise to make memories at a comfortable, steady pace, celebrated under the artificial planetarium sky they raise together in the Sekai.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Thai1210, with edits by Violet and Aquatheories. Retrieved from [[mh:vocaloidlyrics:ステラ (Stella)/Jin|Vocaloid Lyrics Wiki]]."
+  },
+  "EVENT|0002-torawa-reno-marionetto": {
+    "schema_version": "1",
+    "fingerprint": "5bdf41fb542230258c5ceda8b40f98db7117e2ecf9338754f49252d997feedb2",
+    "resonance": "\"Jackpot Sad Girl\" turns Mafuyu's marionette-like paralysis into voice: its opening images of a life lived \"within the standard deviation\" and an expression suffocated until it rots mirror the puppet strings she recognizes at the exhibit and the dream of existing only to meet others' expectations. The song's insistence that the feelings one can't tell a soul are precisely what hold worth reframes Kanade's push to channel raw discomfort into lyrics rather than tidy explanations. As the track shifts from \"unable to comprehend each other\" toward advancing \"as we are,\" it tracks the ending beat where Mafuyu begins speaking honestly to her groupmates. Its closing turn — the sought-after answer already \"in our hands,\" capped by a triumphant \"there it is\" — lands exactly on that first reclaimed step toward her true feelings.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Serene_Snowfall, retrieved from [https://magenetratranslations.tumblr.com/post/633154706092523520/here-is-a-translation-for-syudous-newest-song MagenetraTranslations]. May only be used in accordance with the terms stated on their [https://magenetratranslations.tumblr.com/Terms Tumblr]."
+  },
+  "EVENT|0003-zenryoku-wandaaharouin": {
+    "schema_version": "1",
+    "fingerprint": "d4ffb72ee247d7f9a6379c14e24c8f719ac792efa86c2721df0b3240dd4866af",
+    "resonance": "The song's refrain of everything — plans, futures, ambitions — dissolving and boiling down into shapeless \"potatoes\" mirrors Rui's spiral after the naraku accident, where his fear of harming his cast melts his bold direction into safe, mushy compromises. Its lone plea wondering whether anyone will trust him lands exactly on the rift with Tsukasa, who accuses Rui of holding back and refusing to trust his cast. The track's turn — booing reframed as medals of honor — tracks Rui confronting the childhood peers who abandoned his unconventional ideas, and its closing invitation to all get gleefully \"crumpled\" together voices the resolution: the troupe embracing itself as \"show fools\" who share his passion, freeing Rui to design the high-flying climax.",
+    "model": "claude-opus-4-8-subagent",
+    "attribution": "English translation by Mes, with minor edits by [[User:Tsuyuki|Tsuyuki]], retrieved from the [https://youtu.be/Dun11cIEo9s official music video]."
+  }
+}

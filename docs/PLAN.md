@@ -400,7 +400,10 @@ plus the id **mapping** (our data). Raw lyrics never touch the repo or the cache
 sites (Sekaipedia `ステラ` → `Stella / NeedLe/Stella / Wandering Stella`) and can be
 renamed. So:
 * **`lyric_page_map.json`** (checked in, refreshable — like `story_order.yaml`):
-  `{ music_id: {pageid, title} }`. Built by one paginated Cargo query
+  `{ music_id: {pageid, title, english} }` — `title` is the wiki page name (often
+  romaji), `english` is the standardized English song name (infobox `english`), used
+  as the user-facing display name everywhere (never the JP title; cf. no-slugs-in-UI).
+  Built by one paginated Cargo query
   (`action=cargoquery&tables=songs&fields=_pageID,_pageName,song_id&order_by=song_id
   &offset=…`, ~500/page) joined against `musics.json.id`. `song_id` is unique wiki-
   side, so it's a 1:1 join. Verified: song_id 1/2/3 → pageid 432/398/928 (Tell Your
@@ -418,12 +421,18 @@ renamed. So:
 2. **Lyric fetch (next):** `source/lyrics.py` — map `music_id → pageid`, fetch page
    wikitext, parse `{{Lyrics line}}` → `[{jp, romaji, en}]`. Keyless (egress only),
    never persisted.
-3. **Resonance pass (keyed, offline):** `indexer/resonance.py` + `sekai resonance
-   [--limit N]` — input = event summary + conclusion + fetched lyrics → short
-   resonance note → `resonance_cache.json`, fingerprinted on
-   (summary+conclusion+lyrics+prompt version). Resumable, spend-cap-graceful.
-4. **Keyless serve:** a `_RESONANCE_RE` intent ("how does the song relate to the
-   story", "what does the theme song mean") + an event-view facet, answered from
+3. **Resonance pass (DONE):** `indexer/resonance.py` + `sekai resonance [--limit N]`
+   — input = event summary Overview + conclusion (cached or keyless heuristic) +
+   live-fetched lyrics → short resonance note → `resonance_cache.json`. **Provider-
+   agnostic** (injected `generate`): runs on Gemini via the CLI, or — while waiting on
+   Google credits — via **Claude subagents** driven from the session (same cache
+   format). Fingerprint is **content-only** (Overview+conclusion+lyrics+prompt
+   version, NOT the model), so Claude- and Gemini-generated notes coexist and don't
+   churn on a backend switch (verified: a Gemini run skips Claude's entries).
+   Resumable, spend-cap-graceful. Notes paraphrase — never reproduce lyric lines.
+   Seeded 3 events (0001 Stella / 0002 Jackpot Sad Girl / 0003 potato) via subagents.
+4. **Keyless serve (next):** a `_RESONANCE_RE` intent ("how does the song relate to
+   the story", "what does the theme song mean") + an event-view facet, answered from
    `resonance_cache`. Raw lyrics never stored.
 
 Scope: the resonance intent covers event theme songs (`music_by_event`); the map

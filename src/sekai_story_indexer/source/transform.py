@@ -452,7 +452,13 @@ def build_lyric_page_map(
             continue
         seen.add(sid)
         if sid in known and sid not in mapping:  # song_id is unique wiki-side
-            mapping[sid] = {"pageid": row["pageid"], "title": row.get("title", "")}
+            # `title` is the wiki page name (often romaji); `english` is the
+            # standardized English name (the user-facing display name).
+            mapping[sid] = {
+                "pageid": row["pageid"],
+                "title": row.get("title", ""),
+                "english": row.get("english", ""),
+            }
     return {
         "mapping": mapping,
         "missing": sorted(known - seen),

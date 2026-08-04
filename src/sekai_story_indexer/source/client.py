@@ -363,7 +363,7 @@ def sekaipedia_song_pages(page_size: int = 500) -> list[dict]:
             "action": "cargoquery",
             "format": "json",
             "tables": "songs",
-            "fields": "_pageID=pageid,_pageName=title,song_id=song_id",
+            "fields": "_pageID=pageid,_pageName=title,song_id=song_id,english=english",
             "order_by": "song_id",
             "limit": str(page_size),
             "offset": str(offset),
@@ -378,7 +378,8 @@ def sekaipedia_song_pages(page_size: int = 500) -> list[dict]:
             if sid.isdigit() and pid.isdigit():
                 rows.append(
                     {"song_id": int(sid), "pageid": int(pid),
-                     "title": fields.get("title", "")}
+                     "title": fields.get("title", ""),
+                     "english": fields.get("english", "")}
                 )
         if len(items) < page_size:
             break
