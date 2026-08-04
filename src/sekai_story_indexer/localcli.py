@@ -301,6 +301,91 @@ def summarize(
     typer.echo(f"Done. {have}/{len(arcs)} event summaries cached in {cache}.")
 
 
+@app.command()
+def conclusions(
+    summaries: Path = typer.Option(Path("summaries_cache.json")),
+    cache: Path = typer.Option(Path("conclusions_cache.json")),
+    limit: int = typer.Option(
+        0, help="Derive at most N NEW conclusions (0 = all). Cached ones are reused "
+        "for free, so this is resumable + a cost knob for partial runs."
+    ),
+    skip_existing: bool = typer.Option(
+        False, help="Keep conclusions that already exist even if their fingerprint "
+        "changed (fill only the gaps)."
+    ),
+    model: str = typer.Option(
+        "", help="Generation model (overrides SEKAI_INGEST_MODEL)."
+    ),
+):
+    """Derive a focused 'how it ends' per event from the pre-built summaries — a
+    cheap second LLM pass (Overview + Episode Index only) into the conclusions
+    cache, served keyless by the app. Fingerprint-cached + resumable; skips Chroma.
+    Run `sekai summarize` first so the summaries exist."""
+    import os
+
+    if model:
+        os.environ["SEKAI_INGEST_MODEL"] = model
+
+    try:
+        from .database import (
+            get_generation_model_name,
+            get_generation_provider_name,
+            initialize_ingest_settings,
+        )
+        from .indexer.conclusions import ConclusionExtractor
+    except ImportError as exc:  # generation stack not installed
+        typer.secho(
+            f"`sekai conclusions` needs the generation deps (pydantic-ai + google): "
+            f"{exc}\nInstall with `uv sync`.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1) from exc
+
+    if not summaries.exists():
+        typer.secho(
+            f"No summaries cache at {summaries}. Run `sekai summarize` first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    initialize_ingest_settings()
+    typer.echo(
+        f"generation: {get_generation_provider_name()} · model={get_generation_model_name()}"
+    )
+    summaries_cache = json.loads(summaries.read_text(encoding="utf-8"))
+    total = sum(1 for k in summaries_cache if k.startswith("EVENT|"))
+    already = 0
+    if cache.exists():
+        existing = json.loads(cache.read_text(encoding="utf-8"))
+        already = sum(1 for k in existing if k.startswith("EVENT|"))
+    typer.echo(
+        f"{total} event summaries · {already} conclusions cached · "
+        f"limit={'all' if not limit else limit}"
+    )
+
+    extractor = ConclusionExtractor(
+        generation_model=get_generation_model_name(),
+        generation_provider=get_generation_provider_name(),
+    )
+    try:
+        final = extractor.extract(
+            summaries_cache, cache_file=str(cache), limit=limit, skip_existing=skip_existing
+        )
+    except Exception as exc:
+        msg = str(exc)
+        if not any(s in msg for s in ("429", "RESOURCE_EXHAUSTED", "spend", "quota")):
+            raise
+        typer.secho(
+            f"\nStopped early (API limit): {msg[:200]}\n"
+            "Per-event progress is saved; re-run `sekai conclusions` to resume.",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1) from exc
+
+    have = sum(1 for k in final if k.startswith("EVENT|"))
+    typer.echo(f"Done. {have}/{total} conclusions cached in {cache}.")
+
+
 @app.command("eval")
 def eval_command(golden: Path = typer.Option(Path("eval/golden_local.json"))):
     """Run the local regression eval; non-zero exit on any regression."""
