@@ -107,6 +107,40 @@ def link_content_command(
     )
 
 
+@app.command("build-lyric-map")
+def build_lyric_map_command(
+    out: Path = typer.Option(Path("lyric_page_map.json")),
+    page_size: int = typer.Option(500, help="Cargo rows per query (Cargo caps ~500)."),
+):
+    """Build lyric_page_map.json — map each master-DB song id to its Sekaipedia page
+    (stable pageid) via a deterministic join on song_id (Cargo `songs` table).
+
+    Our id data, not lyric text — safe to commit. Refreshable; songs with no wiki
+    page are reported as `missing` (never a silent wrong-page grab). Network, no key.
+    Downstream, lyric text is fetched LIVE by pageid at analysis time, never rehosted."""
+    from .source import client
+    from .source.transform import build_lyric_page_map
+
+    known_ids = {m["id"] for m in client.musics() if isinstance(m.get("id"), int)}
+    cargo_rows = client.sekaipedia_song_pages(page_size=page_size)
+    result = build_lyric_page_map(cargo_rows, known_ids)
+
+    payload = {
+        "_meta": {
+            "master_songs": len(known_ids),
+            "mapped": len(result["mapping"]),
+            "missing": result["missing"],
+            "wiki_only": len(result["extra"]),
+        },
+        "map": {str(k): result["mapping"][k] for k in sorted(result["mapping"])},
+    }
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    typer.echo(
+        f"Mapped {len(result['mapping'])}/{len(known_ids)} songs -> {out} "
+        f"({len(result['missing'])} missing, {len(result['extra'])} wiki-only)"
+    )
+
+
 @app.command("build-index")
 def build_index_command(
     story_root: Path = typer.Option(Path("story")),

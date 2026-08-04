@@ -431,3 +431,30 @@ def render_episode_markdown(
             blocks.append("\n".join(rendered))
     header = f"# {title}\n\n" if title else ""
     return header + "\n\n---\n\n".join(blocks) + "\n"
+
+
+def build_lyric_page_map(
+    cargo_rows: list[dict], known_music_ids: set[int] | list[int]
+) -> dict:
+    """Join Sekaipedia Cargo song rows to master-DB music ids on ``song_id``.
+
+    ``cargo_rows`` are ``{song_id, pageid, title}`` (from ``sekaipedia_song_pages``).
+    Pure: no network. Returns
+    ``{"mapping": {music_id: {pageid, title}}, "missing": [...], "extra": [...]}``
+    where *missing* = master-DB songs with no wiki page (coverage gap, never a silent
+    wrong-page grab) and *extra* = wiki songs absent from the master DB."""
+    known = set(known_music_ids)
+    mapping: dict[int, dict] = {}
+    seen: set[int] = set()
+    for row in cargo_rows:
+        sid = row.get("song_id")
+        if not isinstance(sid, int):
+            continue
+        seen.add(sid)
+        if sid in known and sid not in mapping:  # song_id is unique wiki-side
+            mapping[sid] = {"pageid": row["pageid"], "title": row.get("title", "")}
+    return {
+        "mapping": mapping,
+        "missing": sorted(known - seen),
+        "extra": sorted(seen - known),
+    }

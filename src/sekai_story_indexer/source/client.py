@@ -16,10 +16,11 @@ import json
 import ssl
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any
 
-from .constants import ASSET_CDN, EN_ASSET_CDN, MASTER_DB
+from .constants import ASSET_CDN, EN_ASSET_CDN, MASTER_DB, SEKAIPEDIA_API
 
 # Transient network faults worth retrying (incl. partial reads from the CDN).
 _RETRYABLE = (urllib.error.URLError, TimeoutError, http.client.IncompleteRead, ConnectionError, OSError)
@@ -344,3 +345,42 @@ def load_catalog_tables() -> dict:
         "cards_by_id": cards_by_id,
         "music_by_event": music_by_event,
     }
+
+
+# --- Sekaipedia (Cargo) -----------------------------------------------------
+
+def sekaipedia_song_pages(page_size: int = 500) -> list[dict]:
+    """Every Sekaipedia song page as ``[{song_id:int, pageid:int, title:str}]``,
+    read from the Cargo ``songs`` table (structured ``{{Infobox song}}`` data).
+
+    ``song_id`` mirrors ``musics.json.id`` (unique wiki-side), so this is the join
+    key for ``lyric_page_map.json``; ``pageid`` is the stable fetch key (survives
+    renames). Paginated via ``offset`` (Cargo caps a query at ~500 rows). Network."""
+    rows: list[dict] = []
+    offset = 0
+    while True:
+        params = urllib.parse.urlencode({
+            "action": "cargoquery",
+            "format": "json",
+            "tables": "songs",
+            "fields": "_pageID=pageid,_pageName=title,song_id=song_id",
+            "order_by": "song_id",
+            "limit": str(page_size),
+            "offset": str(offset),
+        })
+        data = fetch_json(f"{SEKAIPEDIA_API}?{params}")
+        items = data.get("cargoquery", []) if isinstance(data, dict) else []
+        if not items:
+            break
+        for item in items:
+            fields = item.get("title", {})  # Cargo nests row fields under "title"
+            sid, pid = str(fields.get("song_id", "")), str(fields.get("pageid", ""))
+            if sid.isdigit() and pid.isdigit():
+                rows.append(
+                    {"song_id": int(sid), "pageid": int(pid),
+                     "title": fields.get("title", "")}
+                )
+        if len(items) < page_size:
+            break
+        offset += page_size
+    return rows
