@@ -350,6 +350,19 @@ def hierarchical_summaries() -> dict:
 _SLUG_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
+def _episode_title(arc: str, episode: str) -> str:
+    """Official-EN display title for a scene from its event's ``episode_titles_en``
+    ({episodeNo: title}); episode number is the ``NN_`` slug prefix. ``''`` when
+    unresolved (e.g. not localized) — callers fall back to the slug/citation label."""
+    m = re.match(r"(\d+)", episode)
+    if not m:
+        return ""
+    epno = int(m.group(1))
+    ev = next((e for e in load_events() if e.get("arc_slug") == arc), None)
+    titles = (ev or {}).get("episode_titles_en") or {}
+    return titles.get(epno) or titles.get(str(epno)) or ""
+
+
 @app.get("/api/episode-raw")
 def episode_raw(arc: str, episode: str) -> dict:
     """Raw episode transcript (H1 title + scene text) for the sidebar, read from the
@@ -370,7 +383,7 @@ def episode_raw(arc: str, episode: str) -> dict:
         if coords:
             live = _fetch_scene_live(coords)
             if live.get("text"):
-                return {"title": live.get("title") or episode,
+                return {"title": _episode_title(arc, episode) or episode,
                         "text": live["text"], "region": live.get("region")}
         return {"title": episode, "text": "", "region": None}
     jp = matches[0]
@@ -488,7 +501,10 @@ def scene_live(arc: str, episode: str, q: str = "") -> dict:
     coords = _scene_sources().get(f"{arc}/{episode}")
     if not coords:
         return {"title": episode, "text": "", "quote": ""}
-    return _fetch_scene_live(coords, q=q)
+    res = _fetch_scene_live(coords, q=q)
+    if res.get("text"):
+        res["title"] = _episode_title(arc, episode) or episode
+    return res
 
 
 class QueryRequest(BaseModel):

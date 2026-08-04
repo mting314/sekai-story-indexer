@@ -824,6 +824,10 @@ def test_episode_raw_live_fallback_when_no_local_file(tmp_path, monkeypatch):
     importlib.reload(srv)
     monkeypatch.setenv("SEKAI_STORY_ROOT", str(tmp_path))  # empty -> no on-disk match
     monkeypatch.setattr(
+        srv, "load_events",
+        lambda: [{"arc_slug": "0001-x", "episode_titles_en": {1: "Alone in the Rain"}}],
+    )
+    monkeypatch.setattr(
         srv, "_scene_sources",
         lambda: {"0001-x/01-y": {"bundle": "b", "scenario_id": "s", "region": "jp"}},
     )
@@ -833,10 +837,26 @@ def test_episode_raw_live_fallback_when_no_local_file(tmp_path, monkeypatch):
     )
     out = srv.episode_raw("0001-x", "01-y")
     assert out["text"] == "Saki: hi" and out["region"] == "jp"
+    assert out["title"] == "Alone in the Rain"  # official-EN title, not the slug
 
     # No coords for the scene -> genuinely empty (unchanged behavior).
     monkeypatch.setattr(srv, "_scene_sources", lambda: {})
     assert srv.episode_raw("0001-x", "01-y")["text"] == ""
+
+
+def test_episode_title_resolution(monkeypatch):
+    from webapp import server as srv
+
+    monkeypatch.setattr(
+        srv, "load_events",
+        lambda: [{"arc_slug": "0001-x", "episode_titles_en": {2: "Together With Everyone"}},
+                 {"arc_slug": "0002-y", "episode_titles_en": {"3": "Str Key Title"}}],
+    )
+    assert srv._episode_title("0001-x", "02_minna") == "Together With Everyone"  # int key, zero-padded slug
+    assert srv._episode_title("0002-y", "03_z") == "Str Key Title"               # str key
+    assert srv._episode_title("0001-x", "99_none") == ""                          # no such episode
+    assert srv._episode_title("nope", "02_x") == ""                              # no such arc
+    assert srv._episode_title("0001-x", "Overview") == ""                        # non-numeric slug
 
 
 def test_scene_text_caches_successful_fetch(monkeypatch):
