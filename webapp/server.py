@@ -1282,7 +1282,7 @@ def _scoped_event_intercept(req: QueryRequest, prev: Focus | None) -> dict | Non
             label, intent = f"{name} — conclusion", "conclusion"
         else:  # summarize this (scoped) event
             body, label, intent = summary, f"{name} — event summary", "summarize"
-        return {
+        result = {
             "answer": body,
             "answer_parts": [{"type": "text", "text": body}],
             "characters": [],
@@ -1292,6 +1292,12 @@ def _scoped_event_intercept(req: QueryRequest, prev: Focus | None) -> dict | Non
             }],
             "intent": intent, "backend": "summary", "error": None,
         }
+        if intent == "summarize":
+            # Same tabbed event card as the nickname 'summarize' path — the quick-action
+            # was missing it. Only for the full summary; the focus/conclusion bodies
+            # carry section-like labels that must NOT trigger tabs.
+            _attach_summary_sections(result, summary)
+        return result
     except Exception:
         return None
 
