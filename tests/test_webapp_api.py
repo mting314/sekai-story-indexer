@@ -111,6 +111,39 @@ def test_event_children_counts_from_content_parents(tmp_path, monkeypatch):
     assert srv._event_children() == {}
 
 
+def test_scoped_summarize_attaches_section_tabs(tmp_path, monkeypatch):
+    """The 'summarize this event' quick-action must get the tabbed event card
+    (sections), same as the nickname 'summarize' path — it was missing before."""
+    import importlib
+    import json as _json
+
+    from webapp import server as srv
+    from webapp.sessions import Focus
+
+    importlib.reload(srv)
+    ev = {"event_id": 5, "arc_slug": "0005-x", "name": "Re:START", "nickname": "airi1"}
+    summary = ("Overview:\nThe unit regroups.\n\n"
+               "Episode Index:\n- Episode 1: they meet.\n\n"
+               "Character Trajectories:\n- Airi grows.\n")
+    cache = tmp_path / "summaries_cache.json"
+    cache.write_text(_json.dumps({"EVENT|0005-x": {"summary": summary}}), encoding="utf-8")
+    monkeypatch.setattr(srv, "load_events", lambda: [ev])
+    monkeypatch.setattr(srv, "_hierarchical_cache_path", lambda: cache)
+
+    out = srv._scoped_event_intercept(
+        srv.QueryRequest(question="Summarize this event."), Focus(arcs=("0005-x",))
+    )
+    assert out and out["intent"] == "summarize"
+    assert out["section_order"][0] == "Overview"
+    assert set(out["sections"]) >= {"Overview", "Episode Index", "Character Trajectories"}
+
+    # a scoped CONCLUSION must NOT get tabs (its body carries section-like labels)
+    concl = srv._scoped_event_intercept(
+        srv.QueryRequest(question="how does it end?"), Focus(arcs=("0005-x",))
+    )
+    assert concl and concl["intent"] == "conclusion" and "sections" not in concl
+
+
 def test_health(client):
     r = client.get("/api/health")
     assert r.status_code == 200
