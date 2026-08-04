@@ -223,6 +223,19 @@ even the filesystem sorted chronologically). Hand-authored content still uses
   * **Next:** run `sekai conclusions` wherever a key + egress exist to populate the
     cache for the 136 built summaries; consider baking `climax_episode` into the
     citation/UI so the "how it ends" links to the right episode.
+* **Quick-action intent detection is regex-only — misses paraphrases (TODO).** The
+  scoped intents (`_SUMMARIZE_RE`, `_FOCUS_CHAR_RE`, `_CONCLUSION_RE` in
+  `webapp/server.py`) are fixed lexical patterns. A semantically-equivalent phrasing
+  that doesn't match ("how did everything turn out?", "what's the payoff?", "does it
+  have a happy ending?", "where do they end up?") silently falls through to normal
+  extractive retrieval — a graceful but worse answer (generic top quotes, not the
+  focused conclusion/summary/focus-character). It's a deliberate keyless/deterministic
+  trade-off (no model in the default path, eval-stable). Options: (1) broaden the
+  regexes with the synonym long-tail (cheap, still lexical); (2) keyless prototype
+  matching — score the question against curated intent phrases via the existing
+  lexical engine + a threshold (more robust, needs tuning); (3) a keyed embedding/LLM
+  intent classifier on the full backend, regex fallback when keyless. Start with (1);
+  (2)/(3) if/when the keyed backend is the default.
 * **Live transcript fetch on the deployed site — no corpus in the repo (TODO).**
   Now that `story/` is untracked (copyrighted prose isn't checked in), a deployed
   site must obtain verbatim quotes / direct story references by fetching lines
