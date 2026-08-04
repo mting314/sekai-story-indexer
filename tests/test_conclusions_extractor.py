@@ -61,6 +61,27 @@ def test_cached_entries_reused_by_fingerprint(tmp_path):
     assert calls["n"] == 0
 
 
+def test_skip_existing_keeps_stale_entry(tmp_path):
+    """--skip-existing keeps an already-present conclusion even when its summary (and
+    thus fingerprint) changed — fill only the gaps, don't clobber."""
+    cache = str(tmp_path / "c.json")
+    with patch.object(ConclusionExtractor, "_generate", _fake_gen):
+        ConclusionExtractor().extract(SUMMARIES, cache_file=cache)
+
+    edited = dict(SUMMARIES)
+    edited["EVENT|0001-a"] = {"summary": "Overview:\nA changed.\n\nEpisode Index:\n- Episode 9: X apologizes anew.\n"}
+    calls = {"n": 0}
+
+    def counting_gen(self, summary):
+        calls["n"] += 1
+        return (7, "regenerated")
+
+    with patch.object(ConclusionExtractor, "_generate", counting_gen):
+        final = ConclusionExtractor().extract(edited, cache_file=cache, skip_existing=True)
+    assert calls["n"] == 0  # nothing regenerated despite the changed fingerprint
+    assert final["EVENT|0001-a"]["conclusion"] != "regenerated"  # original kept
+
+
 def test_changed_summary_rederives(tmp_path):
     cache = str(tmp_path / "c.json")
     with patch.object(ConclusionExtractor, "_generate", _fake_gen):

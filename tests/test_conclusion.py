@@ -34,6 +34,19 @@ def test_parse_episode_index():
     assert "planetarium" in dict(beats)[8]
 
 
+def test_parse_episode_index_dash_separators():
+    """Bullets/separators may be hyphen, en-dash, or em-dash."""
+    summary = (
+        "Episode Index:\n"
+        "— Episode 1 — they meet.\n"
+        "* Episode 2 – they rehearse.\n"
+        "- Episode 3: they perform.\n"
+    )
+    beats = parse_episode_index(summary)
+    assert [n for n, _ in beats] == [1, 2, 3]
+    assert dict(beats)[1] == "they meet."
+
+
 def test_heuristic_picks_resolution_not_last_episode():
     climax, text = heuristic_conclusion(SUMMARY)
     assert climax == 7  # NOT 8 (the epilogue)

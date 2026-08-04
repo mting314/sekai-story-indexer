@@ -28,8 +28,11 @@ from ..indexer.summary_sections import extract_summary_sections
 
 CONCLUSION_PROMPT_VERSION = "1"
 
-# One "- Episode N: <prose>" line from the Episode Index section.
-_EPISODE_BEAT_RE = re.compile(r"^[-*]?\s*Episode\s+(\d+)\s*[:.\-]\s*(.+)$", re.IGNORECASE)
+# One "- Episode N: <prose>" line from the Episode Index section. The bullet and
+# the number->prose separator both allow hyphen / en-dash / em-dash variants.
+_EPISODE_BEAT_RE = re.compile(
+    r"^[-*–—]?\s*Episode\s+(\d+)\s*[:.\-–—]\s*(.+)$", re.IGNORECASE
+)
 
 # Resolution / climax signals — the dramatic turn where the central conflict pays
 # off. Substrings (matched case-insensitively) so tenses/inflections all hit.
