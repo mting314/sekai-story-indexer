@@ -87,7 +87,7 @@ function SidebarPanel({ s, onClose }: { s: PanelState; onClose: () => void }) {
   const entIdx = useMemo(() => buildEntityIndex(meta), [meta]);
   if (!s.open) return null;
 
-  const speakerColor = (name: string) => entIdx.map[name.trim().toLowerCase()]?.color;
+  const speakerMeta = (name: string) => entIdx.map[name.trim().toLowerCase()] ?? {};
   const hi = s.highlight?.trim();
 
   return (
@@ -112,7 +112,7 @@ function SidebarPanel({ s, onClose }: { s: PanelState; onClose: () => void }) {
             {renderExcerpt(s.text, hi)}
           </pre>
         ) : (
-          <VNTranscript text={s.text} highlight={hi} speakerColor={speakerColor} />
+          <VNTranscript text={s.text} highlight={hi} speakerMeta={speakerMeta} />
         )}
       </div>
     </aside>
@@ -126,7 +126,7 @@ function renderExcerpt(text: string, hi?: string) {
   ));
 }
 
-function VNTranscript({ text, highlight, speakerColor }: { text: string; highlight?: string; speakerColor: (n: string) => string | undefined }) {
+function VNTranscript({ text, highlight, speakerMeta }: { text: string; highlight?: string; speakerMeta: (n: string) => { color?: string; icon?: string } }) {
   const rows = text.split('\n').filter((l) => l.trim() && l.trim() !== '---');
   return (
     <div className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
@@ -137,10 +137,17 @@ function VNTranscript({ text, highlight, speakerColor }: { text: string; highlig
           return <div key={i} className={css({ textAlign: 'center', fontStyle: 'italic', color: 'fg.muted', fontSize: 'sm' })}>{line}</div>;
         }
         const [, speaker, body] = m;
+        const meta = speakerMeta(speaker);
         return (
           <div key={i} className={css({ p: '2', rounded: 'lg', bg: isHit ? 'yellow.400/25' : 'bg.subtle', borderLeftWidth: '3px' })}
-            style={{ borderColor: speakerColor(speaker) ?? 'var(--colors-border-default)' }}>
-            <div className={css({ fontSize: 'xs', fontWeight: 'bold' })} style={{ color: speakerColor(speaker) }}>{speaker}</div>
+            style={{ borderColor: meta.color ?? 'var(--colors-border-default)' }}>
+            <div className={css({ display: 'flex', alignItems: 'center', gap: '1.5', fontSize: 'xs', fontWeight: 'bold', mb: '0.5' })} style={{ color: meta.color }}>
+              {meta.icon && (
+                <img src={meta.icon} alt="" className={css({ w: '5', h: '5', rounded: 'full', objectFit: 'cover', flexShrink: '0' })}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+              )}
+              {speaker}
+            </div>
             <div className={css({ fontSize: 'sm', lineHeight: '1.55' })}>{body}</div>
           </div>
         );

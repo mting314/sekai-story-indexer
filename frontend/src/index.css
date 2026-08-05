@@ -85,6 +85,14 @@
   cursor: pointer;
 }
 .answer-text a.cite:hover, a.cite:hover { text-decoration: underline; }
+.answer-text a.ep-link, a.ep-link {
+  color: var(--colors-accent-default, #33ccff);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.answer-text a.ep-link:hover, a.ep-link:hover { color: var(--colors-accent-text, #7fe3ff); }
 .ent {
   font-weight: 600;
   white-space: nowrap;

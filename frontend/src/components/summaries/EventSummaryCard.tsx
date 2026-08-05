@@ -6,6 +6,7 @@ import { fmtDate } from '~/lib/format';
 import { useStore, useMetaHelpers } from '~/lib/store';
 import { useSongById } from '~/hooks/useData';
 import { SectionTabs } from '~/components/SectionTabs';
+import { useSidebar } from '~/components/Sidebar';
 import { EpisodeRow } from '~/components/summaries/EpisodeRow';
 import { arcOf, type Hierarchy, type HierNode } from '~/types/hier';
 
@@ -17,6 +18,7 @@ export function EventSummaryCard({ node, hier }: { node: HierNode; hier: Hierarc
   const { events } = useStore();
   const { unitColor, unitName, unitSymbol, charName } = useMetaHelpers();
   const songById = useSongById();
+  const { openTranscript } = useSidebar();
 
   const arc = arcOf(node.id);
   const ev = events.find((e) => e.arc_slug === arc);
@@ -26,6 +28,17 @@ export function EventSummaryCard({ node, hier }: { node: HierNode; hier: Hierarc
   const episodes = (node.children ?? [])
     .map((cid) => hier.nodes[cid])
     .filter((n): n is HierNode => !!n && n.kind === 'episode');
+
+  // "Episode N" (from the Episode Index section) → the episode node, by the slug's leading number.
+  const epByNum = new Map<number, HierNode>();
+  for (const ep of episodes) {
+    const n = parseInt(ep.label, 10);
+    if (!Number.isNaN(n)) epByNum.set(n, ep);
+  }
+  const onEpisodeClick = (n: number) => {
+    const ep = epByNum.get(n);
+    if (ep) openTranscript(arc, ep.label, `Episode ${n}`);
+  };
 
   // Hero art: the event song's jacket first (the commissioned/theme song), then event art.
   const song = ev?.song_id != null ? songById.get(String(ev.song_id)) : undefined;
@@ -77,7 +90,7 @@ export function EventSummaryCard({ node, hier }: { node: HierNode; hier: Hierarc
 
           {/* Summary sections as tabs */}
           {summary && summary.sectionOrder.length > 0 && (
-            <SectionTabs order={summary.sectionOrder} sections={summary.sections} />
+            <SectionTabs order={summary.sectionOrder} sections={summary.sections} onEpisodeClick={onEpisodeClick} />
           )}
 
           {/* Episodes */}

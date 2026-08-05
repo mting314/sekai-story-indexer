@@ -5,7 +5,7 @@ import { Markdown } from '~/components/Markdown';
 
 // Tabbed sections (Overview / Key Events / Episode Index / …) — one nav button per section,
 // one markdown pane shown at a time. Shared by the Ask answer cards and the Summaries hero.
-export function SectionTabs({ order, sections, onCite }: { order: string[]; sections: Record<string, string>; onCite?: (ref: number) => void }) {
+export function SectionTabs({ order, sections, onCite, onEpisodeClick }: { order: string[]; sections: Record<string, string>; onCite?: (ref: number) => void; onEpisodeClick?: (n: number) => void }) {
   const [active, setActive] = useState(order[0]);
   // Keep the active tab valid if the section set changes (different event expanded).
   useEffect(() => { if (!order.includes(active)) setActive(order[0]); }, [order, active]);
@@ -20,7 +20,7 @@ export function SectionTabs({ order, sections, onCite }: { order: string[]; sect
           </button>
         ))}
       </div>
-      <Markdown text={sections[active] ?? ''} onCite={onCite} />
+      <Markdown text={sections[active] ?? ''} onCite={onCite} onEpisodeClick={onEpisodeClick} />
     </Stack>
   );
 }
