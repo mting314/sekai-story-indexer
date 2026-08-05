@@ -25,7 +25,13 @@ export function TimelineTab() {
       {shown.length === 0 ? (
         <p className={css({ color: 'fg.muted' })}>No events for this filter.</p>
       ) : (
-        <div className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
+        <div className={css({
+          display: 'flex', flexDirection: 'column', gap: '2',
+          // Scroll the card list independently of the page (like the old timeline). The right
+          // column is sticky, so on desktop this list gets its own bounded scroll area.
+          maxH: { base: 'none', lg: 'calc(100vh - 12rem)' }, overflowY: { base: 'visible', lg: 'auto' },
+          pr: { lg: '1' }
+        })}>
           {shown.map((e) => <EventCard key={e.event_id} e={e} />)}
         </div>
       )}

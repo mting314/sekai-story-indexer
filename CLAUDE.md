@@ -97,6 +97,13 @@ app + evals work with no fetch/keys.
 No PyPI-egress? `PYTHONPATH=src <python-with-pydantic> -m pytest tests/`. The
 `sekai` paths need only typer + fastapi/uvicorn (for serve); no chromadb.
 
+## Pre-push hook (mirror CI)
+CI (`.github/workflows/ci.yml`) runs `ruff check .` + `uv run pytest -q`. A tracked
+`.githooks/pre-push` runs the same locally. Enable once per clone:
+`git config core.hooksPath .githooks` (bypass with `git push --no-verify`). Note: the
+frontend build is a separate artifact (gitignored, not built in CI), so `test_index_html_served`
+tolerates the "Frontend not built" fallback — don't reintroduce a hard `"Sekai" in /` assertion.
+
 ## Phase status (see docs/PLAN.md)
 - Local backend fully implemented + tested (no API key):
   - Phase 2: Tier-1 unit overviews (`query/summaries.py`, deterministic).

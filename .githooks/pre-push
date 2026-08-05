@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Pre-push hook — mirror CI (.github/workflows/ci.yml) so a push never breaks CI.
+# Enable once with:  git config core.hooksPath .githooks
+# Skip in a pinch with:  git push --no-verify
+set -euo pipefail
+
+echo "▶ pre-push: ruff check ."
+uv run ruff check .
+
+echo "▶ pre-push: pytest -q"
+uv run pytest -q
+
+echo "✓ pre-push checks passed — safe to push"
