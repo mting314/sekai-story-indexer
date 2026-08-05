@@ -1,0 +1,110 @@
+@layer reset, base, tokens, recipes, utilities;
+
+/* Keep these global element resets INSIDE @layer base. Unlayered rules outrank every
+   cascade layer, so a bare `a { color: inherit }` would override Panda's atomic link
+   classes (color/underline) everywhere — only font-weight would get through. Layering
+   them lets css({ color, textDecoration }) on links actually win. */
+@layer base {
+  html,
+  body {
+    margin: 0;
+  }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+}
+
+/* Skeleton-loader shimmer. Keyframes are global; the class lives in @layer utilities so it
+   composes predictably. Used by the <Skeleton> component while client-fetched data loads. */
+@keyframes ll-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+@layer utilities {
+  .ll-skeleton {
+    background-color: var(--colors-mypick-tile, rgba(148, 163, 184, 0.18));
+    border-radius: var(--radii-md, 0.375rem);
+    animation: ll-skeleton-pulse 1.4s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ll-skeleton {
+      animation: none;
+    }
+  }
+}
+
+/* Rendered-markdown + name-decoration styles (HTML produced by lib/markdown + lib/decorate,
+   injected via dangerouslySetInnerHTML, so they can't be Panda css() objects). */
+.answer-text {
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.answer-text h2, .answer-text h3, .answer-text h4, .answer-text h5 {
+  margin: 0.6em 0 0.3em;
+  line-height: 1.3;
+}
+.answer-text h2 { font-size: 1.05rem; }
+.answer-text h3 { font-size: 1rem; }
+.answer-text h4, .answer-text h5 { font-size: 0.92rem; }
+.answer-text p { margin: 0.4em 0; }
+/* Panda's preflight resets `ul { list-style: none }`; restore disc markers for rendered
+   markdown lists (these unlayered rules outrank the layered preflight). */
+.answer-text ul { margin: 0.3em 0; padding-left: 1.3em; list-style: disc outside; }
+.answer-text li { margin: 0.2em 0; display: list-item; }
+.answer-text li::marker { color: var(--colors-fg-muted, #9aa0ad); }
+.answer-text code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0 0.3em;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+.answer-text .md-section {
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--colors-fg-muted, #9aa0ad);
+  margin: 0.7em 0 0.2em;
+}
+.answer-text a.cite, a.cite {
+  color: var(--colors-accent-default, #33ccff);
+  font-weight: 600;
+  font-size: 0.9em;
+  text-decoration: none;
+  cursor: pointer;
+}
+.answer-text a.cite:hover, a.cite:hover { text-decoration: underline; }
+.answer-text a.ep-link, a.ep-link {
+  color: var(--colors-accent-default, #33ccff);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.answer-text a.ep-link:hover, a.ep-link:hover { color: var(--colors-accent-text, #7fe3ff); }
+.ent {
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* display:inline-block overrides Panda preflight's `img { display:block }` (which was forcing
+   the icon onto its own line before the name). Sized to the line + baseline-aligned. */
+.ent-ic {
+  display: inline-block;
+  width: 1.35em;
+  height: 1.35em;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: -0.32em;
+  margin-right: 0.25em;
+}

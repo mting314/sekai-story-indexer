@@ -73,10 +73,20 @@ with any interpreter that has `pydantic`+`pyyaml`:
     `summarize` first.
 * `/api/query` picks backend via `SEKAI_QUERY_BACKEND` (`local` default, `full`).
 
+## Web frontend (`frontend/`)
+The web UI is a **React + Vike + Panda CSS** app in `frontend/` (Ask · Timeline · Summaries ·
+Setlist). It replaced the old vanilla `webapp/static/{index.html,app.js}` page. It's a static
+bundle served by FastAPI at `/`; it calls the same `/api/*` endpoints + reuses
+`/static/{meta.json,units,chara}`. Backend (`webapp/server.py` + `/api/*`) is unchanged.
+Build it before serving: `cd frontend && bun install && bun run build` (→ `dist/client`, picked
+up automatically; override with `SEKAI_FRONTEND_DIST`). `bun run fetch-songs` populates the
+Setlist catalog from the Sekai master DB. See `frontend/README.md`.
+
 ## Run / test locally (no keys)
 ```bash
 uv sync --extra web
-sekai serve --story-root sample/story --events-index sample/events_index.json  # web app
+cd frontend && bun install && bun run build && cd ..   # build the web UI (once / after FE changes)
+sekai serve --story-root sample/story --events-index sample/events_index.json  # web app at /
 sekai eval        # regression gate
 uv run pytest     # unit + API + eval tests
 ```
@@ -86,6 +96,14 @@ app + evals work with no fetch/keys.
 ## Env note (restricted sandboxes)
 No PyPI-egress? `PYTHONPATH=src <python-with-pydantic> -m pytest tests/`. The
 `sekai` paths need only typer + fastapi/uvicorn (for serve); no chromadb.
+
+## Pre-push hook (mirror CI)
+CI (`.github/workflows/ci.yml`) has three jobs: `ruff check .`, `uv run pytest -q`, and
+`Frontend (build)` (`bun install --frozen-lockfile && bun run build && bun test src`). The
+tracked `.githooks/pre-push` runs all three locally (frontend step skipped if bun/deps absent).
+Enable once per clone: `git config core.hooksPath .githooks` (bypass with `git push --no-verify`).
+Note: the **pytest** job does not build the frontend, so `test_index_html_served` tolerates the
+"Frontend not built" fallback — don't reintroduce a hard `"Sekai" in /` assertion.
 
 ## Phase status (see docs/PLAN.md)
 - Local backend fully implemented + tested (no API key):

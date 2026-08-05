@@ -1,0 +1,10 @@
+node_modules/
+dist/
+styled-system/
+*.log
+.DS_Store
+
+# The repo-root .gitignore has a Python `lib/` rule (venv) that also matches our source
+# directory src/lib/ — re-include it so the frontend's lib modules are tracked.
+!src/lib/
+!src/lib/**
