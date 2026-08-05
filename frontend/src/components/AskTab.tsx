@@ -36,8 +36,10 @@ export function AskTab() {
   const lastQuery = useRef('');
   const taRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => { getCommands().then(setCommands).catch(() => setCommands([])); }, []);
+  useEffect(() => () => abortRef.current?.abort(), []); // cancel any in-flight stream on unmount
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [messages]);
 
   // Consume a question pushed from another tab (Timeline click, quick-action bridge).
@@ -79,24 +81,30 @@ export function AskTab() {
       history: buildHistory()
     };
 
+    const ac = new AbortController();
+    abortRef.current = ac;
     try {
       let res: QueryResult;
       if (q.startsWith('/')) {
         res = await command(q, body.unit);
       } else {
-        res = await queryStream(body, (evt) => {
-          if (evt.type === 'delta') updateMsg(asstId, (m) => ({ ...m, text: (m.text ?? '') + evt.text }));
-        }).catch(() => query(body));
+        try {
+          res = await queryStream(body, (evt) => {
+            if (evt.type === 'delta') updateMsg(asstId, (m) => ({ ...m, text: (m.text ?? '') + evt.text }));
+          }, ac.signal);
+        } catch {
+          if (ac.signal.aborted) return; // unmounted mid-stream — drop silently
+          res = await query(body); // SSE failed (e.g. proxy-buffered) → non-streaming fallback
+        }
       }
+      if (ac.signal.aborted) return;
       updateMsg(asstId, (m) => ({ ...m, result: res, streaming: false, text: res.answer }));
       // Server focus chip (manual scope takes precedence).
-      if (!store.scope) {
-        if ('focus' in res) setFocusChip(res.focus ?? null);
-      }
+      if (!store.scope && 'focus' in res) setFocusChip(res.focus ?? null);
     } catch (e) {
-      updateMsg(asstId, (m) => ({ ...m, streaming: false, text: `⚠ ${String(e)}` }));
+      if (!ac.signal.aborted) updateMsg(asstId, (m) => ({ ...m, streaming: false, text: `⚠ ${String(e)}` }));
     } finally {
-      setBusy(false);
+      if (!ac.signal.aborted) setBusy(false);
     }
   }
 

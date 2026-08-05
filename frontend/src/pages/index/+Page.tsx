@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { css } from 'styled-system/css';
 import { Box, HStack, Stack } from 'styled-system/jsx';
 import { FaComments, FaTableList, FaBookOpen, FaMusic } from 'react-icons/fa6';
@@ -28,8 +29,20 @@ export default function Page() {
   );
 }
 
+const PANES: Record<TabId, React.ComponentType> = {
+  ask: AskTab, timeline: TimelineTab, summaries: SummariesTab, setlist: SetlistTab
+};
+
 function Shell() {
   const { tab, setTab } = useStore();
+  // Keep-alive: mount a tab on first visit, then keep it mounted (hidden when inactive) so its
+  // state survives tab switches — notably the Ask conversation, and Timeline/Summaries scroll
+  // + expand state. Avoids re-fetching and the "chat lost on tab switch" regression.
+  const [visited, setVisited] = useState<Set<TabId>>(() => new Set<TabId>([tab]));
+  useEffect(() => {
+    setVisited((v) => (v.has(tab) ? v : new Set(v).add(tab)));
+  }, [tab]);
+
   return (
     <Stack gap="4">
       <HStack gap="1" className={css({ borderBottomWidth: '1px', borderColor: 'border.default', overflowX: 'auto' })}>
@@ -55,10 +68,11 @@ function Shell() {
       </HStack>
 
       <Box>
-        {tab === 'ask' && <AskTab />}
-        {tab === 'timeline' && <TimelineTab />}
-        {tab === 'summaries' && <SummariesTab />}
-        {tab === 'setlist' && <SetlistTab />}
+        {TABS.map(({ id }) => {
+          if (!visited.has(id)) return null;
+          const Pane = PANES[id];
+          return <div key={id} style={{ display: tab === id ? undefined : 'none' }}><Pane /></div>;
+        })}
       </Box>
     </Stack>
   );
