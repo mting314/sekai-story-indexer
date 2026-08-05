@@ -68,14 +68,16 @@ function Shell() {
         {ALL_TABS.map((t) => tabBtn(t, tab === t.id))}
       </HStack>
 
-      <Box className={css({ display: 'grid', gap: '4', gridTemplateColumns: { base: '1fr', lg: 'minmax(0, 400px) minmax(0, 1fr)' }, alignItems: 'start' })}>
-        {/* Left: Ask — always visible on desktop; on mobile only when the Ask tab is active. */}
-        <Box className={css({ display: { base: tab === 'ask' ? 'block' : 'none', lg: 'block' }, lg: { position: 'sticky', top: '4' } })}>
+      <Box className={css({ display: 'grid', gap: '4', gridTemplateColumns: { base: '1fr', lg: 'minmax(0, 1fr) minmax(0, 420px)' }, alignItems: 'start' })}>
+        {/* Left: Ask — the wide primary pane. Always visible on desktop; on mobile only when the
+            Ask tab is active. */}
+        <Box className={css({ display: { base: tab === 'ask' ? 'block' : 'none', lg: 'block' }, minW: '0' })}>
           <AskTab />
         </Box>
 
-        {/* Right: content tabs. On mobile hidden while Ask is active. */}
-        <Box className={css({ display: { base: tab === 'ask' ? 'none' : 'block', lg: 'block' }, minW: '0' })}>
+        {/* Right: content tabs — a narrower column (single-column event list). On mobile hidden
+            while Ask is active. */}
+        <Box className={css({ display: { base: tab === 'ask' ? 'none' : 'block', lg: 'block' }, minW: '0', lg: { position: 'sticky', top: '4' } })}>
           <HStack gap="1" className={css({ hideBelow: 'lg', borderBottomWidth: '1px', borderColor: 'border.default', overflowX: 'auto', mb: '3' })}>
             {CONTENT_TABS.map((t) => tabBtn(t, rightTab === t.id))}
           </HStack>

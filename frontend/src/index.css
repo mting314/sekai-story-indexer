@@ -58,8 +58,11 @@
 .answer-text h3 { font-size: 1rem; }
 .answer-text h4, .answer-text h5 { font-size: 0.92rem; }
 .answer-text p { margin: 0.4em 0; }
-.answer-text ul { margin: 0.3em 0; padding-left: 1.2em; }
-.answer-text li { margin: 0.2em 0; }
+/* Panda's preflight resets `ul { list-style: none }`; restore disc markers for rendered
+   markdown lists (these unlayered rules outrank the layered preflight). */
+.answer-text ul { margin: 0.3em 0; padding-left: 1.3em; list-style: disc outside; }
+.answer-text li { margin: 0.2em 0; display: list-item; }
+.answer-text li::marker { color: var(--colors-fg-muted, #9aa0ad); }
 .answer-text code {
   background: rgba(255, 255, 255, 0.08);
   padding: 0 0.3em;

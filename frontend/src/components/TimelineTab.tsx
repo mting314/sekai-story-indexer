@@ -25,7 +25,7 @@ export function TimelineTab() {
       {shown.length === 0 ? (
         <p className={css({ color: 'fg.muted' })}>No events for this filter.</p>
       ) : (
-        <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: 'repeat(2, 1fr)', xl: 'repeat(3, 1fr)' }, gap: '3' })}>
+        <div className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
           {shown.map((e) => <EventCard key={e.event_id} e={e} />)}
         </div>
       )}
