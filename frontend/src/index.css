@@ -89,11 +89,14 @@
   font-weight: 600;
   white-space: nowrap;
 }
+/* display:inline-block overrides Panda preflight's `img { display:block }` (which was forcing
+   the icon onto its own line before the name). Sized to the line + baseline-aligned. */
 .ent-ic {
-  width: 1em;
-  height: 1em;
+  display: inline-block;
+  width: 1.35em;
+  height: 1.35em;
   border-radius: 50%;
   object-fit: cover;
-  vertical-align: -0.15em;
-  margin-right: 0.15em;
+  vertical-align: -0.32em;
+  margin-right: 0.25em;
 }
