@@ -14,11 +14,19 @@ export const useSongs = () => songs;
 export const useSongById = () => songById;
 export const useUnits = () => units;
 
-// Song display name — JP title primary, official/romanized name as a fallback, then id.
+// Song display name — English/romanized title primary, JP title as a fallback, then id.
 export const songName = (id: string) => {
   const s = songById.get(id);
-  return s?.title ?? s?.englishName ?? id;
+  return s?.englishName ?? s?.title ?? id;
 };
+
+// The JP title, shown as a secondary line when it differs from the (English) display name.
+export const songSubName = (id: string) => {
+  const s = songById.get(id);
+  return s?.englishName && s.englishName !== s.title ? s.title : undefined;
+};
+
+export const isCommissioned = (id: string) => songById.get(id)?.commissioned === true;
 
 export const unitName = (id: string) => unitById.get(id)?.name ?? id;
 export const unitColor = (id: string) => unitById.get(id)?.color ?? '#8a8a8a';

@@ -4,12 +4,17 @@ import { useMemo, useState } from 'react';
 import { css } from 'styled-system/css';
 import { Box, Flex, HStack, Stack } from 'styled-system/jsx';
 import { FaXmark, FaPlus } from 'react-icons/fa6';
-import { useSongs, useUnits, songName } from '~/hooks/useData';
+import { useSongs, useUnits, songName, songSubName, isCommissioned } from '~/hooks/useData';
 import { unitIcon } from '~/lib/assets';
-import { filterSongs, EMPTY_SONG_FILTERS, type SongFilters, type UnitFilter } from '~/lib/song-filter';
+import { filterSongs, EMPTY_SONG_FILTERS, type SongFilters, type SongKind, type UnitFilter } from '~/lib/song-filter';
 import { SongJacket } from '~/components/SongJacket';
 
 const MAX_RESULTS = 200;
+const KINDS: { id: SongKind; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'commissioned', label: 'Commissioned' },
+  { id: 'cover', label: 'Covers' }
+];
 
 export function SongSearchModal({
   open, onClose, onPick
@@ -76,6 +81,17 @@ export function SongSearchModal({
               );
             })}
           </HStack>
+          <HStack gap="1">
+            {KINDS.map((k) => (
+              <button
+                key={k.id}
+                onClick={() => setFilters((f) => ({ ...f, kind: k.id }))}
+                className={css({ px: '2.5', py: '1', rounded: 'md', fontSize: 'xs', fontWeight: 'semibold', cursor: 'pointer', bg: filters.kind === k.id ? 'accent.subtle' : 'bg.subtle', color: filters.kind === k.id ? 'accent.text' : 'fg.muted', borderWidth: '1px', borderColor: filters.kind === k.id ? 'accent.default' : 'border.default' })}
+              >
+                {k.label}
+              </button>
+            ))}
+          </HStack>
         </Stack>
 
         <Box className={css({ flex: '1', overflowY: 'auto', p: '2' })}>
@@ -89,8 +105,13 @@ export function SongSearchModal({
                 <Flex key={s.id} align="center" gap="2.5" className={css({ p: '1.5', rounded: 'lg', _hover: { bg: 'bg.subtle' } })}>
                   <SongJacket id={s.id} size={40} />
                   <Stack gap="0" className={css({ flex: '1', minW: '0' })}>
-                    <span className={css({ fontSize: 'sm', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })}>{songName(s.id)}</span>
-                    {s.pronunciation && <span className={css({ fontSize: 'xs', color: 'fg.subtle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })}>{s.pronunciation}</span>}
+                    <HStack gap="1.5" className={css({ minW: '0' })}>
+                      <span className={css({ fontSize: 'sm', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })}>{songName(s.id)}</span>
+                      <KindBadge commissioned={isCommissioned(s.id)} />
+                    </HStack>
+                    {(songSubName(s.id) ?? s.pronunciation) && (
+                      <span className={css({ fontSize: 'xs', color: 'fg.subtle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })}>{songSubName(s.id) ?? s.pronunciation}</span>
+                    )}
                   </Stack>
                   <button
                     aria-label={`Add ${songName(s.id)}`}
@@ -111,5 +132,18 @@ export function SongSearchModal({
         </Box>
       </Box>
     </Box>
+  );
+}
+
+// Small pill distinguishing commissioned (written for Project Sekai) from cover songs.
+export function KindBadge({ commissioned }: { commissioned: boolean }) {
+  return (
+    <span
+      title={commissioned ? 'Commissioned — written for Project Sekai' : 'Cover of an existing song'}
+      className={css({ flexShrink: '0', px: '1.5', py: '0.5', rounded: 'sm', fontSize: '2xs', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.03em' })}
+      style={commissioned ? { background: 'var(--colors-accent-subtle)', color: 'var(--colors-accent-text)' } : { background: 'rgba(255,255,255,0.08)', color: 'var(--colors-fg-muted)' }}
+    >
+      {commissioned ? 'Commissioned' : 'Cover'}
+    </span>
   );
 }

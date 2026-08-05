@@ -34,8 +34,7 @@ export function EventCard({ e }: { e: EventRow }) {
         <img src={art} alt="" onError={() => setNoArt(true)}
           className={css({ position: 'absolute', inset: '0', w: 'full', h: 'full', objectFit: 'cover', opacity: 0.5 })} />
       )}
-      <div className={css({ position: 'absolute', inset: '0' })}
-        style={{ background: 'linear-gradient(to right, rgba(15,17,23,0.94), rgba(15,17,23,0.35) 60%, rgba(15,17,23,0.1))' }} />
+      <div className={css({ position: 'absolute', inset: '0', bgGradient: 'to-r', gradientFrom: 'bg.default', gradientVia: 'bg.default/55', gradientTo: 'transparent' })} />
       <div className={css({ position: 'relative', p: '3' })}>
         <div className={css({ display: 'flex', alignItems: 'center', gap: '2', fontSize: 'xs', color: 'fg.muted', mb: '1' })}>
           <span className={css({ w: '2', h: '2', rounded: 'full' })} style={{ background: e.indexed ? '#4ade80' : 'transparent', border: e.indexed ? '0' : '1px solid currentColor' }} />

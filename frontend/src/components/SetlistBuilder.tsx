@@ -19,9 +19,9 @@ import { FaPlus, FaXmark, FaGripVertical, FaStar } from 'react-icons/fa6';
 import {
   predictionToItems, itemsToPrediction, enterOrdered, leaveOrdered, dividerToFlags, type SetlistItem
 } from '~/lib/setlist-items';
-import { songName } from '~/hooks/useData';
+import { songName, isCommissioned } from '~/hooks/useData';
 import { SongJacket } from '~/components/SongJacket';
-import { SongSearchModal } from '~/components/SongSearchModal';
+import { SongSearchModal, KindBadge } from '~/components/SongSearchModal';
 
 export interface SetlistBuilderProps {
   songs: string[];
@@ -254,6 +254,7 @@ function SongRow({ id, left, right }: { id: string; left?: ReactNode; right?: Re
       <span className={css({ flex: '1', minW: '0', fontSize: 'sm', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })}>
         {songName(id)}
       </span>
+      <KindBadge commissioned={isCommissioned(id)} />
       {right}
     </Flex>
   );

@@ -11,6 +11,7 @@
 export {}; // make this a module so top-level await is allowed
 
 const MASTER = 'https://sekai-world.github.io/sekai-master-db-diff';
+const MASTER_EN = 'https://sekai-world.github.io/sekai-master-db-en-diff';
 
 // musicTag string -> our unit id. A song with only unmapped tags (e.g. "other") gets units: [].
 const TAG_TO_UNIT: Record<string, string> = {
@@ -22,7 +23,7 @@ const TAG_TO_UNIT: Record<string, string> = {
   vocaloid: 'virtual_singer'
 };
 
-interface Music { id: number; title: string; pronunciation?: string; assetbundleName?: string; publishedAt?: number; releasedAt?: number }
+interface Music { id: number; title: string; pronunciation?: string; assetbundleName?: string; publishedAt?: number; releasedAt?: number; isNewlyWrittenMusic?: boolean }
 interface MusicTag { musicId: number; musicTag: string }
 interface VocalChar { characterType: string; characterId: number }
 interface MusicVocal { musicId: number; characters?: VocalChar[] }
@@ -33,11 +34,16 @@ const getJson = async <T>(name: string): Promise<T> => {
   return res.json() as Promise<T>;
 };
 
-const [musics, musicTags, musicVocals] = await Promise.all([
+const [musics, musicTags, musicVocals, musicsEn] = await Promise.all([
   getJson<Music[]>('musics'),
   getJson<MusicTag[]>('musicTags'),
-  getJson<MusicVocal[]>('musicVocals')
+  getJson<MusicVocal[]>('musicVocals'),
+  // English titles from the EN server DB (songs released on EN), joined by music id.
+  fetch(`${MASTER_EN}/musics.json`).then((r) => (r.ok ? r.json() : [])).catch(() => []) as Promise<Music[]>
 ]);
+
+const enTitleById = new Map<number, string>();
+for (const m of musicsEn) if (m.title) enTitleById.set(m.id, m.title);
 
 const tagsBySong = new Map<number, Set<string>>();
 for (const t of musicTags) {
@@ -59,13 +65,20 @@ const out = musics
   .map((m) => {
     const tags = [...(tagsBySong.get(m.id) ?? [])];
     const units = [...new Set(tags.map((t) => TAG_TO_UNIT[t]).filter(Boolean))];
+    const en = enTitleById.get(m.id);
     return {
       id: String(m.id),
       title: m.title,
       pronunciation: m.pronunciation ?? '',
+      // Only set englishName when the EN title differs from the JP title (so Latin-script
+      // originals like "Tell Your World" don't duplicate).
+      englishName: en && en !== m.title ? en : undefined,
       units,
       characters: [...(charsBySong.get(m.id) ?? [])].sort((a, b) => a - b),
       assetbundleName: m.assetbundleName ?? '',
+      // isNewlyWrittenMusic: true = commissioned (written for Project Sekai); false = a cover
+      // of an existing song. Defaults to cover when the flag is absent.
+      commissioned: m.isNewlyWrittenMusic === true,
       publishedAt: m.publishedAt ?? m.releasedAt ?? 0
     };
   })

@@ -19,6 +19,7 @@ export interface Song {
   units: UnitId[]; // derived from musicTags; [] = no owning unit ("Other")
   characters: number[]; // game-character ids from musicVocals (for icons)
   assetbundleName: string; // drives the jacket image URL
+  commissioned: boolean; // true = written for Project Sekai; false = a cover of an existing song
   publishedAt?: number; // epoch ms (for year sort/filter)
 }
 

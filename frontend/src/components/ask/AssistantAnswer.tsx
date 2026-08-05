@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { css } from 'styled-system/css';
 import { Stack } from 'styled-system/jsx';
 import { Markdown } from '~/components/Markdown';
+import { SectionTabs } from '~/components/SectionTabs';
 import { useStore } from '~/lib/store';
 import type { QueryResult } from '~/types/api';
 
@@ -69,23 +69,6 @@ export function AssistantAnswer({ res, onCite }: { res: QueryResult; onCite: (re
       {res.backend && res.backend !== 'command' && (
         <div className={css({ fontSize: '2xs', color: 'fg.subtle' })}>via {BACKEND_LABEL[res.backend] ?? res.backend}</div>
       )}
-    </Stack>
-  );
-}
-
-function SectionTabs({ order, sections, onCite }: { order: string[]; sections: Record<string, string>; onCite: (ref: number) => void }) {
-  const [active, setActive] = useState(order[0]);
-  return (
-    <Stack gap="2">
-      <div className={css({ display: 'flex', gap: '1', flexWrap: 'wrap' })}>
-        {order.map((label) => (
-          <button key={label} onClick={() => setActive(label)}
-            className={css({ px: '2.5', py: '1', rounded: 'md', fontSize: 'xs', fontWeight: 'semibold', cursor: 'pointer', color: active === label ? 'accent.text' : 'fg.muted', bg: active === label ? 'accent.subtle' : 'transparent' })}>
-            {label}
-          </button>
-        ))}
-      </div>
-      <Markdown text={sections[active] ?? ''} onCite={onCite} />
     </Stack>
   );
 }

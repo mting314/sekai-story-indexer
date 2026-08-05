@@ -60,6 +60,25 @@ export function AskTab() {
   const updateMsg = (id: number, fn: (m: Msg) => Msg) =>
     setMessages((ms) => ms.map((m) => (m.id === id ? fn(m) : m)));
 
+  const autosize = () => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
+  };
+
+  // Terminal-style history recall: set the input to a prior entry, put the caret at the end,
+  // and resize the textarea for multi-line entries. idx === history length clears the input.
+  const recall = (idx: number) => {
+    histIdx.current = idx;
+    setInput(inputHistory.current[idx] ?? '');
+    requestAnimationFrame(() => {
+      const ta = taRef.current;
+      if (ta) ta.selectionStart = ta.selectionEnd = ta.value.length;
+      autosize();
+    });
+  };
+
   async function submit(raw: string) {
     const q = raw.trim();
     if (!q || busy) return;
@@ -123,7 +142,7 @@ export function AskTab() {
     } else {
       setMenu((s) => ({ ...s, open: false }));
     }
-    if (taRef.current) { taRef.current.style.height = 'auto'; taRef.current.style.height = Math.min(taRef.current.scrollHeight, 160) + 'px'; }
+    autosize();
   };
 
   const applyCommand = (c: SlashCommand) => {
@@ -140,12 +159,14 @@ export function AskTab() {
       if (e.key === 'Escape') { setMenu((s) => ({ ...s, open: false })); return; }
     }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(input); return; }
-    // terminal-style history recall
+    // terminal-style history recall — only when the caret is collapsed at the start (↑) / end (↓)
     const ta = taRef.current;
-    if (e.key === 'ArrowUp' && ta && ta.selectionStart === 0 && histIdx.current > 0) {
-      e.preventDefault(); histIdx.current -= 1; setInput(inputHistory.current[histIdx.current] ?? '');
-    } else if (e.key === 'ArrowDown' && ta && ta.selectionStart === (input.length) && histIdx.current < inputHistory.current.length) {
-      e.preventDefault(); histIdx.current += 1; setInput(inputHistory.current[histIdx.current] ?? '');
+    const atStart = !!ta && ta.selectionStart === 0 && ta.selectionEnd === 0;
+    const atEnd = !!ta && ta.selectionStart === input.length && ta.selectionEnd === input.length;
+    if (e.key === 'ArrowUp' && atStart && histIdx.current > 0) {
+      e.preventDefault(); recall(histIdx.current - 1);
+    } else if (e.key === 'ArrowDown' && atEnd && histIdx.current < inputHistory.current.length) {
+      e.preventDefault(); recall(histIdx.current + 1);
     }
   };
 
