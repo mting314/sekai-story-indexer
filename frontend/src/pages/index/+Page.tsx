@@ -1,20 +1,18 @@
 import { useEffect, useState } from 'react';
 import { css } from 'styled-system/css';
 import { Box, HStack, Stack } from 'styled-system/jsx';
-import { FaComments, FaTableList, FaBookOpen, FaMusic } from 'react-icons/fa6';
+import { FaComments, FaTableList, FaBookOpen } from 'react-icons/fa6';
 import { AppProvider, useStore, type TabId } from '~/lib/store';
 import { SidebarProvider } from '~/components/Sidebar';
 import { AskTab } from '~/components/AskTab';
 import { TimelineTab } from '~/components/TimelineTab';
 import { SummariesTab } from '~/components/SummariesTab';
-import { SetlistTab } from '~/components/setlist/SetlistTab';
 
 type TabMeta = { id: TabId; label: string; icon: React.ComponentType<{ size?: number }> };
 const ALL_TABS: TabMeta[] = [
   { id: 'ask', label: 'Ask', icon: FaComments },
   { id: 'timeline', label: 'Timeline', icon: FaTableList },
-  { id: 'summaries', label: 'Summaries', icon: FaBookOpen },
-  { id: 'setlist', label: 'Setlist', icon: FaMusic }
+  { id: 'summaries', label: 'Summaries', icon: FaBookOpen }
 ];
 const CONTENT_TABS = ALL_TABS.filter((t) => t.id !== 'ask'); // right-pane tabs on desktop
 const CONTENT_IDS = CONTENT_TABS.map((t) => t.id);
@@ -93,5 +91,5 @@ function Shell() {
 }
 
 const PANES: Record<TabId, React.ComponentType> = {
-  ask: AskTab, timeline: TimelineTab, summaries: SummariesTab, setlist: SetlistTab
+  ask: AskTab, timeline: TimelineTab, summaries: SummariesTab
 };
