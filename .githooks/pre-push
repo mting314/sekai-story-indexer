@@ -10,4 +10,13 @@ uv run ruff check .
 echo "▶ pre-push: pytest -q"
 uv run pytest -q
 
+# Frontend build (tsc + Vike) — mirrors the CI "Frontend (build)" job. Skipped when bun or
+# frontend deps aren't available (e.g. Python-only machines); CI still enforces it.
+if command -v bun >/dev/null 2>&1 && [ -d frontend/node_modules ]; then
+  echo "▶ pre-push: frontend build + tests"
+  ( cd frontend && bun run build >/dev/null && bun test src >/dev/null )
+else
+  echo "⚠ pre-push: skipping frontend build (bun or frontend/node_modules missing)"
+fi
+
 echo "✓ pre-push checks passed — safe to push"
