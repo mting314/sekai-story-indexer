@@ -1,0 +1,38 @@
+{
+  "name": "sekai-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "React/Vike/Panda frontend for sekai-story-indexer (Ask, Timeline, Summaries, Setlist). Served by the FastAPI app.",
+  "scripts": {
+    "dev": "vite",
+    "build": "panda codegen && tsc && vike build",
+    "preview": "vite preview",
+    "type-check": "tsc",
+    "test": "bun test src",
+    "fetch-songs": "bun run scripts/fetch-songs.ts",
+    "prepare": "panda codegen"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@pandacss/dev": "^1.7.1",
+    "@park-ui/panda-preset": "^0.43.1",
+    "lz-string": "^1.5.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-icons": "^5.4.0",
+    "vike": "^0.4.249",
+    "vike-react": "^0.5.11"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "bun-types": "^1.3.14",
+    "typescript": "^5.7.3",
+    "vite": "^7.3.0",
+    "vite-tsconfig-paths": "^6.0.2"
+  }
+}

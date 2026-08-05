@@ -1,0 +1,9 @@
+[
+  { "id": "virtual_singer", "name": "Virtual Singer", "color": "#33ccbb" },
+  { "id": "leo_need", "name": "Leo/need", "color": "#33aaee" },
+  { "id": "more_more_jump", "name": "MORE MORE JUMP!", "color": "#ffccaa" },
+  { "id": "vivid_bad_squad", "name": "Vivid BAD SQUAD", "color": "#ff6699" },
+  { "id": "wonderlands_showtime", "name": "Wonderlands×Showtime", "color": "#ffbb00" },
+  { "id": "nightcord", "name": "25-ji, Nightcord de.", "color": "#bb6688" },
+  { "id": "other", "name": "Other", "color": "#8a8a8a" }
+]

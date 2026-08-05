@@ -26,7 +26,6 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Response
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -1915,10 +1914,24 @@ def health() -> dict:
     return {"status": "ok", "backend": QUERY_BACKEND, "events": len(load_events())}
 
 
-@app.get("/")
-def index() -> FileResponse:
-    return FileResponse(STATIC / "index.html")
-
-
+# ``/static`` still serves shared assets the frontend depends on: meta.json (character/unit
+# colors + icons), and the chara/ + units/ icon PNGs. (The old vanilla page — index.html/app.js/
+# styles.css — was removed at the React cutover.)
 if STATIC.exists():
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+# The React/Vike/Panda frontend (``frontend/``) — the app UI (Ask, Timeline, Summaries, Setlist),
+# a static bundle that calls the same ``/api/*`` endpoints. Served at ``/`` and registered LAST so
+# the explicit ``/api/*`` routes and the ``/static`` mount take precedence over this catch-all.
+# Override the build location with ``SEKAI_FRONTEND_DIST``.
+_frontend_env = os.environ.get("SEKAI_FRONTEND_DIST", "")
+FRONTEND_DIST = Path(_frontend_env) if _frontend_env else (HERE.parent / "frontend" / "dist" / "client")
+if FRONTEND_DIST.is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
+else:
+    @app.get("/")
+    def _frontend_unbuilt() -> Response:
+        return Response(
+            "Frontend not built. Run: cd frontend && bun install && bun run build",
+            media_type="text/plain",
+        )

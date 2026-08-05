@@ -73,10 +73,20 @@ with any interpreter that has `pydantic`+`pyyaml`:
     `summarize` first.
 * `/api/query` picks backend via `SEKAI_QUERY_BACKEND` (`local` default, `full`).
 
+## Web frontend (`frontend/`)
+The web UI is a **React + Vike + Panda CSS** app in `frontend/` (Ask · Timeline · Summaries ·
+Setlist). It replaced the old vanilla `webapp/static/{index.html,app.js}` page. It's a static
+bundle served by FastAPI at `/`; it calls the same `/api/*` endpoints + reuses
+`/static/{meta.json,units,chara}`. Backend (`webapp/server.py` + `/api/*`) is unchanged.
+Build it before serving: `cd frontend && bun install && bun run build` (→ `dist/client`, picked
+up automatically; override with `SEKAI_FRONTEND_DIST`). `bun run fetch-songs` populates the
+Setlist catalog from the Sekai master DB. See `frontend/README.md`.
+
 ## Run / test locally (no keys)
 ```bash
 uv sync --extra web
-sekai serve --story-root sample/story --events-index sample/events_index.json  # web app
+cd frontend && bun install && bun run build && cd ..   # build the web UI (once / after FE changes)
+sekai serve --story-root sample/story --events-index sample/events_index.json  # web app at /
 sekai eval        # regression gate
 uv run pytest     # unit + API + eval tests
 ```
