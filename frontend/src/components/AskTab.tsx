@@ -37,19 +37,11 @@ export function AskTab() {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const busyRef = useRef(false); // synchronous in-flight guard (setBusy is async → not reliable alone)
 
   useEffect(() => { getCommands().then(setCommands).catch(() => setCommands([])); }, []);
   useEffect(() => () => abortRef.current?.abort(), []); // cancel any in-flight stream on unmount
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [messages]);
-
-  // Consume a question pushed from another tab (Timeline click, quick-action bridge).
-  useEffect(() => {
-    if (store.pendingQuestion) {
-      const q = store.consumePending();
-      if (q) submit(q);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.pendingQuestion]);
 
   const buildHistory = () =>
     messages
@@ -81,8 +73,10 @@ export function AskTab() {
 
   async function submit(raw: string) {
     const q = raw.trim();
-    if (!q || busy) return;
+    if (!q || busyRef.current) return; // ref guard: blocks same-tick double-submit (setBusy is async)
+    busyRef.current = true;
     setBusy(true);
+    abortRef.current?.abort(); // cancel any prior in-flight stream before starting a new one
     setMenu((s) => ({ ...s, open: false }));
     if (inputHistory.current[inputHistory.current.length - 1] !== q) inputHistory.current.push(q);
     histIdx.current = inputHistory.current.length;
@@ -123,7 +117,7 @@ export function AskTab() {
     } catch (e) {
       if (!ac.signal.aborted) updateMsg(asstId, (m) => ({ ...m, streaming: false, text: `⚠ ${String(e)}` }));
     } finally {
-      if (!ac.signal.aborted) setBusy(false);
+      if (!ac.signal.aborted) { busyRef.current = false; setBusy(false); }
     }
   }
 
@@ -146,7 +140,7 @@ export function AskTab() {
   };
 
   const applyCommand = (c: SlashCommand) => {
-    setInput(`/${c.command}${c.args ? ' ' : ' '}`);
+    setInput(`/${c.command} `);
     setMenu((s) => ({ ...s, open: false }));
     taRef.current?.focus();
   };

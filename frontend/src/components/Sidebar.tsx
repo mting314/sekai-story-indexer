@@ -1,7 +1,7 @@
 // Shared excerpt / transcript viewer (ported from the vanilla sidebar). Provides open* actions
 // via context and renders a right-hand panel with visual-novel chat bubbles (speaker colors from
 // the entity map) or a marked excerpt. Used by Summaries (transcript links) and Ask (citations).
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { css } from 'styled-system/css';
 import { getEpisodeRaw, getScene } from '~/lib/api';
 import { buildEntityIndex } from '~/lib/decorate';
@@ -39,27 +39,33 @@ const regionLabel = (r?: string | null) =>
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [s, setS] = useState<PanelState>(EMPTY);
+  // Monotonic request id: a slow fetch only applies its result if it's still the latest open.
+  const reqRef = useRef(0);
 
   const api = useMemo<SidebarApi>(() => {
     const openTranscript: SidebarApi['openTranscript'] = (arc, episode, label, highlight, enQuote) => {
+      const id = ++reqRef.current;
       setS({ ...EMPTY, open: true, title: label, sub: '', loading: true });
       getEpisodeRaw(arc, episode).then((d) => {
+        if (id !== reqRef.current) return; // superseded by a newer open
         const hi = d.region === 'en' ? (enQuote ?? highlight) : highlight;
         setS({
           open: true, loading: false, title: d.title || label, sub: regionLabel(d.region),
           text: d.text, highlight: hi, mode: 'vn',
           banner: enQuote && d.region !== 'en' ? 'Official EN quote shown separately' : undefined
         });
-      }).catch(() => setS((p) => ({ ...p, loading: false, text: 'Failed to load transcript.' })));
+      }).catch(() => { if (id === reqRef.current) setS((p) => ({ ...p, loading: false, text: 'Failed to load transcript.' })); });
     };
 
     const openCitation: SidebarApi['openCitation'] = (c, lastQuery) => {
       // derived/prose-free backend: fetch the live scene; else load the on-disk transcript.
       if (c.source && c.episode && c.arc_id) {
+        const id = ++reqRef.current;
         setS({ ...EMPTY, open: true, title: c.label || c.arc_id, sub: 'live from sekai.best', loading: true });
         getScene(c.arc_id, c.episode, lastQuery ?? '').then((d) => {
+          if (id !== reqRef.current) return; // superseded
           setS({ open: true, loading: false, title: d.title || c.label || c.arc_id, sub: 'live from sekai.best', text: d.text, highlight: d.quote, mode: 'vn' });
-        }).catch(() => setS((p) => ({ ...p, loading: false, text: 'Failed to load scene.' })));
+        }).catch(() => { if (id === reqRef.current) setS((p) => ({ ...p, loading: false, text: 'Failed to load scene.' })); });
         return;
       }
       if (c.episode && c.arc_id) {
@@ -68,10 +74,11 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
         return;
       }
       // fallback: raw excerpt with the quote marked
+      reqRef.current++; // invalidate any in-flight fetch
       setS({ open: true, loading: false, title: c.label || c.arc_id, sub: c.episode_title || '', text: c.excerpt || '', highlight: c.quote, mode: 'excerpt' });
     };
 
-    return { openTranscript, openCitation, close: () => setS((p) => ({ ...p, open: false })) };
+    return { openTranscript, openCitation, close: () => { reqRef.current++; setS((p) => ({ ...p, open: false })); } };
   }, []);
 
   return (

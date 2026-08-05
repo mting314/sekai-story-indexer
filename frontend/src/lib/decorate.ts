@@ -68,6 +68,9 @@ export function decorateHtml(root: HTMLElement, idx: EntityIndex): void {
         if (SKIP.has(el.tagName) || el.classList.contains('ent')) return NodeFilter.FILTER_REJECT;
         el = el.parentElement;
       }
+      // Reset before every test: `re` is a shared /g/ regex, so a prior .test() left lastIndex
+      // mid-string, which would make this test resume at the wrong offset and drop matches.
+      idx.re!.lastIndex = 0;
       return idx.re!.test(node.nodeValue ?? '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     }
   });

@@ -20,11 +20,6 @@ interface AppStore {
   setScope: (e: EventRow | null) => void;
   tab: TabId;
   setTab: (t: TabId) => void;
-  // Phase 4 wires this so Timeline/quick-actions can submit into Ask. Until then it's a no-op
-  // that just focuses the Ask tab (the pending question is stashed for the Ask tab to consume).
-  pendingQuestion: string | null;
-  ask: (q: string) => void;
-  consumePending: () => string | null;
 }
 
 const EMPTY_META: Meta = { characters: {}, units: {} };
@@ -39,7 +34,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeUnit, setActiveUnit] = useState('all');
   const [scope, setScope] = useState<EventRow | null>(null);
   const [tab, setTab] = useState<TabId>('ask');
-  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -57,11 +51,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AppStore>(() => ({
     meta, units, events, eventChildren, loading,
-    activeUnit, setActiveUnit, scope, setScope, tab, setTab,
-    pendingQuestion,
-    ask: (q: string) => { setPendingQuestion(q); setTab('ask'); },
-    consumePending: () => { const q = pendingQuestion; setPendingQuestion(null); return q; }
-  }), [meta, units, events, eventChildren, loading, activeUnit, scope, tab, pendingQuestion]);
+    activeUnit, setActiveUnit, scope, setScope, tab, setTab
+  }), [meta, units, events, eventChildren, loading, activeUnit, scope, tab]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

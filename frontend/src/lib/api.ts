@@ -102,6 +102,19 @@ export async function queryStream(
       onEvent(evt);
     }
   }
+  // Defensive: process a trailing frame not terminated by \n\n (e.g. a proxy stripped the final
+  // blank line), so the `done` payload (citations/focus) isn't silently dropped.
+  if (!done) {
+    const line = buf.split('\n').find((l) => l.startsWith('data:'));
+    if (line) {
+      try {
+        const evt = JSON.parse(line.slice(5).trim()) as StreamEvent;
+        if (evt.type === 'delta') text += evt.text;
+        if (evt.type === 'done') done = evt;
+        onEvent(evt);
+      } catch { /* ignore malformed tail */ }
+    }
+  }
   return done ?? { answer: text };
 }
 
