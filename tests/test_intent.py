@@ -18,6 +18,33 @@ def test_classify_intents():
     assert classify("Why did Mafuyu disappear?") == "general"
 
 
+def test_classify_paraphrases_multilingual():
+    # Conclusion paraphrases (EN / JP / ZH)
+    assert classify("how did everything turn out?") == "conclusion"
+    assert classify("what is the outcome of this arc?") == "conclusion"
+    assert classify("where do they end up in the story?") == "conclusion"
+    assert classify("結末はどうなった？") == "conclusion"
+    assert classify("最後結果如何？") == "conclusion"
+
+    # Summarize paraphrases
+    assert classify("give me the main takeaway") == "summarize"
+    assert classify("explain the plot of this event") == "summarize"
+    assert classify("あらすじを教えて") == "summarize"
+    assert classify("故事梗概是什麼") == "summarize"
+
+    # Focus character paraphrases
+    assert classify("who is the central figure?") == "focus_character"
+    assert classify("who gets the spotlight in this event?") == "focus_character"
+    assert classify("誰が主役？") == "focus_character"
+    assert classify("主角是誰？") == "focus_character"
+
+    # Resonance paraphrases
+    assert classify("how does the song relate to the story?") == "resonance"
+    assert classify("meaning of the event song") == "resonance"
+    assert classify("書き下ろし曲の意味") == "resonance"
+    assert classify("主題曲和故事的關係") == "resonance"
+
+
 def test_summarize_pulls_whole_scope():
     eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
     r = eng.summarize("Summarize koha1")
