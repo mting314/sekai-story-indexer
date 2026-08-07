@@ -1,0 +1,79 @@
+name: Deploy
+
+# Deploys to Cloud Run and Firebase Hosting on pushes to master or manually.
+# Requires repository configuration (Settings → Secrets and variables → Actions):
+#   secret  GCP_SA_KEY     JSON key for a service account with roles: run.admin,
+#                          cloudbuild.builds.editor, iam.serviceAccountUser,
+#                          storage.admin, artifactregistry.admin, firebasehosting.admin
+#   var     GCP_PROJECT    e.g. sekai-story-indexer
+#   var     GCP_REGION     e.g. us-central1
+
+on:
+  push:
+    branches: ["master"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cloud-run
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    # We reference the existing CI check to make sure code is green before deploying
+    name: Run CI Checks
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy to GCP
+    needs: ci
+    runs-on: ubuntu-latest
+    env:
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+    steps:
+      - name: Note if unconfigured
+        if: ${{ env.GCP_SA_KEY == '' }}
+        run: echo "::notice::GCP_SA_KEY secret not set — skipping Cloud Run deploy."
+
+      - uses: actions/checkout@v4
+        if: ${{ env.GCP_SA_KEY != '' }}
+
+      - name: Authenticate to Google Cloud
+        if: ${{ env.GCP_SA_KEY != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        if: ${{ env.GCP_SA_KEY != '' }}
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        if: ${{ env.GCP_SA_KEY != '' }}
+        run: |
+          # Swap in the derived (copyright-clean) Dockerfile
+          cp Dockerfile.derived Dockerfile
+          gcloud run deploy sekai-story-indexer --source . \
+            --project "${{ vars.GCP_PROJECT || 'sekai-story-indexer' }}" \
+            --region "${{ vars.GCP_REGION || 'us-central1' }}" \
+            --quiet
+
+      # Build the frontend client assets for CDN delivery
+      - name: Set up Bun
+        if: ${{ env.GCP_SA_KEY != '' }}
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build client assets
+        if: ${{ env.GCP_SA_KEY != '' }}
+        run: |
+          cd frontend
+          bun install --frozen-lockfile
+          bun run build
+
+      # Deploy static assets directly to Firebase Hosting CDN
+      - name: Deploy assets to Firebase Hosting
+        if: ${{ env.GCP_SA_KEY != '' }}
+        continue-on-error: true
+        run: |
+          bunx firebase-tools@latest deploy --only hosting \
+            --project "${{ vars.GCP_PROJECT || 'sekai-story-indexer' }}" \
+            --non-interactive

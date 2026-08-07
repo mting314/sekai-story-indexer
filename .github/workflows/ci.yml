@@ -6,6 +6,8 @@ on:
   push:
     branches: ["**"]
   pull_request:
+  workflow_call:
+  workflow_dispatch:
 
 # Cancel superseded runs for the same ref (e.g. rapid pushes to a PR).
 concurrency:
