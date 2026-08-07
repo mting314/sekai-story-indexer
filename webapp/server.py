@@ -1139,31 +1139,12 @@ def _log_turn(rec: dict) -> None:
         pass
 
 
-_SUMMARIZE_RE = re.compile(r"\b(summar(?:y|ize|ise)|recap|overview|tl;?dr|synops)", re.IGNORECASE)
-# Analytical intents about the FOCUSED event that the extractive backend can't
-# answer by quote-picking — routed to the event's pre-built summary + metadata.
-_FOCUS_CHAR_RE = re.compile(
-    r"\bfocus character\b|who(?:'s| is| are) the (?:main|focus|central|lead)\b|"
-    r"whose (?:event|story|arc) is this",
-    re.IGNORECASE,
-)
-_CONCLUSION_RE = re.compile(
-    r"\bconclusion\b|\bfinale\b|what happens (?:at|in|by) the end|"
-    r"how (?:does|did) (?:it|this|the (?:event|story|arc)) (?:end|conclude|wrap up|resolve)|"
-    r"\bend(?:ing)? of (?:this|the) (?:event|story|arc)\b",
-    re.IGNORECASE,
-)
-# Lyric↔story resonance: "how does the (theme) song relate to the story", "what does
-# the song mean", "song and story", "lyrics … reflect the event", "resonance".
-_RESONANCE_RE = re.compile(
-    r"\bresonan(?:ce|t|tes?)\b"
-    r"|\b(?:theme\s+)?song(?:'s)?\b[^.?!]*\b(?:mean|meaning|message|significan|"
-    r"relate|relation|connect|reflect|represent|resonate|tie|about the (?:story|event))"
-    r"|\b(?:mean|meaning|message|significance|point) of the (?:theme\s+)?song\b"
-    r"|\blyrics?\b[^.?!]*\b(?:mean|meaning|message|relate|connect|reflect|"
-    r"about the (?:story|event)|and the (?:story|event))"
-    r"|\b(?:theme\s+)?song\s+and\s+(?:the\s+)?story\b|\bstory\s+and\s+(?:the\s+)?song\b",
-    re.IGNORECASE,
+from sekai_story_indexer.query.intent import (
+    _CONCLUSION_RE,
+    _FOCUS_CHAR_RE,
+    _RESONANCE_RE,
+    _SUMMARIZE_RE,
+    classify,
 )
 
 
@@ -1172,7 +1153,7 @@ def _summarize_intercept(question: str) -> dict | None:
     pre-computed **hierarchical** event summary (``summaries_cache.json`` →
     ``EVENT|<arc>``) -> return that directly, instead of letting RAG re-summarize
     raw scenes. Events without a hierarchical summary fall through to normal RAG."""
-    if not _SUMMARIZE_RE.search(question):
+    if classify(question) != "summarize":
         return None
     try:
         from sekai_story_indexer.query.metadata import resolve_focus_reference
@@ -1214,10 +1195,11 @@ def _scoped_event_intercept(req: QueryRequest, prev: Focus | None) -> dict | Non
     needle questions ('what did X say about Y') don't match the intent patterns and
     fall through to normal scoped retrieval."""
     q = req.question
-    want_sum = bool(_SUMMARIZE_RE.search(q))
-    want_focus = bool(_FOCUS_CHAR_RE.search(q))
-    want_concl = bool(_CONCLUSION_RE.search(q))
-    want_reson = bool(_RESONANCE_RE.search(q))
+    intent = classify(q)
+    want_sum = (intent == "summarize")
+    want_focus = (intent == "focus_character")
+    want_concl = (intent == "conclusion")
+    want_reson = (intent == "resonance")
     if not (want_sum or want_focus or want_concl or want_reson):
         return None
     try:
