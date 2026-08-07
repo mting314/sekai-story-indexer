@@ -242,3 +242,5 @@ web/summary-reader-production/data/
 /story/
 /content_parents.json
 chat_log.jsonl
+.firebase/
+
