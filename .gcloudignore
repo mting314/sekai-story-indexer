@@ -1,0 +1,11 @@
+.git
+.github
+.venv
+node_modules/
+frontend/node_modules/
+frontend/styled-system/
+chroma_db/
+*.db
+ingestion_manifest.json
+.env
+*.log
