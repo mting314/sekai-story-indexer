@@ -13,6 +13,10 @@ export interface EventRow {
   nickname?: string;
   unit: string;
   indexed: boolean; // has story on disk / chat-answerable
+  // Ingestion freshness (see webapp/server.py::_annotate_freshness). 'pending' =
+  // Tier 1 landed (searchable) but the Tier 2 LLM summary hasn't been written yet.
+  summary_status?: 'complete' | 'pending' | 'none';
+  is_new?: boolean; // first seen by an ingest run inside the freshness window
   is_key_story?: boolean;
   started_at?: number;
   ended_at?: number;

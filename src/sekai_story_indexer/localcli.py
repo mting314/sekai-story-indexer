@@ -496,6 +496,86 @@ def resonance(
     typer.echo(f"Done. {have} resonance notes cached in {cache}.")
 
 
+@app.command()
+def ingest(
+    story_root: Path = typer.Option(Path("story")),
+    events_index: Path = typer.Option(Path("events_index.json")),
+    skip_existing: bool = typer.Option(
+        True, help="Resume: don't re-download episodes already on disk. Turn off for a "
+        "full re-fetch (slow, and only needed when the source text itself changed)."
+    ),
+    limit_events: int = typer.Option(0, help="Only the N earliest events (0 = all)."),
+    cards: bool = typer.Option(True, help="Also fetch card side-stories."),
+    areas: bool = typer.Option(True, help="Also fetch area conversations."),
+    unit_stories: bool = typer.Option(False, help="Also refetch the unit (formation) stories."),
+    with_llm: bool = typer.Option(
+        False, "--with-llm", "--summarize", help="Also run Tier 2 (summaries → conclusions → "
+        "resonance). Needs GOOGLE_API_KEY + generation deps; failures are logged, not fatal."
+    ),
+    batch_limit: int = typer.Option(
+        5, help="Tier 2 only: how many NEW items each LLM pass may generate this run. "
+        "Keeps a scheduled drain under the spend cap; use 0 for 'no cap'."
+    ),
+    model: str = typer.Option("", help="Tier 2 generation model (overrides SEKAI_INGEST_MODEL)."),
+    reload_url: str = typer.Option(
+        "", help="POST here after a successful run to flush a live server's caches "
+        "(e.g. http://127.0.0.1:8000/api/admin/reload)."
+    ),
+    state_path: Path = typer.Option(
+        Path("ingest_state.json"), help="Where to record first-seen event timestamps (drives "
+        "the timeline's NEW badge)."
+    ),
+):
+    """One-shot 'catch up with the game' run: fetch → link → map → classify → index,
+    then optionally the LLM passes.
+
+    Tier 1 is keyless and always runs, so a brand-new event becomes queryable
+    immediately; Tier 2 (summaries/conclusions/resonance) is rate-budgeted by
+    ``--batch-limit`` and never fails the run. Safe to schedule."""
+    from .ingest import IngestConfig, run_ingest
+
+    cfg = IngestConfig(
+        story_root=story_root,
+        events_index=events_index,
+        state_path=state_path,
+        skip_existing=skip_existing,
+        limit_events=limit_events,
+        cards=cards,
+        areas=areas,
+        unit_stories=unit_stories,
+        with_llm=with_llm,
+        batch_limit=batch_limit,
+        model=model,
+    )
+    report = run_ingest(cfg, log=typer.echo)
+    typer.echo(report.summary())
+    if report.ok and reload_url:
+        typer.echo(_notify_reload(reload_url))
+    raise typer.Exit(code=0 if report.ok else 1)
+
+
+def _notify_reload(url: str) -> str:
+    """Best-effort cache-flush ping to a running server (never fails the ingest)."""
+    import os
+    import urllib.error
+    import urllib.request
+
+    req = urllib.request.Request(url, data=b"", method="POST")
+    token = os.environ.get("SEKAI_ADMIN_TOKEN")
+    if token:
+        req.add_header("X-Admin-Token", token)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 - operator-supplied URL
+            return f"reload {url}: HTTP {resp.status}"
+    except urllib.error.HTTPError as exc:
+        # The server answered and refused — 403 (loopback-only / bad token) and 429
+        # (cooldown) are actionable, so don't bury them under "not running".
+        hint = {403: " — set SEKAI_ADMIN_TOKEN on both sides", 429: " — cooldown, try later"}
+        return f"reload {url}: HTTP {exc.code}{hint.get(exc.code, '')}"
+    except (urllib.error.URLError, OSError) as exc:
+        return f"reload {url} failed (server not running?): {exc}"
+
+
 @app.command("eval")
 def eval_command(golden: Path = typer.Option(Path("eval/golden_local.json"))):
     """Run the local regression eval; non-zero exit on any regression."""

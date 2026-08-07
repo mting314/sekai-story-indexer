@@ -53,7 +53,7 @@ with any interpreter that has `pydantic`+`pyyaml`:
 ## Two CLIs / two query backends
 * `indexer` (cli.py) — full Google/Chroma RAG; needs deps + `GOOGLE_API_KEY`.
 * `sekai` (localcli.py) — dependency-light, no-API core: `fetch`,
-  `fetch-unit-stories`, `build-index`, `build-lyric-map`, `ask`, `serve`, `eval`. Uses the **local**
+  `fetch-unit-stories`, `build-index`, `build-lyric-map`, `ingest`, `ask`, `serve`, `eval`. Uses the **local**
   lexical engine (`query/local.py`): deterministic TF-IDF retrieval + unit/nickname
   (`kasa5`) scoping + indexed-only queryable contract. This is what makes the app
   runnable + evals stable anywhere.
@@ -72,6 +72,33 @@ with any interpreter that has `pydantic`+`pyyaml`:
     agnostic; served keyless by the resonance intent. Needs `build-lyric-map` +
     `summarize` first.
 * `/api/query` picks backend via `SEKAI_QUERY_BACKEND` (`local` default, `full`).
+
+## Constant ingestion (`sekai ingest`) — see docs/ingestion.md
+One scheduled command catches the corpus up with the game (a new event ~every 15
+days). `src/sekai_story_indexer/ingest.py` is a plain ordered `Step` list run by
+`run_steps`; **Tier 1** (fetch → card/area → link-content → build-lyric-map →
+classify → build-index → record-state) is keyless and always runs, so a new event
+is queryable immediately. **Tier 2** (`--with-llm`: summarize → conclusions →
+resonance) is capped by `--batch-limit` (default 5 new items/pass) so a nightly
+run drains a backlog without tripping the spend cap. Required steps abort the run;
+network side-quests and all of Tier 2 log and continue — a missing key is normal.
+* `record-state` writes `ingest_state.json` (first-seen per event id). The server
+  derives `is_new` + `summary_status` (`none`/`pending`/`complete`, gated on
+  `indexed`) onto `/api/events`; the timeline renders NEW / "Summary pending"
+  badges (`frontend/src/lib/freshness.ts`). The **first** run is a baseline:
+  first-seen is backdated to release dates so adoption doesn't badge the whole
+  back catalogue.
+* Server caches are mtime-keyed (events index, summary caches, derived index,
+  built lexical engine), so a run lands without a restart. `POST
+  /api/admin/reload` is the explicit flush. A flush costs an engine rebuild + a
+  live master-DB pull, so it's **loopback-only unless `SEKAI_ADMIN_TOKEN` is set**
+  (then token-required everywhere, no loopback bypass) and rate-limited by
+  `SEKAI_ADMIN_RELOAD_COOLDOWN` (default 5s).
+* Schedulers: `.github/workflows/ingest.yml` (nightly, Tier 1, corpus in the
+  Actions cache — transcripts are never committed) and `scripts/run_ingestion.py`
+  (env-driven, for cron/launchd).
+* `ingest` writes repo-root-relative paths like the commands it composes — run it
+  from the repo root, or from a scratch dir for a throwaway run.
 
 ## Web frontend (`frontend/`)
 The web UI is a **React + Vike + Panda CSS** app in `frontend/` (Ask · Timeline · Summaries ·
@@ -144,10 +171,11 @@ Note: the **pytest** job does not build the frontend, so `test_index_html_served
 - Fetch is resilient (retries IncompleteRead) + resumable (`--skip-existing`).
 
 ## Tests
-CI runs the **full** suite (`uv run pytest -q`) — **478 passing**. chromadb is
+CI runs the **full** suite (`uv run pytest -q`) — **542 passing**. chromadb is
 installed in CI, so the inherited linkura tests collect + run too; **run the full
 `uv run pytest` locally before pushing, not just a Sekai subset** (a subset-only
 run once missed a `test_database.py` break that CI caught). Sekai-specific files:
 `test_sekai_source test_local_query test_scoping test_eval_local test_webapp_api
 test_content_and_summaries test_sessions test_generate_config test_summarize_limit
-test_conclusion test_conclusions_extractor test_lyrics test_resonance`.
+test_conclusion test_conclusions_extractor test_lyrics test_resonance
+test_ingest_pipeline test_webapp_freshness`.
