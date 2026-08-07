@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "master_songs": 706,
-    "mapped": 699,
+    "master_songs": 709,
+    "mapped": 700,
     "missing": [
       241,
       290,
@@ -9,7 +9,9 @@
       674,
       675,
       676,
-      795
+      750,
+      751,
+      764
     ],
     "wiki_only": 0
   },
@@ -3508,6 +3510,11 @@
       "pageid": 110616,
       "title": "De Los Santos",
       "english": "De Los Santos"
+    },
+    "795": {
+      "pageid": 110814,
+      "title": "Ichiokunen Koi Shiteru",
+      "english": "In Love For A Hundred Million Years"
     }
   }
 }

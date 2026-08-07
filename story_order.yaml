@@ -210,5 +210,7 @@ chronological_order: &id001
   - 0209-aidoru-hanazato-minori-yume-no-saizensen
   - 0210-ase-nai-ima-wo-sai-tte
   - 0211-kun-no-tonari-kun-to-miru-ashita
+  - 0212-echo-of-a-prayer
+  - 0213-leap-beyond-the-limits
 summary_order: *id001
 part_order_overrides: []

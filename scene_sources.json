@@ -8553,5 +8553,85 @@
     "bundle": "event_wl_3rd_part4_2026",
     "scenario_id": "wl_3rd_group4_07",
     "region": "jp"
+  },
+  "0212-echo-of-a-prayer/01_juujitsu-shita-hibi": {
+    "bundle": "event_ofprayer_2026",
+    "scenario_id": "event_212_01",
+    "region": "jp"
+  },
+  "0212-echo-of-a-prayer/02_atarashii-chousen": {
+    "bundle": "event_ofprayer_2026",
+    "scenario_id": "event_212_02",
+    "region": "jp"
+  },
+  "0212-echo-of-a-prayer/03_ryouritsu-notameni": {
+    "bundle": "event_ofprayer_2026",
+    "scenario_id": "event_212_03",
+    "region": "jp"
+  },
+  "0212-echo-of-a-prayer/04_tenki": {
+    "bundle": "event_ofprayer_2026",
+    "scenario_id": "event_212_04",
+    "region": "jp"
+  },
+  "0212-echo-of-a-prayer/05_igai-na-kotae": {
+    "bundle": "event_ofprayer_2026",
+    "scenario_id": "event_212_05",
+    "region": "jp"
+  },
+  "0212-echo-of-a-prayer/06_sentakushi-wo-mae-ni": {
+    "bundle": "event_ofprayer_2026",
+    "scenario_id": "event_212_06",
+    "region": "jp"
+  },
+  "0212-echo-of-a-prayer/07_daiji-nishitainoha": {
+    "bundle": "event_ofprayer_2026",
+    "scenario_id": "event_212_07",
+    "region": "jp"
+  },
+  "0212-echo-of-a-prayer/08_hamon-ha-hiroga-tte": {
+    "bundle": "event_ofprayer_2026",
+    "scenario_id": "event_212_08",
+    "region": "jp"
+  },
+  "0213-leap-beyond-the-limits/01_hajimari-no-toki": {
+    "bundle": "event_limits_2026",
+    "scenario_id": "event_213_01",
+    "region": "jp"
+  },
+  "0213-leap-beyond-the-limits/02_taisen-aite": {
+    "bundle": "event_limits_2026",
+    "scenario_id": "event_213_02",
+    "region": "jp"
+  },
+  "0213-leap-beyond-the-limits/03_junkesshou-ni-muke-te": {
+    "bundle": "event_limits_2026",
+    "scenario_id": "event_213_03",
+    "region": "jp"
+  },
+  "0213-leap-beyond-the-limits/04_ketsui-wo-mune-ni": {
+    "bundle": "event_limits_2026",
+    "scenario_id": "event_213_04",
+    "region": "jp"
+  },
+  "0213-leap-beyond-the-limits/05_kiri-nosono-saki": {
+    "bundle": "event_limits_2026",
+    "scenario_id": "event_213_05",
+    "region": "jp"
+  },
+  "0213-leap-beyond-the-limits/06_make-rarenai-riyuu": {
+    "bundle": "event_limits_2026",
+    "scenario_id": "event_213_06",
+    "region": "jp"
+  },
+  "0213-leap-beyond-the-limits/07_mayoi-no-hate-ni": {
+    "bundle": "event_limits_2026",
+    "scenario_id": "event_213_07",
+    "region": "jp"
+  },
+  "0213-leap-beyond-the-limits/08_shinji-ru": {
+    "bundle": "event_limits_2026",
+    "scenario_id": "event_213_08",
+    "region": "jp"
   }
 }
