@@ -66,10 +66,15 @@ jobs:
           key: story-corpus-${{ github.run_id }}
           restore-keys: story-corpus-
 
+      # `inputs.*` are null on a schedule trigger, so the nightly is deliberately
+      # Tier 1 with no card/area fetch. Say so in the log — a bounded run that
+      # doesn't announce what it skipped reads as "covered everything".
       - name: Run ingestion
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
+          echo "cards+areas: ${{ inputs.cards_and_areas && 'fetching' || 'SKIPPED (dispatch-only)' }}"
+          echo "tier 2:      ${{ (inputs.with_llm && secrets.GOOGLE_API_KEY && 'enabled') || 'SKIPPED (needs --with-llm + GOOGLE_API_KEY)' }}"
           uv run sekai ingest \
             --skip-existing \
             --batch-limit "${{ inputs.batch_limit || '5' }}" \
@@ -84,19 +89,33 @@ jobs:
           key: story-corpus-${{ github.run_id }}
 
       # Only our generated/derived artifacts — the transcripts stay out of git.
+      #
+      # Stage one file at a time. `git add a b missing` is atomic on pathspec
+      # resolution: a single absent file aborts the whole add and stages NOTHING,
+      # which would make this step report "no index changes" and exit 0 forever.
+      # Several of these legitimately don't exist yet (conclusions_cache.json,
+      # ingest_state.json before the first run), so that is the default path, not
+      # an edge case. Errors are NOT swallowed — a failure here must be visible.
       - name: Commit refreshed indexes
         run: |
+          set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- events_index.json story_order.yaml scene_sources.json \
-                     derived_index.json.gz lyric_page_map.json ingest_state.json \
-                     summaries_cache.json conclusions_cache.json resonance_cache.json 2>/dev/null || true
+          for f in events_index.json story_order.yaml scene_sources.json \
+                   derived_index.json.gz lyric_page_map.json ingest_state.json \
+                   summaries_cache.json conclusions_cache.json resonance_cache.json; do
+            if [ -f "$f" ]; then git add -- "$f"; else echo "absent, not staged: $f"; fi
+          done
           if git diff --cached --quiet; then
             echo "no index changes"
             exit 0
           fi
+          echo "staging:"; git diff --cached --name-only
           git commit -m "chore(ingest): refresh indexes $(date -u +%Y-%m-%d)"
-          git push
+          # master may have moved while the (long) fetch ran; rebase our single
+          # index commit on top rather than failing the whole nightly.
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       # Nudge a long-lived deployment to drop its caches. No-op unless the repo
       # sets SEKAI_RELOAD_URL (plus SEKAI_ADMIN_TOKEN if the endpoint is guarded).
