@@ -203,7 +203,7 @@ export function AskTab() {
 
       <div className={css({ position: 'relative' })}>
         {menu.open && (
-          <div className={css({ position: 'absolute', bottom: '100%', left: '0', mb: '1', w: 'full', bg: 'bg.default', borderWidth: '1px', borderColor: 'border.default', rounded: 'lg', boxShadow: 'lg', overflow: 'hidden', zIndex: '10' })}>
+          <div className={css({ position: 'absolute', top: '100%', left: '0', mt: '1.5', w: 'full', maxH: '240px', overflowY: 'auto', bg: 'bg.default', borderWidth: '1px', borderColor: 'border.default', rounded: 'lg', boxShadow: 'xl', zIndex: '30' })}>
             {menu.items.map((c, i) => (
               <button key={c.command} onMouseDown={(e) => { e.preventDefault(); applyCommand(c); }}
                 className={css({ display: 'block', w: 'full', textAlign: 'left', px: '3', py: '1.5', fontSize: 'sm', cursor: 'pointer', bg: i === menu.active ? 'bg.subtle' : 'transparent' })}>
