@@ -24,7 +24,8 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir \
     "fastapi>=0.115" "uvicorn[standard]>=0.32" "pydantic>=2.13" \
-    pyyaml python-dotenv certifi
+    pyyaml python-dotenv certifi pykakasi
+
 
 COPY src/ ./src/
 COPY webapp/ ./webapp/

@@ -25,7 +25,8 @@ WORKDIR /app
 # the engine's optional paths.
 RUN pip install --no-cache-dir \
     "fastapi>=0.115" "uvicorn[standard]>=0.32" "pydantic>=2.13" \
-    pyyaml python-dotenv certifi
+    pyyaml python-dotenv certifi pykakasi
+
 
 # Source + committed corpus/data (self-contained — no fetch at runtime).
 COPY src/ ./src/
