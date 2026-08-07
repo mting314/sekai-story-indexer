@@ -28,6 +28,7 @@ RUN pip install --no-cache-dir \
 
 COPY src/ ./src/
 COPY webapp/ ./webapp/
+COPY frontend/dist/ ./frontend/dist/
 # Derived + our-own + metadata ONLY — no story/ (no transcript prose in the image).
 COPY derived_index.json.gz summaries_cache.json events_index.json scene_sources.json glossary.json ./
 

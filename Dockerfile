@@ -31,6 +31,7 @@ RUN pip install --no-cache-dir \
 COPY src/ ./src/
 COPY webapp/ ./webapp/
 COPY story/ ./story/
+COPY frontend/dist/ ./frontend/dist/
 COPY events_index.json story_order.yaml glossary.json summaries_cache.json ./
 
 # Drop privileges.
