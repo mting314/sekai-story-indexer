@@ -2,8 +2,14 @@ import { useState } from 'react';
 import { css } from 'styled-system/css';
 import { proxied } from '~/lib/api';
 import { fmtDate } from '~/lib/format';
+import { eventBadges, type BadgeTone } from '~/lib/freshness';
 import { useStore, useMetaHelpers } from '~/lib/store';
 import type { EventRow } from '~/types/api';
+
+const BADGE_STYLE: Record<BadgeTone, { bg: string; fg: string }> = {
+  new: { bg: '#4ade80', fg: '#052e16' },
+  pending: { bg: 'rgba(250, 204, 21, .22)', fg: '#facc15' }
+};
 
 // A banner-forward event tile (ported/refreshed from the vanilla event-card). Click scopes the
 // Ask tab to this event (indexed events only — pending ones aren't chat-answerable yet).
@@ -16,12 +22,19 @@ export function EventCard({ e }: { e: EventRow }) {
   const focus = charName(e.focus_character_id) ?? e.focus_character;
   const child = eventChildren[e.arc_slug];
   const clickable = e.indexed;
+  const badges = eventBadges(e);
 
   return (
     <button
       type="button"
       disabled={!clickable}
-      title={clickable ? 'Ask about this event' : 'Indexing pending — not chat-answerable yet'}
+      title={
+        !clickable
+          ? 'Indexing pending — not chat-answerable yet'
+          : e.summary_status === 'pending'
+            ? 'Ask about this event — searches the raw transcript (no LLM summary yet)'
+            : 'Ask about this event'
+      }
       onClick={() => { if (clickable) { setScope(e); setTab('ask'); } }}
       className={css({
         position: 'relative', textAlign: 'left', w: 'full', minH: '20', rounded: 'xl', overflow: 'hidden',
@@ -41,6 +54,19 @@ export function EventCard({ e }: { e: EventRow }) {
           <span className={css({ fontVariantNumeric: 'tabular-nums' })}>{fmtDate(e.started_at)}</span>
           {e.nickname && <span className={css({ color: 'accent.text', fontWeight: 'bold' })}>{e.nickname}</span>}
           {e.is_key_story && <span className={css({ color: 'yellow.400' })}>★ key</span>}
+          {badges.map((b) => (
+            <span
+              key={b.tone}
+              title={b.title}
+              className={css({
+                px: '1.5', rounded: 'sm', fontSize: '2xs', fontWeight: 'bold',
+                letterSpacing: 'wide', textTransform: 'uppercase', whiteSpace: 'nowrap'
+              })}
+              style={{ background: BADGE_STYLE[b.tone].bg, color: BADGE_STYLE[b.tone].fg }}
+            >
+              {b.label}
+            </span>
+          ))}
         </div>
         <div className={css({ fontSize: 'sm', fontWeight: 'bold' })}>{e.name}</div>
         {focus && <div className={css({ fontSize: 'xs', color: 'fg.muted' })}>★ {focus}</div>}

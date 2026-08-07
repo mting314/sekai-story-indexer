@@ -14,6 +14,8 @@ export function TimelineTab() {
 
   const shown = activeUnit === 'all' ? events : events.filter((e) => e.unit === activeUnit);
   const indexed = shown.filter((e) => e.indexed).length;
+  // Tier-2 backlog: searchable now, LLM summary still queued (see lib/freshness).
+  const awaitingSummary = shown.filter((e) => e.indexed && e.summary_status === 'pending').length;
 
   return (
     <Stack gap="3">
@@ -21,6 +23,12 @@ export function TimelineTab() {
       <div className={css({ display: 'flex', gap: '4', fontSize: 'xs', color: 'fg.muted' })}>
         <span><span className={css({ display: 'inline-block', w: '2', h: '2', rounded: 'full', mr: '1' })} style={{ background: '#4ade80' }} />queryable in chat ({indexed})</span>
         <span><span className={css({ display: 'inline-block', w: '2', h: '2', rounded: 'full', mr: '1', borderWidth: '1px', borderColor: 'currentColor' })} />indexing pending ({shown.length - indexed})</span>
+        {awaitingSummary > 0 && (
+          <span title="Searchable now; the LLM summary pass hasn’t reached these yet">
+            <span className={css({ display: 'inline-block', w: '2', h: '2', rounded: 'full', mr: '1' })} style={{ background: '#facc15' }} />
+            summary pending ({awaitingSummary})
+          </span>
+        )}
       </div>
       {shown.length === 0 ? (
         <p className={css({ color: 'fg.muted' })}>No events for this filter.</p>

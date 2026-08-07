@@ -25,7 +25,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Header, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -38,18 +38,33 @@ STATIC = HERE / "static"
 # timeline is served LIVE from the master DB (with our enrichment) and cached,
 # rather than frozen at last ingest. TTL default 6h; override via env.
 EVENTS_TTL_SECONDS = int(os.environ.get("SEKAI_EVENTS_TTL", "21600"))
-_cache: dict[str, object] = {"at": 0.0, "rows": None}
+_cache: dict[str, object] = {"at": 0.0, "rows": None, "src": None}
+
+
+def _mtime(path: Path) -> float | None:
+    """``st_mtime`` or None when absent — the invalidation key for every on-disk
+    artifact an ingest run rewrites (index, caches, derived index)."""
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return None
+
+
+def _events_index_path() -> Path:
+    env = os.environ.get("SEKAI_EVENTS_INDEX")
+    cands = (
+        [Path(env)] if env else [Path("events_index.json"), HERE.parent / "events_index.json"]
+    )
+    return next((c for c in cands if c.exists()), cands[-1])
 
 
 def _static_events() -> list[dict]:
     """Fallback: the last on-disk index written by `indexer fetch`."""
-    env = os.environ.get("SEKAI_EVENTS_INDEX")
-    candidates = [Path(env)] if env else [Path("events_index.json"), HERE.parent / "events_index.json"]
-    for path in candidates:
-        if path.exists():
-            rows = json.loads(path.read_text(encoding="utf-8"))
-            rows.sort(key=lambda r: (r.get("started_at", 0), r.get("event_id", 0)))
-            return rows
+    path = _events_index_path()
+    if path.exists():
+        rows = json.loads(path.read_text(encoding="utf-8"))
+        rows.sort(key=lambda r: (r.get("started_at", 0), r.get("event_id", 0)))
+        return rows
     return []
 
 
@@ -62,9 +77,15 @@ def _indexed_event_ids() -> set[int]:
 def load_events() -> list[dict]:
     """Live, cached timeline. Pulls the master tables + our enrichment; annotates
     each row `indexed` (has the ingest pipeline embedded it yet?). Falls back to
-    the static index when the source is unreachable."""
+    the static index when the source is unreachable.
+
+    Cached for the TTL *and* keyed on the on-disk index's mtime, so a `sekai
+    ingest` run that lands new events shows up on the next request instead of up
+    to six hours later (`indexed` is derived from that file)."""
     now = time.time()
-    if _cache["rows"] is not None and now - float(str(_cache["at"])) < EVENTS_TTL_SECONDS:
+    src = _mtime(_events_index_path())
+    fresh = _cache["rows"] is not None and now - float(str(_cache["at"])) < EVENTS_TTL_SECONDS
+    if fresh and _cache["src"] == src:
         return _cache["rows"]  # type: ignore[return-value]
 
     try:
@@ -86,6 +107,7 @@ def load_events() -> list[dict]:
     _overlay_en_titles(rows)
     _cache["rows"] = rows
     _cache["at"] = now
+    _cache["src"] = src
     return rows
 
 
@@ -142,9 +164,77 @@ def units() -> list[dict]:
     return [{"slug": s, "name": UNIT_NAMES.get(s, s)} for s in UNIT_SLUGS]
 
 
+# Freshness window for the timeline's NEW badge: an event counts as new for this
+# many days after the ingest pipeline first saw it (falls back to its release date
+# when there's no ingest state yet).
+NEW_EVENT_DAYS = float(os.environ.get("SEKAI_NEW_EVENT_DAYS", "14"))
+
+_ingest_state_cache: dict[str, Any] = {"key": object(), "state": {}}
+
+
+def _ingest_state_path() -> Path:
+    env = os.environ.get("SEKAI_INGEST_STATE")
+    cands = (
+        [Path(env)] if env else [Path("ingest_state.json"), HERE.parent / "ingest_state.json"]
+    )
+    return next((c for c in cands if c.exists()), cands[-1])
+
+
+def _ingest_state() -> dict:
+    """``ingest_state.json`` as written by `sekai ingest` (first-seen timestamps
+    per event id); ``{}`` when the pipeline has never run here."""
+    path = _ingest_state_path()
+    key = (str(path), _mtime(path))
+    if _ingest_state_cache["key"] != key:
+        try:
+            state = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        except (OSError, ValueError):
+            state = {}
+        _ingest_state_cache.update(key=key, state=state if isinstance(state, dict) else {})
+    return _ingest_state_cache["state"]  # type: ignore[return-value]
+
+
+def _summary_status(row: dict, summaries: dict) -> str:
+    """Where this event sits in the two-tier pipeline:
+
+    ``none`` — no transcript on disk (Tier 1 hasn't reached it); ``pending`` —
+    indexed and queryable, but the Tier-2 LLM pass hasn't summarized it yet;
+    ``complete`` — both tiers done.
+
+    ``indexed`` gates the whole thing: the status is a refinement of "can the app
+    answer about this event", so a stale summary for an unfetched event (possible
+    when the caches and the corpus disagree) never reads as ready."""
+    if not row.get("indexed"):
+        return "none"
+    return "complete" if row.get("arc_slug") in summaries else "pending"
+
+
+def _annotate_freshness(rows: list[dict], *, now: float | None = None) -> list[dict]:
+    """Attach ``summary_status`` + ``is_new`` to timeline rows (non-mutating copies,
+    so the cached `load_events()` list stays a pure source snapshot)."""
+    now = time.time() if now is None else now
+    summaries = _event_summaries_map()
+    first_seen = _ingest_state().get("first_seen") or {}
+    window = NEW_EVENT_DAYS * 86400
+    out = []
+    for row in rows:
+        seen = first_seen.get(str(row.get("event_id")))
+        if not isinstance(seen, (int, float)):
+            # No ingest state for this event -> fall back to its release date, and
+            # never call an unreleased/future event "new".
+            seen = row.get("started_at")
+            seen = seen / 1000 if isinstance(seen, (int, float)) else None
+        out.append({
+            **row,
+            "summary_status": _summary_status(row, summaries),
+            "is_new": bool(seen is not None and 0 <= now - seen < window),
+        })
+    return out
+
+
 @app.get("/api/events")
 def events() -> list[dict]:
-    return load_events()
+    return _annotate_freshness(load_events())
 
 
 _event_children_cache: dict[str, Any] = {"mtime": None, "data": {}}
@@ -578,11 +668,18 @@ def _story_root() -> Path:
     return Path("story")
 
 
-_local_engine: dict[str, object] = {"engine": None}
+_local_engine: dict[str, object] = {"engine": None, "key": None}
 
 
 def _get_local_engine():
-    if _local_engine["engine"] is None:
+    """The built lexical engine, rebuilt when the events index changes.
+
+    Every `sekai ingest` run rewrites ``events_index.json`` (the classify step), so
+    its mtime is a cheap proxy for "the corpus moved" — far cheaper than stat-ing
+    the whole story tree, and it means a newly fetched event becomes answerable
+    without restarting the server."""
+    key = _mtime(_events_index_path())
+    if _local_engine["engine"] is None or _local_engine["key"] != key:
         from sekai_story_indexer.query.local import build_local_engine
 
         # Overlay official-English episode titles onto the index rows before build,
@@ -594,6 +691,7 @@ def _get_local_engine():
         except Exception:  # egress blocked / offline -> keep Japanese labels
             pass
         _local_engine["engine"] = build_local_engine(_story_root(), events)
+        _local_engine["key"] = key
     return _local_engine["engine"]
 
 
@@ -957,24 +1055,31 @@ def _query_full(
 # Retrieves scene refs over the derived index (token counts, no prose) and answers
 # from OUR summaries; the exact quote is fetched LIVE on citation click via
 # /api/scene. Hosts no transcript prose. See docs/derived-hosting.md.
-_derived_cache: dict[str, Any] = {"index": None}
+_derived_cache: dict[str, Any] = {"index": None, "key": None}
+
+
+def _derived_index_path() -> Path | None:
+    env = os.environ.get("SEKAI_DERIVED_INDEX")
+    cands = (
+        [Path(env)] if env
+        else [Path("derived_index.json.gz"), Path("derived_index.json"),
+              HERE.parent / "derived_index.json.gz", HERE.parent / "derived_index.json"]
+    )
+    return next((c for c in cands if c.exists()), None)
 
 
 def _derived_index() -> dict:
-    if _derived_cache["index"] is None:
+    """The prose-free derived index, reloaded when `sekai ingest` rewrites it."""
+    p = _derived_index_path()
+    key = (str(p), _mtime(p)) if p else None
+    if _derived_cache["index"] is None or _derived_cache["key"] != key:
         from sekai_story_indexer.query.derived_index import load_derived_index
 
-        env = os.environ.get("SEKAI_DERIVED_INDEX")
-        cands = (
-            [Path(env)] if env
-            else [Path("derived_index.json.gz"), Path("derived_index.json"),
-                  HERE.parent / "derived_index.json.gz", HERE.parent / "derived_index.json"]
-        )
-        p = next((c for c in cands if c.exists()), None)
         try:
             _derived_cache["index"] = load_derived_index(p) if p else {"scenes": [], "idf": {}, "expansions": []}
         except Exception:
             _derived_cache["index"] = {"scenes": [], "idf": {}, "expansions": []}
+        _derived_cache["key"] = key
     return _derived_cache["index"]  # type: ignore[return-value]
 
 
@@ -1901,6 +2006,49 @@ def proxy_image(u: str) -> Response:
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok", "backend": QUERY_BACKEND, "events": len(load_events())}
+
+
+def reset_caches() -> list[str]:
+    """Drop every in-memory snapshot of an on-disk artifact and return what was
+    cleared. Most caches self-invalidate on mtime; this is the explicit escape
+    hatch for the ones that can't cheaply (the built lexical engine, the derived
+    index) and for forcing a live re-pull of the master DB after an ingest."""
+    cleared = []
+    _cache.update(at=0.0, rows=None, src=None)
+    _en_cache.update(at=0.0, names=None, songs=None, episodes=None)
+    _region_cache.update(at=0.0, times=None)
+    cleared += ["events", "en_titles", "regions"]
+    for cache in (_event_summaries_cache, _conclusions_cache, _resonance_cache,
+                  _ingest_state_cache):
+        cache["key"] = object()
+    cleared += ["summaries", "conclusions", "resonance", "ingest_state"]
+    _event_children_cache.update(mtime=object(), data={})
+    _derived_cache.update(index=None, key=None)
+    _local_engine.update(engine=None, key=None)
+    _scene_text_cache.clear()
+    _scene_sources_cache["map"] = None
+    _official_en_cache["map"] = None
+    cleared += ["event_children", "derived_index", "local_engine", "scene_text",
+                "scene_sources", "official_en"]
+    return cleared
+
+
+@app.post("/api/admin/reload")
+def admin_reload(response: Response, x_admin_token: str = Header("")) -> dict:
+    """Flush the server's caches — the hook an ingest run pings so a long-lived
+    deployment picks up new events/summaries without a restart.
+
+    Unauthenticated by default (the app is read-only and this only drops caches);
+    set ``SEKAI_ADMIN_TOKEN`` to require a matching ``X-Admin-Token`` header.
+
+    Drops only — it deliberately does NOT repopulate. Rebuilding here would make
+    the call block on a live master-DB pull (tens of seconds) and time out the
+    ingest run's ping; the next real request warms things lazily instead."""
+    token = os.environ.get("SEKAI_ADMIN_TOKEN", "")
+    if token and x_admin_token != token:
+        response.status_code = 403
+        return {"status": "forbidden"}
+    return {"status": "ok", "cleared": reset_caches()}
 
 
 # ``/static`` still serves shared assets the frontend depends on: meta.json (character/unit

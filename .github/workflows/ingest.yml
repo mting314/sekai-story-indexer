@@ -1,0 +1,110 @@
+name: Ingest
+
+# Scheduled "catch up with the game" run. Project Sekai ships a new event roughly
+# every 15 days, so a nightly Tier-1 pass keeps the timeline and the lexical
+# backend current without anyone remembering to run anything.
+#
+# Tier 1 (fetch → link → lyric map → classify → derived index) is keyless and is
+# what makes a brand-new event queryable. Tier 2 (summaries → conclusions →
+# resonance) only runs when GOOGLE_API_KEY is configured as a repo secret, and is
+# rate-budgeted by `--batch-limit` so a backlog drains a few events per night
+# instead of tripping the spend cap.
+#
+# The story corpus itself is copyrighted game text and is NOT committed (see
+# .gitignore); it lives in the Actions cache between runs so each night only
+# downloads the delta. Only OUR derived artifacts get committed back.
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # 04:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      with_llm:
+        description: "Also run Tier 2 (needs GOOGLE_API_KEY secret)"
+        type: boolean
+        default: false
+      batch_limit:
+        description: "Max NEW items per Tier 2 pass"
+        type: string
+        default: "5"
+      cards_and_areas:
+        description: "Also fetch card side-stories + area conversations (slow)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ingest-${{ github.ref }}
+  cancel-in-progress: false # never interrupt a half-written cache/commit
+
+permissions:
+  contents: write
+
+jobs:
+  ingest:
+    name: sekai ingest
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --extra web
+
+      # Incremental corpus: restore the previous run's story tree so `--skip-existing`
+      # only downloads new episodes. Never fatal if the cache is cold (first run
+      # just fetches everything).
+      - name: Restore story corpus
+        id: corpus
+        uses: actions/cache/restore@v4
+        with:
+          path: story
+          key: story-corpus-${{ github.run_id }}
+          restore-keys: story-corpus-
+
+      - name: Run ingestion
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          uv run sekai ingest \
+            --skip-existing \
+            --batch-limit "${{ inputs.batch_limit || '5' }}" \
+            ${{ (inputs.cards_and_areas && '--cards --areas') || '--no-cards --no-areas' }} \
+            ${{ (inputs.with_llm && secrets.GOOGLE_API_KEY && '--with-llm') || '' }}
+
+      - name: Save story corpus
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: story
+          key: story-corpus-${{ github.run_id }}
+
+      # Only our generated/derived artifacts — the transcripts stay out of git.
+      - name: Commit refreshed indexes
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- events_index.json story_order.yaml scene_sources.json \
+                     derived_index.json.gz lyric_page_map.json ingest_state.json \
+                     summaries_cache.json conclusions_cache.json resonance_cache.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no index changes"
+            exit 0
+          fi
+          git commit -m "chore(ingest): refresh indexes $(date -u +%Y-%m-%d)"
+          git push
+
+      # Nudge a long-lived deployment to drop its caches. No-op unless the repo
+      # sets SEKAI_RELOAD_URL (plus SEKAI_ADMIN_TOKEN if the endpoint is guarded).
+      - name: Ping deployment to reload
+        if: vars.SEKAI_RELOAD_URL != ''
+        env:
+          SEKAI_ADMIN_TOKEN: ${{ secrets.SEKAI_ADMIN_TOKEN }}
+        run: |
+          curl -fsS -X POST "${{ vars.SEKAI_RELOAD_URL }}" \
+            ${SEKAI_ADMIN_TOKEN:+-H "X-Admin-Token: $SEKAI_ADMIN_TOKEN"} || \
+            echo "reload ping failed (non-fatal)"
