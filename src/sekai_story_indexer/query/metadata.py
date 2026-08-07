@@ -141,36 +141,109 @@ def metadata_answer(question: str, events_index: list[dict], characters: dict, s
     return _pack(text, picks, summaries)
 
 
+import difflib
+
+
+def _clean_str(s: str) -> str:
+    s = s.lower()
+    s = re.sub(r"[^\w\s]", " ", s)
+    return " ".join(s.split())
+
+
+def resolve_event_by_title(query: str, events_index: list[dict], threshold: float = 0.55) -> dict | None:
+    """Resolve a query or event reference string to an event using exact, substring,
+    and fuzzy matching against event names (English, JP), romaji slugs, and nicknames."""
+    if not query or not query.strip():
+        return None
+
+    q_clean = _clean_str(query)
+    if not q_clean:
+        return None
+
+    best_match: dict | None = None
+    best_score: float = 0.0
+
+    for e in events_index:
+        candidates = []
+        if e.get("nickname"):
+            candidates.append(e["nickname"])
+        if e.get("name"):
+            candidates.append(e["name"])
+        if e.get("name_jp"):
+            candidates.append(e["name_jp"])
+        if e.get("arc_slug"):
+            # e.g. "0020-resonate-with-you" -> "resonate with you"
+            slug_words = re.sub(r"^\d+-", "", e["arc_slug"]).replace("-", " ")
+            candidates.append(slug_words)
+
+        for cand in candidates:
+            if not cand:
+                continue
+            cand_clean = _clean_str(cand)
+            if not cand_clean:
+                continue
+
+            if q_clean == cand_clean:
+                return e
+
+            if len(q_clean) >= 3 and len(cand_clean) >= 3:
+                if q_clean in cand_clean:
+                    score = 0.85 + (len(q_clean) / len(cand_clean)) * 0.14
+                    if score > best_score:
+                        best_score = score
+                        best_match = e
+                elif cand_clean in q_clean:
+                    score = 0.80 + (len(cand_clean) / len(q_clean)) * 0.14
+                    if score > best_score:
+                        best_score = score
+                        best_match = e
+
+            ratio = difflib.SequenceMatcher(None, q_clean, cand_clean).ratio()
+            if ratio > best_score:
+                best_score = ratio
+                best_match = e
+
+    if best_score >= threshold:
+        return best_match
+    return None
+
+
 def resolve_focus_reference(question: str, events_index: list[dict], characters: dict) -> dict | None:
     """Resolve a focus-event REFERENCE in a (content) question to a single event, so
     the RAG can be pointed at it. Handles a bare nickname ('saki1', 'kasa5',
-    'wl2-4') or 'X's <ordinal|last> focus event'. Returns the event dict or None."""
+    'wl2-4'), 'X's <ordinal|last> focus event', or event titles (exact/fuzzy)."""
     by_nick = {(e.get("nickname") or "").lower(): e for e in events_index if e.get("nickname")}
     for m in _NICK_RE.finditer(question):
         e = by_nick.get(m.group(1).lower())
         if e:
             return e
-    if not _FOCUS_RE.search(question):
-        return None
-    q = question.lower()
-    cid = _resolve_char(q, characters)
-    if cid is None:
-        return None
-    events = sorted(
-        (e for e in events_index if e.get("focus_character_id") == cid),
-        key=lambda e: (e.get("focus_index") or 0, e.get("started_at") or 0),
-    )
-    if not events:
-        return None
-    ordinal = next((v for k, v in _ORDINALS.items() if re.search(rf"\b{k}\b", q)), None)
-    if ordinal:
-        return events[ordinal - 1] if ordinal <= len(events) else None
-    if any(w in q for w in _LAST):
-        return events[-1]
-    # singular "X's focus event" with no ordinal -> default to the first
-    if re.search(r"focus event\b", q) and not re.search(r"focus events\b", q):
-        return events[0]
-    return None
+
+    if _FOCUS_RE.search(question):
+        q = question.lower()
+        cid = _resolve_char(q, characters)
+        if cid is not None:
+            events = sorted(
+                (e for e in events_index if e.get("focus_character_id") == cid),
+                key=lambda e: (e.get("focus_index") or 0, e.get("started_at") or 0),
+            )
+            if events:
+                ordinal = next((v for k, v in _ORDINALS.items() if re.search(rf"\b{k}\b", q)), None)
+                if ordinal:
+                    return events[ordinal - 1] if ordinal <= len(events) else None
+                if any(w in q for w in _LAST):
+                    return events[-1]
+                if re.search(r"focus event\b", q) and not re.search(r"focus events\b", q):
+                    return events[0]
+
+    # Clean out command/question lead-in verbs to isolate event title queries
+    clean_q = re.sub(
+        r"^(summar(?:y|ize|ise)|recap|overview|tl;?dr|synops(?:is|e)?|what happen(?:s|ed)? (?:in|during)|tell me about|lines|characters|song|scope)\s+",
+        "",
+        question,
+        flags=re.IGNORECASE,
+    ).strip()
+
+    return resolve_event_by_title(clean_q or question, events_index)
 
 
 def _pack(text: str, picks: list[dict], summaries: dict, single: bool = False) -> dict:

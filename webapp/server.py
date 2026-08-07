@@ -1484,26 +1484,30 @@ def _command_response(text: str, *, backend: str = "command", citations: list | 
 
 def _resolve_event_ref(arg: str, events: list[dict], characters: dict) -> dict | None:
     """Resolve a command's <event> arg to an event. Accepts a nickname (`mino7`),
-    `X's Nth focus event`, or the terse `<character> <N>` form (`minori 7`)."""
-    from sekai_story_indexer.query.metadata import _resolve_char, resolve_focus_reference
+    `X's Nth focus event`, the terse `<character> <N>` form (`minori 7`), or event titles (exact/fuzzy)."""
+    from sekai_story_indexer.query.metadata import (
+        _resolve_char,
+        resolve_event_by_title,
+        resolve_focus_reference,
+    )
 
     ev = resolve_focus_reference(arg, events, characters)
     if ev:
         return ev
     # terse "<character> <N>" — resolve the character, then its Nth focus event.
     m = re.search(r"(\d+)\s*$", arg)
-    if not m:
-        return None
-    n = int(m.group(1))
-    cid = _resolve_char(arg.lower(), characters)
-    if cid is None:
-        return None
-    matches = sorted(
-        (e for e in events if e.get("focus_character_id") == cid),
-        key=lambda e: (e.get("focus_index") or 0, e.get("started_at") or 0),
-    )
-    exact = next((e for e in matches if e.get("focus_index") == n), None)
-    return exact or (matches[n - 1] if 0 < n <= len(matches) else None)
+    if m:
+        n = int(m.group(1))
+        cid = _resolve_char(arg.lower(), characters)
+        if cid is not None:
+            matches = sorted(
+                (e for e in events if e.get("focus_character_id") == cid),
+                key=lambda e: (e.get("focus_index") or 0, e.get("started_at") or 0),
+            )
+            exact = next((e for e in matches if e.get("focus_index") == n), None)
+            if exact or (0 < n <= len(matches)):
+                return exact or matches[n - 1]
+    return resolve_event_by_title(arg, events)
 
 
 def _resolve_command_event(arg: str, req: CommandRequest) -> dict | None:
