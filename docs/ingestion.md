@@ -65,8 +65,20 @@ request rather than after the 6h timeline TTL.
 `POST /api/admin/reload` is the explicit hammer (it also forces the next request
 to re-pull the master DB). It drops caches only and returns immediately —
 repopulating inline would block the caller on a multi-second live pull.
-Unauthenticated by default; set `SEKAI_ADMIN_TOKEN` to require a matching
-`X-Admin-Token` header.
+
+A flush is **not** free: it costs a ~3s engine rebuild plus a live master-DB pull
+on the next request, so an open endpoint is a cheap amplification lever. Access
+is therefore closed by default for anyone off-box:
+
+| `SEKAI_ADMIN_TOKEN` | Who may flush |
+|---|---|
+| unset | loopback only (`127.0.0.1`, `::1`) — local dev and a same-host ingest need no config |
+| set | any host presenting a matching `X-Admin-Token`; no loopback bypass |
+
+Calls are also rate-limited to one per `SEKAI_ADMIN_RELOAD_COOLDOWN` seconds
+(default 5, `0` disables) — excess calls get `429` with a `retry_after`. A refused
+call doesn't start the cooldown, so a rejected caller can't lock out a legitimate
+one.
 
 ```bash
 sekai ingest --reload-url http://127.0.0.1:8000/api/admin/reload

@@ -184,6 +184,18 @@ def test_load_events_reruns_when_the_index_file_changes(srv, tmp_path, monkeypat
     assert srv.load_events() is not first, "a new mtime invalidates the snapshot"
 
 
+def _reload_client(srv, host="127.0.0.1"):
+    """A TestClient with a controllable peer address (the endpoint is loopback-only
+    unless a token is configured)."""
+    return TestClient(srv.app, client=(host, 12345))
+
+
+@pytest.fixture(autouse=True)
+def _no_reload_cooldown(monkeypatch):
+    """Tests exercise the cooldown explicitly; elsewhere it just adds flakiness."""
+    monkeypatch.setenv("SEKAI_ADMIN_RELOAD_COOLDOWN", "0")
+
+
 def test_admin_reload_clears_caches(srv, tmp_path, monkeypatch):
     rows = [{"event_id": 1, "arc_slug": "0001-a", "indexed": True}]
     _write_index(tmp_path, rows)
@@ -192,24 +204,73 @@ def test_admin_reload_clears_caches(srv, tmp_path, monkeypatch):
     monkeypatch.setattr(
         srv, "load_events", lambda: (_ for _ in ()).throw(AssertionError("must not reload"))
     )
-    client = TestClient(srv.app)
 
-    body = client.post("/api/admin/reload").json()
+    body = _reload_client(srv).post("/api/admin/reload").json()
     assert body["status"] == "ok"
     assert {"events", "summaries", "local_engine", "derived_index"} <= set(body["cleared"])
     assert srv._local_engine["engine"] is None
     assert srv._derived_cache["index"] is None
 
 
+def test_admin_reload_is_loopback_only_without_a_token(srv, tmp_path):
+    """A flush costs an engine rebuild + a live master-DB pull, so an open endpoint
+    is an amplification lever. Off-box callers are refused unless a token is set."""
+    _write_index(tmp_path, [{"event_id": 1, "arc_slug": "0001-a", "indexed": True}])
+
+    assert _reload_client(srv).post("/api/admin/reload").status_code == 200
+    remote = _reload_client(srv, host="203.0.113.5").post("/api/admin/reload")
+    assert remote.status_code == 403
+    assert "SEKAI_ADMIN_TOKEN" in remote.json()["reason"]
+
+
 def test_admin_reload_honours_a_configured_token(srv, tmp_path, monkeypatch):
     monkeypatch.setenv("SEKAI_ADMIN_TOKEN", "s3cret")
     _write_index(tmp_path, [{"event_id": 1, "arc_slug": "0001-a", "indexed": True}])
-    client = TestClient(srv.app)
+    client = _reload_client(srv)
 
     assert client.post("/api/admin/reload").json()["status"] == "forbidden"
     assert client.post("/api/admin/reload", headers={"X-Admin-Token": "wrong"}).status_code == 403
     ok = client.post("/api/admin/reload", headers={"X-Admin-Token": "s3cret"})
     assert ok.status_code == 200 and ok.json()["status"] == "ok"
+
+
+def test_a_token_admits_a_remote_caller(srv, tmp_path, monkeypatch):
+    monkeypatch.setenv("SEKAI_ADMIN_TOKEN", "s3cret")
+    _write_index(tmp_path, [{"event_id": 1, "arc_slug": "0001-a", "indexed": True}])
+    resp = _reload_client(srv, host="203.0.113.5").post(
+        "/api/admin/reload", headers={"X-Admin-Token": "s3cret"}
+    )
+    assert resp.status_code == 200
+
+
+def test_a_token_makes_loopback_present_it_too(srv, tmp_path, monkeypatch):
+    """Once a token is configured it applies everywhere — no loopback bypass."""
+    monkeypatch.setenv("SEKAI_ADMIN_TOKEN", "s3cret")
+    _write_index(tmp_path, [{"event_id": 1, "arc_slug": "0001-a", "indexed": True}])
+    assert _reload_client(srv).post("/api/admin/reload").status_code == 403
+
+
+def test_admin_reload_is_rate_limited(srv, tmp_path, monkeypatch):
+    """Repeated flushes would keep the caches permanently cold."""
+    monkeypatch.setenv("SEKAI_ADMIN_RELOAD_COOLDOWN", "60")
+    _write_index(tmp_path, [{"event_id": 1, "arc_slug": "0001-a", "indexed": True}])
+    srv._last_reload["at"] = 0.0
+    client = _reload_client(srv)
+
+    assert client.post("/api/admin/reload").status_code == 200
+    throttled = client.post("/api/admin/reload")
+    assert throttled.status_code == 429
+    assert 0 < throttled.json()["retry_after"] <= 60
+
+
+def test_throttling_does_not_apply_to_a_refused_call(srv, tmp_path, monkeypatch):
+    """A rejected caller must not be able to start the cooldown for everyone else."""
+    monkeypatch.setenv("SEKAI_ADMIN_RELOAD_COOLDOWN", "60")
+    _write_index(tmp_path, [{"event_id": 1, "arc_slug": "0001-a", "indexed": True}])
+    srv._last_reload["at"] = 0.0
+
+    assert _reload_client(srv, host="203.0.113.5").post("/api/admin/reload").status_code == 403
+    assert _reload_client(srv).post("/api/admin/reload").status_code == 200
 
 
 def test_local_engine_rebuilds_after_the_index_changes(srv, tmp_path):

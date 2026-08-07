@@ -567,6 +567,11 @@ def _notify_reload(url: str) -> str:
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 - operator-supplied URL
             return f"reload {url}: HTTP {resp.status}"
+    except urllib.error.HTTPError as exc:
+        # The server answered and refused — 403 (loopback-only / bad token) and 429
+        # (cooldown) are actionable, so don't bury them under "not running".
+        hint = {403: " — set SEKAI_ADMIN_TOKEN on both sides", 429: " — cooldown, try later"}
+        return f"reload {url}: HTTP {exc.code}{hint.get(exc.code, '')}"
     except (urllib.error.URLError, OSError) as exc:
         return f"reload {url} failed (server not running?): {exc}"
 

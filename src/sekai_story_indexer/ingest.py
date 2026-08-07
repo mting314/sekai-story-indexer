@@ -181,9 +181,17 @@ def update_ingest_state(
     A first run over an existing corpus sees *every* event at once. Flagging all
     of them as new would light up the whole timeline for the freshness window, so
     a baseline run is stamped from release dates and announces nothing.
+
+    An empty/missing index means the run learned nothing, and the state file is
+    left completely untouched: writing a baseline marker for zero events would
+    make the *next* (real) run look incremental, so it would stamp the entire
+    catalogue at ``now`` and badge all of it NEW — the exact failure the baseline
+    rule exists to prevent.
     """
     now = time.time() if now is None else now
     rows = json.loads(events_index.read_text(encoding="utf-8")) if events_index.exists() else []
+    if not rows:
+        return []
     prior = None
     if state_path.exists():
         try:

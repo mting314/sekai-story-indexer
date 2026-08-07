@@ -1,14 +1,16 @@
-"""The `sekai ingest` pipeline runner + its ingest-state bookkeeping.
+"""The `sekai ingest` pipeline: runner, step bodies, and ingest-state bookkeeping.
 
-Everything here is offline: the runner is exercised with synthetic steps, and the
-pipeline shape is asserted structurally (names/order/required-ness) rather than by
-running the real network stages.
+Everything here is offline. The runner is exercised with synthetic steps; the step
+*bodies* run for real with their network dependencies injected, so a typo in the
+wiring fails here rather than at 4am in the scheduled job.
 """
 
+import inspect
 import json
 
 import pytest
 
+from sekai_story_indexer import ingest as ing
 from sekai_story_indexer.ingest import (
     IngestConfig,
     Step,
@@ -122,6 +124,164 @@ def test_unit_stories_are_opt_in():
     ]
 
 
+# --- step bodies ----------------------------------------------------------
+#
+# build_pipeline() only asserts shape, so without these a typo inside a step body
+# would ship green. Each step runs for real with its network dependency injected.
+
+
+@pytest.fixture
+def cfg(tmp_path):
+    return IngestConfig(
+        story_root=tmp_path / "story",
+        events_index=tmp_path / "events_index.json",
+        content_parents=tmp_path / "content_parents.json",
+        lyric_map=tmp_path / "lyric_page_map.json",
+        derived_index=tmp_path / "derived_index.json.gz",
+        state_path=tmp_path / "ingest_state.json",
+    )
+
+
+def test_fetch_step_forwards_limit_and_skip_existing(cfg, monkeypatch):
+    seen = {}
+
+    def fake(story_root, **kw):
+        seen.update(story_root=story_root, **kw)
+        return ["plan-a", "plan-b"]
+
+    monkeypatch.setattr("sekai_story_indexer.source.fetcher.fetch_and_write", fake)
+    cfg.limit_events = 3
+    assert "2 events" in ing._fetch_events(cfg)
+    assert seen["story_root"] == cfg.story_root
+    assert seen["limit"] == 3 and seen["skip_existing"] is True
+    assert seen["log"]("noise") is None, "per-episode chatter is silenced"
+
+
+def test_fetch_step_passes_no_limit_for_zero(cfg, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        "sekai_story_indexer.source.fetcher.fetch_and_write",
+        lambda story_root, **kw: (seen.update(kw), [])[1],
+    )
+    ing._fetch_events(cfg)
+    assert seen["limit"] is None, "0 means 'all', not 'fetch nothing'"
+
+
+@pytest.mark.parametrize(
+    "body,target,detail",
+    [
+        (ing._fetch_unit_stories, "fetch_unit_stories", "7 unit-story episodes"),
+        (ing._fetch_cards, "fetch_card_stories", "7 card-story episodes"),
+        (ing._fetch_areas, "fetch_area_conversations", "7 area-conversation talks"),
+    ],
+)
+def test_corpus_fetch_steps_report_their_counts(cfg, monkeypatch, body, target, detail):
+    monkeypatch.setattr(f"sekai_story_indexer.source.fetcher.{target}", lambda *a, **k: 7)
+    assert detail in body(cfg)
+
+
+def test_link_content_writes_the_parents_file(cfg, monkeypatch):
+    doc = {"cards": {"1": {}, "2": {}}, "areas": {"9": {}}}
+    for name in ("cards", "event_cards", "action_sets", "release_conditions",
+                 "event_stories", "events"):
+        monkeypatch.setattr(f"sekai_story_indexer.source.client.{name}", lambda: [])
+    for name in ("build_card_parent_map", "build_area_event_map"):
+        monkeypatch.setattr(f"sekai_story_indexer.source.transform.{name}", lambda *a, **k: {})
+    monkeypatch.setattr(
+        "sekai_story_indexer.source.transform.build_content_parents", lambda *a, **k: doc
+    )
+    assert ing._link_content(cfg) == "2 cards + 1 area talks linked"
+    assert json.loads(cfg.content_parents.read_text()) == doc
+
+
+def test_build_lyric_map_writes_meta_and_sorted_map(cfg, monkeypatch):
+    monkeypatch.setattr(
+        "sekai_story_indexer.source.client.musics", lambda: [{"id": 2}, {"id": 1}, {"id": "x"}]
+    )
+    monkeypatch.setattr("sekai_story_indexer.source.client.sekaipedia_song_pages", lambda: [])
+    monkeypatch.setattr(
+        "sekai_story_indexer.source.transform.build_lyric_page_map",
+        lambda rows, known: {"mapping": {2: 22, 1: 11}, "missing": [3], "extra": []},
+    )
+    assert ing._build_lyric_map(cfg) == "2/2 songs mapped"
+    doc = json.loads(cfg.lyric_map.read_text())
+    assert list(doc["map"]) == ["1", "2"], "stable ordering keeps the commit diff clean"
+    assert doc["_meta"]["missing"] == [3]
+
+
+def test_classify_rewrites_the_index_in_place(cfg):
+    cfg.events_index.write_text(
+        json.dumps([{"event_id": 1, "name": "a"}, {"event_id": 2, "name": "b"}]), encoding="utf-8"
+    )
+    detail = ing._classify(cfg)
+    rows = json.loads(cfg.events_index.read_text())
+    assert all("plot_weight" in r for r in rows)
+    assert all(r["name"] for r in rows), "classify must not drop existing fields"
+    assert "2 events" in detail
+
+
+def test_build_index_step_forwards_its_paths(cfg, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        "sekai_story_indexer.query.derived_index.build_index_file",
+        lambda story_root, **kw: (seen.update(story_root=story_root, **kw), kw["out_path"])[1],
+    )
+    assert str(cfg.derived_index) in ing._build_index(cfg)
+    assert seen["story_root"] == cfg.story_root
+    assert seen["events_index_path"] == cfg.events_index
+
+
+def test_record_state_step_reports_new_events(cfg):
+    cfg.events_index.write_text(json.dumps([{"event_id": 1}]), encoding="utf-8")
+    assert ing._record_state(cfg) == "no new events", "the first run is a baseline"
+    cfg.events_index.write_text(json.dumps([{"event_id": 1}, {"event_id": 2}]), encoding="utf-8")
+    assert ing._record_state(cfg) == "1 new event(s): [2]"
+
+
+# --- Tier 2 wiring --------------------------------------------------------
+#
+# The Tier-2 steps call Typer command functions directly, whose defaults are
+# OptionInfo objects. If a command gains a parameter and ingest.py isn't updated,
+# an OptionInfo silently arrives where a value belongs. Pin the signatures.
+
+TIER2 = [("_summarize", "summarize"), ("_conclusions", "conclusions"), ("_resonance", "resonance")]
+
+
+@pytest.mark.parametrize("body_name,cli_name", TIER2)
+def test_tier2_steps_pass_every_cli_parameter(cfg, monkeypatch, body_name, cli_name):
+    import typer
+
+    from sekai_story_indexer import localcli
+
+    expected = set(inspect.signature(getattr(localcli, cli_name)).parameters)
+    captured: dict = {}
+    monkeypatch.setattr(localcli, cli_name, lambda **kw: captured.update(kw))
+
+    getattr(ing, body_name)(cfg)
+
+    missing = expected - set(captured)
+    assert not missing, (
+        f"localcli.{cli_name} gained {sorted(missing)}; ingest.{body_name} must pass "
+        f"it explicitly or Typer's OptionInfo default leaks in as a value"
+    )
+    leaked = [k for k, v in captured.items() if isinstance(v, typer.models.OptionInfo)]
+    assert not leaked, f"OptionInfo passed as a value for {leaked}"
+
+
+@pytest.mark.parametrize("body_name,cli_name", TIER2)
+def test_tier2_steps_are_resumable_and_batch_capped(cfg, monkeypatch, body_name, cli_name):
+    """--batch-limit is the spend-cap knob; skip_existing is what makes a capped
+    run resumable instead of a partial rewrite."""
+    from sekai_story_indexer import localcli
+
+    captured: dict = {}
+    monkeypatch.setattr(localcli, cli_name, lambda **kw: captured.update(kw))
+    cfg.batch_limit = 3
+    getattr(ing, body_name)(cfg)
+    assert captured["limit"] == 3
+    assert captured["skip_existing"] is True
+
+
 # --- ingest state ---------------------------------------------------------
 
 
@@ -187,10 +347,32 @@ def test_corrupt_state_file_is_treated_as_a_fresh_baseline(tmp_path):
     assert json.loads(state_path.read_text())["first_seen"] == {"7": 5.0}
 
 
-def test_missing_events_index_is_not_fatal(tmp_path):
+def test_missing_events_index_is_not_fatal_and_writes_nothing(tmp_path):
     state_path = tmp_path / "ingest_state.json"
     assert update_ingest_state(tmp_path / "nope.json", state_path, now=5.0) == []
-    assert json.loads(state_path.read_text())["first_seen"] == {}
+    assert not state_path.exists(), "a run that learned nothing must not stamp state"
+
+
+def test_an_empty_index_cannot_poison_the_next_real_run(tmp_path):
+    """Regression: writing a baseline marker for zero events made the NEXT run look
+    incremental, so it stamped the whole catalogue at `now` and badged it all NEW —
+    exactly what the baseline rule exists to prevent."""
+    idx = tmp_path / "events_index.json"
+    state_path = tmp_path / "ingest_state.json"
+
+    idx.write_text("[]", encoding="utf-8")
+    assert update_ingest_state(idx, state_path, now=1_000_000.0) == []
+    assert not state_path.exists()
+
+    # The first run with real data is still treated as the baseline: backdated,
+    # nothing announced.
+    idx.write_text(
+        json.dumps([{"event_id": i, "started_at": 100_000} for i in range(3)]), encoding="utf-8"
+    )
+    assert update_ingest_state(idx, state_path, now=2_000_000.0) == []
+    doc = json.loads(state_path.read_text())
+    assert doc["baseline"] is True
+    assert set(doc["first_seen"].values()) == {100.0}, "backdated, not stamped at now"
 
 
 # --- CLI wiring -----------------------------------------------------------

@@ -90,7 +90,10 @@ network side-quests and all of Tier 2 log and continue — a missing key is norm
   back catalogue.
 * Server caches are mtime-keyed (events index, summary caches, derived index,
   built lexical engine), so a run lands without a restart. `POST
-  /api/admin/reload` is the explicit flush (guard with `SEKAI_ADMIN_TOKEN`).
+  /api/admin/reload` is the explicit flush. A flush costs an engine rebuild + a
+  live master-DB pull, so it's **loopback-only unless `SEKAI_ADMIN_TOKEN` is set**
+  (then token-required everywhere, no loopback bypass) and rate-limited by
+  `SEKAI_ADMIN_RELOAD_COOLDOWN` (default 5s).
 * Schedulers: `.github/workflows/ingest.yml` (nightly, Tier 1, corpus in the
   Actions cache — transcripts are never committed) and `scripts/run_ingestion.py`
   (env-driven, for cron/launchd).
@@ -168,7 +171,7 @@ Note: the **pytest** job does not build the frontend, so `test_index_html_served
 - Fetch is resilient (retries IncompleteRead) + resumable (`--skip-existing`).
 
 ## Tests
-CI runs the **full** suite (`uv run pytest -q`) — **520 passing**. chromadb is
+CI runs the **full** suite (`uv run pytest -q`) — **542 passing**. chromadb is
 installed in CI, so the inherited linkura tests collect + run too; **run the full
 `uv run pytest` locally before pushing, not just a Sekai subset** (a subset-only
 run once missed a `test_database.py` break that CI caught). Sekai-specific files:

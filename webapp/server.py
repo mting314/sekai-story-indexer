@@ -25,7 +25,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Header, Response
+from fastapi import FastAPI, Header, Request, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -2033,21 +2033,55 @@ def reset_caches() -> list[str]:
     return cleared
 
 
+_LOOPBACK = {"127.0.0.1", "::1"}
+_last_reload: dict[str, float] = {"at": 0.0}
+
+
+def _reload_denial(client_host: str | None, x_admin_token: str) -> str:
+    """``""`` when the caller may flush, else the reason.
+
+    A flush is NOT free: dropping the engine forces a ~3s rebuild and dropping
+    the events cache forces a live master-DB pull on the next request, so an open
+    endpoint is a cheap amplification lever, not a harmless no-op. Closed by
+    default for anyone off-box:
+
+    * ``SEKAI_ADMIN_TOKEN`` set -> require a matching ``X-Admin-Token``, any host.
+    * unset -> loopback only, so local dev and a same-host ingest run need no
+      config while a public deployment is shut by default.
+    """
+    token = os.environ.get("SEKAI_ADMIN_TOKEN", "")
+    if token:
+        return "" if x_admin_token == token else "bad or missing X-Admin-Token"
+    if client_host in _LOOPBACK:
+        return ""
+    return "remote reload requires SEKAI_ADMIN_TOKEN to be configured"
+
+
 @app.post("/api/admin/reload")
-def admin_reload(response: Response, x_admin_token: str = Header("")) -> dict:
+def admin_reload(request: Request, response: Response, x_admin_token: str = Header("")) -> dict:
     """Flush the server's caches — the hook an ingest run pings so a long-lived
     deployment picks up new events/summaries without a restart.
 
-    Unauthenticated by default (the app is read-only and this only drops caches);
-    set ``SEKAI_ADMIN_TOKEN`` to require a matching ``X-Admin-Token`` header.
+    Loopback-only unless ``SEKAI_ADMIN_TOKEN`` is set (see :func:`_reload_denial`),
+    and rate-limited by ``SEKAI_ADMIN_RELOAD_COOLDOWN`` seconds (default 5, 0
+    disables) so repeated calls can't be used to keep the caches permanently cold.
 
     Drops only — it deliberately does NOT repopulate. Rebuilding here would make
     the call block on a live master-DB pull (tens of seconds) and time out the
     ingest run's ping; the next real request warms things lazily instead."""
-    token = os.environ.get("SEKAI_ADMIN_TOKEN", "")
-    if token and x_admin_token != token:
+    denial = _reload_denial(request.client.host if request.client else None, x_admin_token)
+    if denial:
         response.status_code = 403
-        return {"status": "forbidden"}
+        return {"status": "forbidden", "reason": denial}
+
+    cooldown = float(os.environ.get("SEKAI_ADMIN_RELOAD_COOLDOWN", "5"))
+    now = time.time()
+    waited = now - _last_reload["at"]
+    if cooldown and waited < cooldown:
+        response.status_code = 429
+        return {"status": "throttled", "retry_after": round(cooldown - waited, 2)}
+
+    _last_reload["at"] = now
     return {"status": "ok", "cleared": reset_caches()}
 
 
