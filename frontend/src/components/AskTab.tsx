@@ -10,7 +10,7 @@ import { useSidebar } from '~/components/Sidebar';
 import { AssistantAnswer } from '~/components/ask/AssistantAnswer';
 import type { Focus, QueryResult, SlashCommand } from '~/types/api';
 
-interface Msg { id: number; role: 'user' | 'assistant' | 'system'; text?: string; result?: QueryResult; streaming?: boolean }
+interface Msg { id: number; role: 'user' | 'assistant' | 'system'; text?: string; result?: QueryResult; streaming?: boolean; isCommand?: boolean }
 
 const QUICK_ACTIONS = [
   { label: 'Summarize this event', q: 'Summarize this event.' },
@@ -83,7 +83,8 @@ export function AskTab() {
     lastQuery.current = q;
 
     const asstId = nextId();
-    setMessages((ms) => [...ms, { id: nextId(), role: 'user', text: q }, { id: asstId, role: 'assistant', streaming: true, text: '' }]);
+    const isCmd = q.startsWith('/');
+    setMessages((ms) => [...ms, { id: nextId(), role: 'user', text: q }, { id: asstId, role: 'assistant', streaming: true, text: '', isCommand: isCmd }]);
     setInput('');
     if (taRef.current) taRef.current.style.height = 'auto';
 
@@ -241,10 +242,11 @@ function MessageBubble({ m, onCite }: { m: Msg; onCite: (ref: number) => void })
     return <div className={css({ alignSelf: 'center', fontSize: 'xs', color: 'fg.muted', fontStyle: 'italic' })}>{m.text}</div>;
   }
   // assistant
+  const placeholder = m.isCommand ? 'Loading…' : 'Thinking…';
   return (
     <div className={css({ alignSelf: 'flex-start', maxW: '95%', px: '3', py: '2', rounded: 'lg', bg: 'bg.subtle', borderWidth: '1px', borderColor: 'border.subtle' })}>
       {m.streaming || !m.result
-        ? <div className={css({ fontSize: 'sm', whiteSpace: 'pre-wrap', color: m.text ? 'fg.default' : 'fg.muted' })}>{m.text || 'Thinking…'}</div>
+        ? <div className={css({ fontSize: 'sm', whiteSpace: 'pre-wrap', color: m.text ? 'fg.default' : 'fg.muted' })}>{m.text || placeholder}</div>
         : <AssistantAnswer res={m.result} onCite={onCite} />}
     </div>
   );
