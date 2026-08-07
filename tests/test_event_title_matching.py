@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+
 from sekai_story_indexer.query.metadata import resolve_event_by_title, resolve_focus_reference
 
 

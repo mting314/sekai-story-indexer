@@ -16,6 +16,7 @@ its community nickname is <abbrev><index>, e.g. saki1.
 from __future__ import annotations
 
 import datetime
+import difflib
 import re
 
 _ORDINALS = {
@@ -139,9 +140,6 @@ def metadata_answer(question: str, events_index: list[dict], characters: dict, s
     body = "\n".join(line(i, e) for i, e in enumerate(picks, 1))
     text = f"{head}\n{body}"
     return _pack(text, picks, summaries)
-
-
-import difflib
 
 
 def _clean_str(s: str) -> str:

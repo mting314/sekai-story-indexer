@@ -1139,7 +1139,10 @@ def _log_turn(rec: dict) -> None:
         pass
 
 
-from sekai_story_indexer.query.intent import (
+# The intent regexes are re-exported, not used here: tests reach them through this
+# module's namespace (`srv._RESONANCE_RE`), so ruff's "unused import" is wrong —
+# deleting them turns test_resonance red. noqa rather than a silent removal.
+from sekai_story_indexer.query.intent import (  # noqa: F401 - re-exported for tests
     _CONCLUSION_RE,
     _FOCUS_CHAR_RE,
     _RESONANCE_RE,
