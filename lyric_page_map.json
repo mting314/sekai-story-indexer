@@ -1,7 +1,7 @@
 {
   "_meta": {
     "master_songs": 709,
-    "mapped": 701,
+    "mapped": 702,
     "missing": [
       241,
       290,
@@ -9,8 +9,7 @@
       674,
       675,
       676,
-      750,
-      764
+      750
     ],
     "wiki_only": 0
   },
@@ -3484,6 +3483,11 @@
       "pageid": 107805,
       "title": "All in One",
       "english": "All in One"
+    },
+    "764": {
+      "pageid": 111153,
+      "title": "Otsukimi Recital",
+      "english": "Otsukimi Recital"
     },
     "765": {
       "pageid": 110337,
