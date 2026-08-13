@@ -937,6 +937,82 @@ def fetch(
     console.print(f"[bold green]Fetched {len(plans)} events into {story_root}[/bold green]")
 
 
+@app.command(name="song-resonance")
+def song_resonance(
+    query: str = typer.Argument(..., help="Event title, arc slug, or song name"),
+    resonance_file: Path = typer.Option(Path("song_resonance.json"), help="Path to song_resonance.json"),
+):
+    """View line-by-line lyric-to-quote story resonance mappings for a song/event."""
+    from .source.resonance import load_song_resonance
+
+    data = load_song_resonance(resonance_file)
+    if not data:
+        console.print(f"[yellow]No resonance data found in {resonance_file}[/yellow]")
+        return
+
+    matched_entry = None
+    matched_slug = None
+    query_lower = query.lower()
+    for slug, entry in data.items():
+        if (
+            slug.lower() == query_lower
+            or entry.get("song_title", "").lower() == query_lower
+            or entry.get("song_title_en", "").lower() == query_lower
+            or str(entry.get("event_id")) == query
+        ):
+            matched_slug = slug
+            matched_entry = entry
+            break
+
+    if not matched_entry:
+        console.print(f"[red]No resonance entry matched '{query}'.[/red]")
+        console.print(f"Available songs/events: {', '.join(data.keys())}")
+        return
+
+    console.print(f"\n[bold cyan]🎵 Song Resonance: {matched_entry.get('song_title')} ({matched_entry.get('song_title_en', '')})[/bold cyan]")
+    console.print(f"[dim]Event: {matched_slug} | Focus: {matched_entry.get('focus_character')} | Unit: {matched_entry.get('unit')}[/dim]\n")
+
+    for idx, mapping in enumerate(matched_entry.get("resonance_mappings", []), start=1):
+        line_ref = f"{mapping.get('story_episode')}:{mapping.get('line_range', '')}" if mapping.get('line_range') else mapping.get('story_episode')
+        console.print(f"[bold yellow]Mapping #{idx}[/bold yellow] [dim]({line_ref})[/dim]")
+        console.print(f"  [bold]Lyric (JP):[/bold] {mapping.get('lyric_jp')}")
+        console.print(f"  [bold]Lyric (EN):[/bold] {mapping.get('lyric_en')}")
+        console.print(f"  [bold]Speaker:[/bold] {mapping.get('speaker')} ([link=file:///{matched_slug}/{mapping.get('story_episode')}]{line_ref}[/link])")
+        console.print(f"  [bold]Story Quote (JP):[/bold] {mapping.get('story_quote_jp')}")
+        console.print(f"  [bold]Story Quote (EN):[/bold] {mapping.get('story_quote_en')}")
+        console.print(f"  [bold green]Resonance Commentary:[/bold green] {mapping.get('resonance_commentary')}\n")
+
+
+@app.command(name="draft-resonance")
+def draft_resonance(
+    arc_slug: str = typer.Argument(..., help="Event arc slug, e.g. 0001-ameagari-no-ichiban-hoshi"),
+    song_title: str = typer.Option("", help="Featured commissioned song title"),
+):
+    """Generate a draft song resonance entry using event context."""
+    console.print(f"[bold cyan]Drafting song resonance structure for {arc_slug}...[/bold cyan]")
+    sample_entry = {
+        "event_id": 0,
+        "song_title": song_title or "Draft Song Title",
+        "song_title_en": song_title or "Draft Song Title EN",
+        "composer": "Draft Composer",
+        "unit": "leo_need",
+        "focus_character": "Draft Focus Character",
+        "resonance_mappings": [
+            {
+                "lyric_jp": "歌詞フレーズ",
+                "lyric_en": "Lyric phrase translation",
+                "story_episode": "01_episode_name",
+                "line_range": "L46-L59",
+                "speaker": "Character Name",
+                "story_quote_jp": "ストーリーのセリフ引用",
+                "story_quote_en": "Story transcript verbatim quote in English",
+                "resonance_commentary": "Explanation of how the lyric ties to the character arc and story moment."
+            }
+        ]
+    }
+    console.print_json(json.dumps({arc_slug: sample_entry}, ensure_ascii=False, indent=2))
+
+
 def main():
     app()
 

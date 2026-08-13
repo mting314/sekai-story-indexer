@@ -278,6 +278,18 @@ def event_children() -> dict[str, dict]:
     return _event_children()
 
 
+@app.get("/api/song-resonance")
+def song_resonance_endpoint(arc: str = "") -> dict:
+    """Line-by-line lyric to direct story quote resonance mappings for an event."""
+    from sekai_story_indexer.source.resonance import get_resonance_for_event, load_song_resonance
+
+    if not arc:
+        return {"resonance": load_song_resonance()}
+
+    res = get_resonance_for_event(arc)
+    return {"arc_slug": arc, "resonance": res}
+
+
 # Per-region event windows (JP/EN/TW/KR). Release schedules are static once set,
 # so cache for a day. Best-effort: any failure -> no region data, never fatal.
 _REGION_TTL_SECONDS = int(os.environ.get("SEKAI_REGION_TTL", "86400"))
@@ -461,6 +473,7 @@ def hierarchical_summaries() -> dict:
     # Label event-tier nodes with the real event name/nickname instead of "Arc <id>".
     # Cosmetic only — never let it sink the already-built tree if load_events hiccups.
     try:
+        res_map = _resonance_map()
         events_by_arc = {e.get("arc_slug"): e for e in load_events()}
         for node in data.get("nodes", {}).values():
             if node.get("kind") != "event":
@@ -472,9 +485,59 @@ def hierarchical_summaries() -> dict:
                 nickname = ev.get("nickname")
                 node["title"] = name
                 node["label"] = f"{name} · {nickname}" if nickname else name
+
+            # Inject Song Resonance tab into event summary sections if present
+            sid = node.get("summaryId")
+            if sid and sid in data.get("summaries", {}):
+                r_entry = res_map.get(arc)
+                res_markdown = _build_song_resonance_markdown(arc, r_entry)
+                if res_markdown:
+                    s_item = data["summaries"][sid]
+                    if "Song Resonance" not in s_item.get("sectionOrder", []):
+                        s_item["sectionOrder"].append("Song Resonance")
+                        s_item["sections"]["Song Resonance"] = res_markdown
     except Exception:  # noqa: BLE001 - enrichment is best-effort labeling
         pass
     return data
+
+
+def _build_song_resonance_markdown(arc: str, cache_entry: dict | None = None) -> str:
+    """Build rich markdown for the Song Resonance tab combining direct quote-to-lyric ties
+    with the overall narrative overview."""
+    from sekai_story_indexer.source.resonance import get_resonance_for_event
+
+    curated = get_resonance_for_event(arc)
+    parts = []
+
+    if curated and curated.get("resonance_mappings"):
+        song_title = curated.get("song_title_en") or curated.get("song_title") or "Featured Song"
+        parts.append(f"### 🎵 {song_title} — Lyric & Quote Resonance\n")
+
+        for idx, m in enumerate(curated["resonance_mappings"], start=1):
+            episode = m.get("story_episode", "")
+            line_range = m.get("line_range", "")
+            ref_str = f"{episode}:{line_range}" if line_range else episode
+            speaker = m.get("speaker", "Speaker")
+
+            parts.append(f"#### Quote Pair #{idx}: {speaker} ({ref_str})")
+            if m.get("lyric_jp") or m.get("lyric_en"):
+                lyric_text = f"**Lyric**: *{m.get('lyric_jp', '')}* — \"*{m.get('lyric_en', '')}*\""
+                parts.append(f"> {lyric_text}")
+            if m.get("story_quote_en") or m.get("story_quote_jp"):
+                quote_text = m.get("story_quote_en") or m.get("story_quote_jp")
+                parts.append(f"> **Story Quote**: {speaker}: \"{quote_text}\"")
+            parts.append(f"> **Transcript Ref**: `{ref_str}`\n")
+            if m.get("resonance_commentary"):
+                parts.append(f"{m['resonance_commentary']}\n")
+
+    if cache_entry and isinstance(cache_entry, dict) and cache_entry.get("resonance"):
+        if parts:
+            parts.append("\n---\n### Narrative Resonance Overview\n")
+        parts.append(cache_entry["resonance"])
+        if cache_entry.get("attribution"):
+            parts.append(f"\n\n*Attribution: {cache_entry['attribution']}*")
+
+    return "\n".join(parts).strip()
 
 
 _SLUG_RE = re.compile(r"[A-Za-z0-9_-]+")

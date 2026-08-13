@@ -1,0 +1,62 @@
+{
+  "0001-ameagari-no-ichiban-hoshi": {
+    "event_id": 1,
+    "song_title": "ステラ",
+    "song_title_en": "stella",
+    "composer": "じん",
+    "unit": "leo_need",
+    "focus_character": "天馬咲希",
+    "resonance_mappings": [
+      {
+        "lyric_jp": "描いてた未来ってなんだっけな",
+        "lyric_en": "What was the future we used to paint together?",
+        "story_episode": "07_yukkuri-susumo-u",
+        "line_range": "L46-L59",
+        "speaker": "Saki Tenma",
+        "story_quote_jp": "あたし、何にもできなかった間も、時間はどんどん過ぎていって……。全部、奪われていくみたいで……すごく、怖かったの……。",
+        "story_quote_en": "I kept thinking, we should be having classes together instead of this... I should've been with them, but the clock was ticking away while I was in the hospital, unable to do anything... I felt like it was all being taken away from me... I felt... So scared...",
+        "resonance_commentary": "Saki's intense anxiety over lost youth and hospital isolation directly echoes the longing in Jin's opening lyrics about losing track of their shared future."
+      },
+      {
+        "lyric_jp": "雨上がりの一番星が綺麗だったから",
+        "lyric_en": "Because the first star after the rain was so beautiful",
+        "story_episode": "08_atashi-tooru-no-hoshizora",
+        "line_range": "L63-L67",
+        "speaker": "Saki Tenma",
+        "story_quote_jp": "（……もう大丈夫だよ。アタシ。 もう焦ったり、怖がったりしなくていいよ） （これからゆっくり、 みんなとの時間を作っていけるから——）",
+        "story_quote_en": "(...Everything will be okay now. No more anxiety. No more being scared. I'll take my time and enjoy every day as it comes. Together, with my friends.)",
+        "resonance_commentary": "The rainy weather that canceled the observatory outing becomes their mock planetarium in the Sekai, symbolizing their star after the rain—a permanent bond that no longer needs to be rushed."
+      }
+    ]
+  },
+  "0020-resonate-with-you": {
+    "event_id": 20,
+    "song_title": "「１」",
+    "song_title_en": "1",
+    "composer": "164",
+    "unit": "leo_need",
+    "focus_character": "日野森志歩",
+    "resonance_mappings": [
+      {
+        "lyric_jp": "ここからまた始めるんだ ゼロからじゃなく一から",
+        "lyric_en": "We start over from here, not from zero, but from one",
+        "story_episode": "08_hibike-kokoro-ni",
+        "line_range": "L53-L60",
+        "speaker": "Ichika Hoshino",
+        "story_quote_jp": "私達、本気だよ……。 待たせてごめんね。もう、ひとりじゃないよ……！ 私達を選んで……！",
+        "story_quote_en": "Shiho, we were being serious... I'm sorry for making you wait all this time. You're not alone anymore... I hope you'll have us...",
+        "resonance_commentary": "Leo/need's opening act performance proves their collective resolve to turn professional, stepping forward together as 4 unified musicians from step one."
+      },
+      {
+        "lyric_jp": "響け、僕らの音よ 心の奥まで届け",
+        "lyric_en": "Resonate, our sound—reach deep into our hearts",
+        "story_episode": "08_hibike-kokoro-ni",
+        "line_range": "L23-L26",
+        "speaker": "Shiho Hinomori",
+        "story_quote_jp": "一歌……っ！ 私、こんな歌い方するの、知らなかった……。 すごい……っ！",
+        "story_quote_en": "Ichika... I didn't know you could sing like that. It was incredible...",
+        "resonance_commentary": "Ichika's raw vocal drive pierces through initial stage fright, creating emotional resonance that reaches Shiho and convinces her to decline STANDOUT's scout offer."
+      }
+    ]
+  }
+}

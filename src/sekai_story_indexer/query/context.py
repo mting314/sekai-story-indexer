@@ -60,13 +60,24 @@ def arc_context_line(
         who = " / ".join(n for n in (focus_name_en, focus_jp) if n) or "the focus character"
         bits.append(f"{who}'s {_ordinal(int(focus_index))} focus event")
 
-    unit = UNIT_NAMES.get(meta.get("unit"), meta.get("unit"))
+    raw_unit = meta.get("unit")
+    unit_key = str(raw_unit) if raw_unit is not None else ""
+    unit = UNIT_NAMES.get(unit_key, raw_unit)
     if unit:
         bits.append(str(unit))
 
     song = meta.get("song_title")
     if song:
         bits.append(f"commissioned song {song}")
+
+    arc_slug = meta.get("arc_slug")
+    if arc_slug:
+        from ..source.resonance import get_resonance_for_event
+
+        res = get_resonance_for_event(arc_slug)
+        if res and res.get("resonance_mappings"):
+            pair_count = len(res["resonance_mappings"])
+            bits.append(f"song resonance mappings ({pair_count} direct lyric-to-quote ties)")
 
     # Alias title forms (JP / official EN / romaji) so the same event is findable
     # however it's referred to; deduped against the primary name.

@@ -30,7 +30,7 @@ def client():
     # Pin the timeline/events source to the sample so tests are deterministic and
     # offline (load_events() otherwise hits the live master DB, whose arc slugs
     # differ from the sample the engine indexes). In prod both are the same source.
-    sample_events = json.loads((REPO / "sample" / "events_index.json").read_text())
+    sample_events = json.loads((REPO / "sample" / "events_index.json").read_text(encoding="utf-8"))
     server_module.load_events = lambda: sample_events
     return TestClient(server_module.app)
 
@@ -266,7 +266,7 @@ def _pin_sample_events(monkeypatch):
     import json as _json
 
     from webapp import server
-    events = _json.loads((REPO / "sample" / "events_index.json").read_text())
+    events = _json.loads((REPO / "sample" / "events_index.json").read_text(encoding="utf-8"))
     monkeypatch.setattr(server, "load_events", lambda: events)
 
 
