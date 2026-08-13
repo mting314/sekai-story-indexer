@@ -21,12 +21,12 @@ from pathlib import Path
 
 from .constants import CHARACTER_ID_TO_UNIT, DB_UNIT_TO_SLUG
 
-
 def en_sidecar_path(jp_path: Path) -> Path:
     """Co-located official-EN sidecar for a JP episode: ``foo.md`` → ``foo.md.en``.
     The trailing ``.en`` (not ``.en.md``) keeps it off every ``*.md`` glob, so the
     EN text is never indexed as JP story content."""
     return jp_path.with_name(jp_path.name + ".en")
+
 
 _KAKASI = None
 _SLUG_STRIP_RE = re.compile(r"[^a-z0-9]+")

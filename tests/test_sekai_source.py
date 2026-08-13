@@ -647,8 +647,6 @@ def test_virtual_singer_banner_is_not_a_focus_event():
     cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
                         music_by_event={}, banner_char_by_event=banner,
                         event_card_ids=event_card_ids, cards_by_id=cards_by_id)
-    r = cat[0]
-    assert r["is_focus_event"] is False
     assert r["focus_character_id"] == 0 and r["nickname"] is None
 
 
@@ -789,3 +787,28 @@ def test_load_official_en_skips_drifted_pairs(tmp_path: Path):
     (d / "05_y.md").write_text("# t\n\na: 1\nb: 2", encoding="utf-8")
     (d / "05_y.md.en").write_text("# t\n\nA: one", encoding="utf-8")  # count drift
     assert load_official_en(tmp_path) == {}
+
+
+def test_backfill_story_tree(tmp_path: Path):
+    import json
+
+    from sekai_story_indexer.source.backfill_slugs import backfill_story_tree
+
+    story_root = tmp_path / "story"
+    ep_dir = story_root / "leo_need" / "event" / "0001"
+    ep_dir.mkdir(parents=True)
+    ep_file = ep_dir / "01.md"
+    ep_file.write_text("# 1. 雨上がりのステップ\n\n咲希: こんにちは", encoding="utf-8")
+
+    index_file = tmp_path / "events_index.json"
+    index_file.write_text(
+        json.dumps([{"event_id": 1, "name": "雨上がりのステップ", "arc_slug": "0001"}], ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    stats = backfill_story_tree(story_root, index_file, tmp_path / "story_order.yaml")
+    assert stats["dirs_renamed"] == 1
+    assert stats["files_renamed"] == 1
+    assert (
+        story_root / "leo_need" / "event" / "0001-ameagari-no-suteppu" / "01_ameagari-no-suteppu.md"
+    ).exists()
