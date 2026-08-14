@@ -1,7 +1,7 @@
 {
   "_meta": {
     "master_songs": 712,
-    "mapped": 703,
+    "mapped": 704,
     "missing": [
       241,
       290,
@@ -10,8 +10,7 @@
       675,
       676,
       728,
-      752,
-      753
+      752
     ],
     "wiki_only": 0
   },
@@ -3455,6 +3454,11 @@
       "pageid": 111136,
       "title": "Additional Memory",
       "english": "Additional Memory"
+    },
+    "753": {
+      "pageid": 111276,
+      "title": "Kuusou Forest",
+      "english": "Fantasy Forest"
     },
     "754": {
       "pageid": 109206,
