@@ -1,7 +1,7 @@
 {
   "_meta": {
     "master_songs": 712,
-    "mapped": 704,
+    "mapped": 705,
     "missing": [
       241,
       290,
@@ -9,8 +9,7 @@
       674,
       675,
       676,
-      728,
-      752
+      728
     ],
     "wiki_only": 0
   },
@@ -3454,6 +3453,11 @@
       "pageid": 111136,
       "title": "Additional Memory",
       "english": "Additional Memory"
+    },
+    "752": {
+      "pageid": 111372,
+      "title": "Ayano no Koufuku Riron",
+      "english": "Ayano’s Theory of Happiness"
     },
     "753": {
       "pageid": 111276,
