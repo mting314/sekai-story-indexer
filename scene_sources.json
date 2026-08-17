@@ -8633,5 +8633,40 @@
     "bundle": "event_limits_2026",
     "scenario_id": "event_213_08",
     "region": "jp"
+  },
+  "0214-again-and-again-ambition/01_omoi-gakenai-hikari": {
+    "bundle": "event_wl_3rd_part5_2026",
+    "scenario_id": "wl_3rd_group5_01",
+    "region": "jp"
+  },
+  "0214-again-and-again-ambition/02_kesshi-no-bouken": {
+    "bundle": "event_wl_3rd_part5_2026",
+    "scenario_id": "wl_3rd_group5_02",
+    "region": "jp"
+  },
+  "0214-again-and-again-ambition/03_tansaku-misshon": {
+    "bundle": "event_wl_3rd_part5_2026",
+    "scenario_id": "wl_3rd_group5_03",
+    "region": "jp"
+  },
+  "0214-again-and-again-ambition/04_daki-shimeta-koe": {
+    "bundle": "event_wl_3rd_part5_2026",
+    "scenario_id": "wl_3rd_group5_04",
+    "region": "jp"
+  },
+  "0214-again-and-again-ambition/05_mita-sarenai-omoi-ha": {
+    "bundle": "event_wl_3rd_part5_2026",
+    "scenario_id": "wl_3rd_group5_05",
+    "region": "jp"
+  },
+  "0214-again-and-again-ambition/06_anatano-tatakai-hou": {
+    "bundle": "event_wl_3rd_part5_2026",
+    "scenario_id": "wl_3rd_group5_06",
+    "region": "jp"
+  },
+  "0214-again-and-again-ambition/07_kokode-warai-ae-ru-nichi": {
+    "bundle": "event_wl_3rd_part5_2026",
+    "scenario_id": "wl_3rd_group5_07",
+    "region": "jp"
   }
 }
