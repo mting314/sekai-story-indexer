@@ -6230,5 +6230,30 @@
     "world_link_label": "World Link 3 Part 5",
     "wl_alias": "wl3-5",
     "indexed": true
+  },
+  {
+    "event_id": 215,
+    "name": "Mix&Make Party Time!!",
+    "unit": "mixed",
+    "event_type": "marathon",
+    "content_type": "event",
+    "arc_slug": "0215-mix-make-party-time",
+    "started_at": 1787983200000,
+    "ended_at": 1788523199000,
+    "outline": "他のセカイの自分達と出会ったことをきっかけに、もっと色々なバーチャル・シンガー達と仲良くなりたいと考えるストリートのセカイのルカ。どうすれば、みんなが交流できる場を作れるだろうと考えていると——。",
+    "is_key_story": false,
+    "plot_weight": "filler",
+    "focus_character_id": 0,
+    "focus_character": "",
+    "has_story": true,
+    "episodes": 8,
+    "logo_url": "https://storage.sekai.best/sekai-jp-assets/event/event_partytime_2026/logo/logo.webp",
+    "banner_url": "https://storage.sekai.best/sekai-jp-assets/home/banner/event_partytime_2026/event_partytime_2026.webp",
+    "story_banner_url": "https://storage.sekai.best/sekai-jp-assets/event_story/event_partytime_2026/screen_image/banner_event_story.webp",
+    "jacket_url": "",
+    "is_focus_event": false,
+    "nickname": null,
+    "focus_index": null,
+    "indexed": false
   }
 ]

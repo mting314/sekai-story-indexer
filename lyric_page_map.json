@@ -1,14 +1,18 @@
 {
   "_meta": {
-    "master_songs": 714,
-    "mapped": 708,
+    "master_songs": 716,
+    "mapped": 706,
     "missing": [
       241,
       290,
       388,
+      550,
       674,
       675,
-      676
+      676,
+      707,
+      708,
+      709
     ],
     "wiki_only": 0
   },
@@ -3258,21 +3262,6 @@
       "title": "Eien Hanahadashii",
       "english": "Eternally Incredible"
     },
-    "707": {
-      "pageid": 96708,
-      "title": "Saitama 2000",
-      "english": "Saitama 2000"
-    },
-    "708": {
-      "pageid": 96937,
-      "title": "Yugen no Ran",
-      "english": "Yugen no Ran"
-    },
-    "709": {
-      "pageid": 96779,
-      "title": "Hatsune Miku no Shoushitsu -Gekijouban-",
-      "english": "The Disappearance of Hatsune Miku -Theater Version-"
-    },
     "710": {
       "pageid": 101573,
       "title": "Hedgehog",
@@ -3516,12 +3505,12 @@
     "788": {
       "pageid": 112351,
       "title": "ANTI-SAINOU",
-      "english": "ANTI-SAINOU"
+      "english": "ANTI-TALENT"
     },
     "789": {
       "pageid": 110395,
       "title": "Tenbin, Yubisaki de Furete",
-      "english": ""
+      "english": "The Scale Touched with Fingertips"
     },
     "790": {
       "pageid": 110180,
@@ -3552,6 +3541,11 @@
       "pageid": 112221,
       "title": "Kimi ni Okuru Mirai",
       "english": "A Future for You"
+    },
+    "803": {
+      "pageid": 112406,
+      "title": "Sora ni Menjite",
+      "english": "For the Skies' Sake"
     }
   }
 }

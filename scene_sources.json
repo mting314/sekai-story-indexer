@@ -8668,5 +8668,45 @@
     "bundle": "event_wl_3rd_part5_2026",
     "scenario_id": "wl_3rd_group5_07",
     "region": "jp"
+  },
+  "0215-mix-make-party-time/01_tomodachi-ninaritai": {
+    "bundle": "event_partytime_2026",
+    "scenario_id": "event_215_01",
+    "region": "jp"
+  },
+  "0215-mix-make-party-time/02_sakusen-kaigi": {
+    "bundle": "event_partytime_2026",
+    "scenario_id": "event_215_02",
+    "region": "jp"
+  },
+  "0215-mix-make-party-time/03_minnaga-nakayoku-narutameni": {
+    "bundle": "event_partytime_2026",
+    "scenario_id": "event_215_03",
+    "region": "jp"
+  },
+  "0215-mix-make-party-time/04_tanoshii-kimochi-ha-kazari-tsuke-kara": {
+    "bundle": "event_partytime_2026",
+    "scenario_id": "event_215_04",
+    "region": "jp"
+  },
+  "0215-mix-make-party-time/05_minnaga-yorokobu-menyuu-wo": {
+    "bundle": "event_partytime_2026",
+    "scenario_id": "event_215_05",
+    "region": "jp"
+  },
+  "0215-mix-make-party-time/06_nani-ga-nande-doregadore": {
+    "bundle": "event_partytime_2026",
+    "scenario_id": "event_215_06",
+    "region": "jp"
+  },
+  "0215-mix-make-party-time/07_paateiisutaato": {
+    "bundle": "event_partytime_2026",
+    "scenario_id": "event_215_07",
+    "region": "jp"
+  },
+  "0215-mix-make-party-time/08_saigo-ni-todoke-tai-omoi": {
+    "bundle": "event_partytime_2026",
+    "scenario_id": "event_215_08",
+    "region": "jp"
   }
 }
