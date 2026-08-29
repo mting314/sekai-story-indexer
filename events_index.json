@@ -6254,6 +6254,6 @@
     "is_focus_event": false,
     "nickname": null,
     "focus_index": null,
-    "indexed": false
+    "indexed": true
   }
 ]
