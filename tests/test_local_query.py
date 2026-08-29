@@ -1,4 +1,5 @@
 import json
+from collections import Counter
 from pathlib import Path
 
 from sekai_story_indexer.query.local import LocalQueryEngine, build_local_engine, tokenize
@@ -218,12 +219,81 @@ def test_derived_index_gz_roundtrip_scope_and_coords(tmp_path):
     eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
     m0 = eng.nodes[0].metadata
     coords = {f"{m0.arc_id}/{m0.episode_name}": {"bundle": "b", "scenario_id": "s", "region": "jp"}}
-    p = write_derived_index(build_derived_index(eng, coords), tmp_path / "d.json.gz")
+    # quotable_only=False: this case covers round-trip + scoping, not the coverage
+    # filter (which would drop every scene but the one given coords above).
+    p = write_derived_index(
+        build_derived_index(eng, coords, quotable_only=False), tmp_path / "d.json.gz"
+    )
     idx = load_derived_index(p)  # gzip round-trip
 
     refs = score_query(idx, "How does Kohane feel about singing?", arc_ids=("0006-lyric",))
     assert refs and all(r["arc_id"] == "0006-lyric" for r in refs)  # scope filter honored
     assert "source" in refs[0]  # live-fetch coords carried on refs
+
+
+def test_derived_index_ships_only_openable_scenes():
+    """A scene with no live-fetch coords ranks in search and then shows an empty
+    citation, so the public index leaves it out — except unit overviews, which are
+    our own derived prose and need no fetch."""
+    from sekai_story_indexer.query.derived_index import build_derived_index
+
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    m0 = eng.nodes[0].metadata
+    coords = {f"{m0.arc_id}/{m0.episode_name}": {"bundle": "b", "scenario_id": "s"}}
+    idx = build_derived_index(eng, coords)
+
+    kinds = {(s["arc_id"], s["episode"]) for s in idx["scenes"]}
+    assert (m0.arc_id, m0.episode_name) in kinds  # the quotable one survives
+    assert len(idx["scenes"]) < len(eng.nodes), "unquotable scenes must be dropped"
+    assert all(s.get("source") for s in idx["scenes"]), "every shipped scene must be openable"
+
+
+def test_derived_index_keeps_unit_overviews_without_coords():
+    """Unit overviews are our own derived prose, not transcript — they have no
+    sekai.best scene to fetch, so the openable-only rule must not drop them.
+    (The sample events carry no ``outline``, so no overview nodes are built from
+    the fixture; exercise the exemption against the rule directly.)"""
+    from sekai_story_indexer.query.derived_index import build_derived_index
+    from sekai_story_indexer.query.summaries import build_unit_overviews
+
+    rows = [
+        dict(r, outline="Something happens.")
+        for r in SAMPLE_INDEX
+        if r.get("unit") == "vivid_bad_squad"
+    ]
+    overviews = build_unit_overviews(rows)
+    assert overviews, "fixture should yield at least one overview node"
+
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    eng.nodes = eng.nodes + overviews
+    eng._tf = eng._tf + [Counter(tokenize(n.text)) for n in overviews]
+    m0 = eng.nodes[0].metadata
+    coords = {f"{m0.arc_id}/{m0.episode_name}": {"bundle": "b", "scenario_id": "s"}}
+
+    shipped = build_derived_index(eng, coords)["scenes"]
+    assert any(s["arc_id"].startswith("__unit__") for s in shipped)
+
+
+def test_derived_filter_is_inert_without_any_coords():
+    """With no coords at all nothing is quotable, so filtering would empty the
+    index rather than trim it — the filter must no-op instead."""
+    from sekai_story_indexer.query.derived_index import build_derived_index
+
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    assert len(build_derived_index(eng)["scenes"]) == len(eng.nodes)
+
+
+def test_derived_scoring_matches_the_local_engine():
+    """The public deploy must not drift from the local engine — that drift is how
+    the shipped index ended up ranking on name mass alone."""
+    from sekai_story_indexer.query.derived_index import build_derived_index, score_query
+
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    idx = build_derived_index(eng, quotable_only=False)
+    q = "When does Haruka become the producer?"
+    assert score_query(idx, q, top_k=1)[0]["arc_id"] == eng.retrieve(q, k=1)[0][0].metadata.arc_id
+    # and the name-dense, topic-free scene must not win here either
+    assert [r["arc_id"] for r in score_query(idx, q, top_k=5)].count("0057-painful") == 0
 
 
 def test_names_absent_character_detects_stale_focus():
@@ -354,3 +424,43 @@ def test_scoped_event_hits_positional_score_boost():
     early = scores("how does it begin")  # -> 'early' (opening weighted up)
     assert late[id(last)] > early[id(last)]     # finale scores higher under 'late'
     assert early[id(first)] > late[id(first)]   # opening scores higher under 'early'
+
+
+# -- concept scoring: a name is one concept, not N repeated tokens --------------
+
+DISTRACTOR = "0057-painful"  # Haruka-dense, contains no "producer" at all
+STATE_CHANGE = "0133-lead"  # where she is actually asked, and accepts
+
+
+def test_additive_scoring_is_won_by_name_mass():
+    """Documents the failure mode the concept scorer exists to remove: plain
+    TF-IDF ranks a scene by how often the character is *named*, so a long scene
+    that never mentions the topic beats the one that answers the question."""
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    q = "When does Haruka become the producer?"
+    ranked = eng._retrieve_additive(q, eng._candidate_indices(None, None, ()), k=3)
+    assert ranked[0][0].metadata.arc_id == DISTRACTOR
+
+
+def test_concept_scoring_requires_the_topic_to_be_present():
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    ranked = eng.retrieve("When does Haruka become the producer?", k=5)
+    arcs = [n.metadata.arc_id for n, _ in ranked]
+    assert arcs[0] == STATE_CHANGE
+    assert DISTRACTOR not in arcs, "a scene with no topic term must not be retrieved"
+
+
+def test_unit_abbreviation_is_scope_not_topic():
+    """'MMJ' identifies the group; treating it as a topic would penalise the very
+    scene that answers the question for spelling the name out in full."""
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    topics = {t for group in eng._scoring_groups("when does Haruka become MMJ's producer?")[1] for t in group}
+    assert topics == {"producer"}
+
+
+def test_coverage_is_proportional_not_all_or_nothing():
+    """Questions paraphrase and the tokenizer does not stem, so a scene matching
+    some topics must still rank rather than being filtered out."""
+    eng = build_local_engine(SAMPLE_STORY, SAMPLE_INDEX)
+    r = eng.query("What does Kanade promise to do about Mafuyu in the Empty Sekai?")
+    assert r["citations"][0]["arc_id"] == "0002-marionette"  # "promise" is never said
