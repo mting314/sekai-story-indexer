@@ -190,8 +190,14 @@ def en_unit_story_scenario(chapter_asset_bundle: str, scenario_id: str) -> dict:
 
 
 def en_card_story_scenario(card_asset_bundle: str, scenario_id: str) -> dict:
-    """Official-EN card side-story scenario asset. Returns {} when not localized."""
-    url = f"{EN_ASSET_CDN}/character/member/{card_asset_bundle}/{scenario_id}.asset"
+    """Official-EN card side-story scenario asset. Returns {} when not localized.
+
+    NOTE the path differs from JP: the EN bucket serves card scenarios under
+    ``character/member_scenario/``, not ``character/member/``. Events and unit
+    stories share their path across both buckets; cards are the only asymmetric
+    case, and using the JP path here 404s for *every* card — which reads as "not
+    localized yet" rather than as a bug."""
+    url = f"{EN_ASSET_CDN}/character/member_scenario/{card_asset_bundle}/{scenario_id}.asset"
     try:
         return fetch_json(url)
     except Exception:

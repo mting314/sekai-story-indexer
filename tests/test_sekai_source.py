@@ -812,3 +812,27 @@ def test_backfill_story_tree(tmp_path: Path):
     assert (
         story_root / "leo_need" / "event" / "0001-ameagari-no-suteppu" / "01_ameagari-no-suteppu.md"
     ).exists()
+
+def test_en_card_scenario_uses_the_en_bucket_path(monkeypatch):
+    """The EN mirror serves card side-stories under ``character/member_scenario/``
+    while JP uses ``character/member/``. Events and unit stories share their path
+    across both buckets, so cards are the one asymmetric case — and pointing EN at
+    the JP path 404s every card, which reads as "not localized yet" rather than as
+    a bug. Guard the asymmetry so it can't quietly regress."""
+    from sekai_story_indexer.source import client
+
+    seen: list[str] = []
+
+    def fake_fetch(url, **kwargs):
+        seen.append(url)
+        return {"TalkData": []}
+
+    monkeypatch.setattr(client, "fetch_json", fake_fetch)
+
+    client.en_card_story_scenario("res003_no044", "003044_honami02")
+    client.card_story_scenario("res003_no044", "003044_honami02")
+    en_url, jp_url = seen
+
+    assert "sekai-en-assets" in en_url and "/character/member_scenario/" in en_url
+    assert "sekai-jp-assets" in jp_url and "/character/member/" in jp_url
+    assert "/character/member_scenario/" not in jp_url
