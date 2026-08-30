@@ -398,33 +398,27 @@ even the filesystem sorted chronologically). Hand-authored content still uses
     follow the same rule — derived refs + live fetch, never stored text — or it
     breaks the thing that makes the deploy hostable.
 
-* **Citation click should scroll to the quoted line (TODO).**
-  Clicking a citation opens the episode in the sidebar and tints the matching row
-  (`isHit` → `yellow.400/25`, `VNTranscript` in `frontend/src/components/Sidebar.tsx`),
-  but nothing scrolls. A scene here is a whole episode — ~48 dialogue turns, up to
-  324 — so the highlighted line is usually well below the fold and the reader has
-  to hunt for the thing they just clicked. The panel has no scroll logic at all
-  today; the only `useRef` is request sequencing.
+* **Citation click scrolls to the quoted line (DONE).**
+  Clicking a citation used to open the episode and tint the matching row without
+  moving the viewport. A scene here is a whole episode — ~48 dialogue turns, up to
+  324 — so the cited line was almost always below the fold.
 
-  Not just "call `scrollIntoView`" — the anchor is unreliable:
-  * **Matching is exact string equality** (`line.trim() === highlight`). Cross-
-    lingual citations routinely miss: the quote can be official-EN while the
-    fetched transcript is JP (or the reverse, when the EN CDN has the scene and
-    the cached quote came from JP). On a miss nothing is tinted, so there is
-    nothing to scroll to and the failure is silent.
-  * **Text arrives after the panel opens** (live fetch from sekai.best, or
-    `/api/episode-raw`), so the scroll has to run post-render, not on open.
-  * **Two modes.** `vn` renders rows; `excerpt` renders a marked blob. They need
-    different anchoring.
-  * **A better anchor already exists for turn-attributed hits:** citations now
-    carry `window` (the surrounding turns) and turn retrieval knows the anchor
-    turn index — positional, not string-matched. That is local-backend only; the
-    derived backend has no turns, so string matching stays the fallback there.
+  The scroll was the easy half; the anchor was the problem. Matching was exact
+  string equality, and quote and transcript routinely disagree: the quote can be
+  official-EN while the transcript is JP (or the reverse), quotes carry a speaker
+  prefix the rendered row doesn't, and width/spacing/ellipsis drift between the
+  master DB, the asset CDN and our own extraction. On a miss nothing was tinted,
+  so there was no target *and* no signal that anything had failed.
 
-  Suggested shape: have the matched row register a ref, scroll it to centre on
-  first paint after load, and fall back to the first `window` line when exact
-  matching fails. Worth a visible "couldn't locate the quote" state rather than
-  silently showing an untinted transcript.
+  `frontend/src/lib/quote-anchor.ts` resolves the row in tiers — exact →
+  normalised (speaker-stripped, NFKC, whitespace/punctuation-free) → containment
+  either way (guarded by a minimum length so short fragments can't match) → the
+  citation's `window`. That last tier is the conversational turns carried by
+  turn-attributed citations: a positional anchor from turn retrieval rather than a
+  text guess, which recovers the cross-lingual case. `useScrollToAnchor` centres
+  the row on the frame after paint (text arrives async, so it can't run on open),
+  and an unresolvable quote now says so instead of silently rendering an untinted
+  transcript. Applies to both panel modes; 11 unit tests.
 
 ## 6. Lyric ↔ story resonance (new feature, phased)
 

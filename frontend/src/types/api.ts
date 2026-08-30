@@ -53,6 +53,8 @@ export interface Citation {
   excerpt?: string;
   quote?: string;
   quote_en?: string;
+  /** Surrounding turns for a turn-attributed citation — fallback scroll anchor. */
+  window?: string[];
   source?: string;
 }
 
