@@ -398,6 +398,28 @@ even the filesystem sorted chronologically). Hand-authored content still uses
     follow the same rule — derived refs + live fetch, never stored text — or it
     breaks the thing that makes the deploy hostable.
 
+* **Citation click scrolls to the quoted line (DONE).**
+  Clicking a citation used to open the episode and tint the matching row without
+  moving the viewport. A scene here is a whole episode — ~48 dialogue turns, up to
+  324 — so the cited line was almost always below the fold.
+
+  The scroll was the easy half; the anchor was the problem. Matching was exact
+  string equality, and quote and transcript routinely disagree: the quote can be
+  official-EN while the transcript is JP (or the reverse), quotes carry a speaker
+  prefix the rendered row doesn't, and width/spacing/ellipsis drift between the
+  master DB, the asset CDN and our own extraction. On a miss nothing was tinted,
+  so there was no target *and* no signal that anything had failed.
+
+  `frontend/src/lib/quote-anchor.ts` resolves the row in tiers — exact →
+  normalised (speaker-stripped, NFKC, whitespace/punctuation-free) → containment
+  either way (guarded by a minimum length so short fragments can't match) → the
+  citation's `window`. That last tier is the conversational turns carried by
+  turn-attributed citations: a positional anchor from turn retrieval rather than a
+  text guess, which recovers the cross-lingual case. `useScrollToAnchor` centres
+  the row on the frame after paint (text arrives async, so it can't run on open),
+  and an unresolvable quote now says so instead of silently rendering an untinted
+  transcript. Applies to both panel modes; 11 unit tests.
+
 ## 6. Lyric ↔ story resonance (new feature, phased)
 
 **Goal.** Each Sekai event has a commissioned/theme song deliberately tied to its
