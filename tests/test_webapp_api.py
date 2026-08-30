@@ -990,3 +990,87 @@ def test_scene_text_thread_safe(monkeypatch):
     assert not errors
     assert results == [("S: x", "en")] * 12
     assert ("b", "s") in srv._scene_text_cache
+
+
+# -- official-EN headings for the sidebar --------------------------------------
+# The fetcher writes EN sidecars with the *Japanese* title, so an English
+# transcript would otherwise render under a Japanese header (e.g. body in English
+# under "131. 教室のセカイ"). The heading is resolved at serve time instead.
+
+
+def _heading(monkeypatch, arc, episode, ctype, *, areas=None, cards=None, events=None):
+    import webapp.server as srv
+
+    monkeypatch.setattr(srv, "_en_aux_titles", {"areas": areas or {}, "cards": cards or {}})
+    if events is not None:
+        monkeypatch.setattr(srv, "_episode_title", lambda a, e: events)
+    return srv._en_heading(arc, episode, ctype)
+
+
+def test_en_heading_area_uses_area_id_from_the_arc_slug(monkeypatch):
+    # area arcs are slugged "<areaId>-<jp-slug>"; heading is "<talk no>. <area>"
+    got = _heading(monkeypatch, "05-kyoushitsu-no-sekai", "131_areatalk-monthly2210-004",
+                   "area", areas={5: "School SEKAI"})
+    assert got == "131. School SEKAI"
+
+
+def test_en_heading_card_uses_card_id_and_part(monkeypatch):
+    got = _heading(monkeypatch, "1144-ano-gorono-watashi-tooru", "02_saidosutoorii-kouhen",
+                   "card", cards={1144: {1: "Side Story (Part 1)", 2: "Side Story (Part 2)"}})
+    assert got == "2. Side Story (Part 2)"
+
+
+def test_en_heading_event_delegates_to_episode_titles_en(monkeypatch):
+    got = _heading(monkeypatch, "0001-ameagari-no-ichiban-hoshi", "05_itsudemonante",
+                   "event", events="Whenever")
+    assert got == "5. Whenever"
+
+
+def test_en_heading_empty_when_not_localized(monkeypatch):
+    # card past the EN region's catalogue / area with no EN name -> caller keeps JP
+    assert _heading(monkeypatch, "1319-x", "02_y", "card", cards={}) == ""
+    assert _heading(monkeypatch, "05-x", "131_y", "area", areas={}) == ""
+
+
+def test_en_heading_survives_an_unreachable_master_db(monkeypatch):
+    """Offline must degrade to the Japanese H1, never raise."""
+    import webapp.server as srv
+    from sekai_story_indexer.source import client
+
+    monkeypatch.setattr(srv, "_en_aux_titles", {"areas": None, "cards": None})
+    monkeypatch.setattr(client, "en_area_names", lambda: (_ for _ in ()).throw(OSError("no net")))
+    assert srv._en_heading("05-x", "131_y", "area") == ""
+
+
+def test_episode_raw_prefers_the_english_heading_over_the_sidecar_h1(monkeypatch, tmp_path):
+    import webapp.server as srv
+
+    d = tmp_path / "leo_need" / "area" / "05-kyoushitsu-no-sekai"
+    d.mkdir(parents=True)
+    jp = d / "131_areatalk-x.md"
+    jp.write_text("# 131. 教室のセカイ\n\nリン: こんにちは\n", encoding="utf-8")
+    # sidecar body is English but its H1 is Japanese — the bug this guards
+    jp.with_name(jp.name + ".en").write_text("# 131. 教室のセカイ\n\nRin: Hello\n", encoding="utf-8")
+
+    monkeypatch.setenv("SEKAI_STORY_ROOT", str(tmp_path))
+    monkeypatch.setattr(srv, "_en_aux_titles", {"areas": {5: "School SEKAI"}, "cards": {}})
+    out = srv.episode_raw("05-kyoushitsu-no-sekai", "131_areatalk-x")
+
+    assert out["region"] == "en"
+    assert out["title"] == "131. School SEKAI"
+    assert "Rin: Hello" in out["text"] and "教室のセカイ" not in out["text"]
+
+
+def test_episode_raw_falls_back_to_the_japanese_h1(monkeypatch, tmp_path):
+    import webapp.server as srv
+
+    d = tmp_path / "leo_need" / "area" / "05-kyoushitsu-no-sekai"
+    d.mkdir(parents=True)
+    (d / "131_areatalk-x.md").write_text("# 131. 教室のセカイ\n\nリン: こんにちは\n", encoding="utf-8")
+
+    monkeypatch.setenv("SEKAI_STORY_ROOT", str(tmp_path))
+    monkeypatch.setattr(srv, "_en_aux_titles", {"areas": {}, "cards": {}})
+    out = srv.episode_raw("05-kyoushitsu-no-sekai", "131_areatalk-x")
+
+    assert out["region"] == "jp"
+    assert out["title"] == "131. 教室のセカイ"

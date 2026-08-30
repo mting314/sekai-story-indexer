@@ -556,6 +556,61 @@ def _episode_title(arc: str, episode: str) -> str:
     return titles.get(epno) or titles.get(str(epno)) or ""
 
 
+# Official-EN headings for NON-event content. Events carry theirs on the index row
+# (`episode_titles_en`); area talks and card side-stories have no index row, so the
+# EN master DB is consulted lazily and memoized. Both are best-effort: offline or
+# not-yet-localized resolves to "" and the caller keeps the Japanese H1.
+_en_aux_titles: dict[str, Any] = {"areas": None, "cards": None}
+
+
+def _en_area_names() -> dict:
+    if _en_aux_titles["areas"] is None:
+        try:
+            from sekai_story_indexer.source import client
+
+            _en_aux_titles["areas"] = client.en_area_names()
+        except Exception:
+            _en_aux_titles["areas"] = {}
+    return _en_aux_titles["areas"]
+
+
+def _en_card_titles() -> dict:
+    if _en_aux_titles["cards"] is None:
+        try:
+            from sekai_story_indexer.source import client
+
+            _en_aux_titles["cards"] = client.en_card_episode_titles()
+        except Exception:
+            _en_aux_titles["cards"] = {}
+    return _en_aux_titles["cards"]
+
+
+def _en_heading(arc: str, episode: str, content_type: str) -> str:
+    """Official-EN heading for any scene, mirroring the Japanese H1's shape
+    (``"<n>. <title>"``). The EN sidecars themselves are no help here: the fetcher
+    writes them with the *Japanese* title, so an English transcript renders under a
+    Japanese heading. ``''`` when there's no English name for this scene."""
+    ep_no = re.match(r"(\d+)", episode)
+    ident = re.match(r"(\d+)", arc)
+    if content_type == "event":
+        title = _episode_title(arc, episode)
+        return f"{int(ep_no.group(1))}. {title}" if (title and ep_no) else title
+    if not ident:
+        return ""
+    if content_type == "area":
+        # Area arcs are slugged "<areaId>-<jp-slug>"; the heading is "<talk no>. <area>".
+        name = _en_area_names().get(int(ident.group(1)))
+        if not name:
+            return ""
+        return f"{int(ep_no.group(1))}. {name}" if ep_no else name
+    if content_type == "card":
+        # Card arcs are slugged "<cardId>-<jp-slug>"; episode prefix is the part.
+        part = int(ep_no.group(1)) if ep_no else 0
+        title = (_en_card_titles().get(int(ident.group(1))) or {}).get(part)
+        return f"{part}. {title}" if title else ""
+    return ""
+
+
 @app.get("/api/episode-raw")
 def episode_raw(arc: str, episode: str) -> dict:
     """Raw episode transcript (H1 title + scene text) for the sidebar, read from the
@@ -592,6 +647,11 @@ def episode_raw(arc: str, episode: str) -> dict:
             title = line[2:].strip()
             continue
         body_lines.append(line)
+    # The sidecar's own H1 is Japanese even for an English transcript (the fetcher
+    # reuses the JP title), so prefer the official-EN heading when one exists —
+    # otherwise an English scene renders under a Japanese header.
+    content_type = jp.parts[-3] if len(jp.parts) >= 3 else ""
+    title = _en_heading(arc, episode, content_type) or title
     return {"title": title, "text": "\n".join(body_lines).strip(), "region": region}
 
 
@@ -2091,8 +2151,9 @@ def reset_caches() -> list[str]:
     _scene_text_cache.clear()
     _scene_sources_cache["map"] = None
     _official_en_cache["map"] = None
+    _en_aux_titles.update(areas=None, cards=None)
     cleared += ["event_children", "derived_index", "local_engine", "scene_text",
-                "scene_sources", "official_en"]
+                "scene_sources", "official_en", "en_aux_titles"]
     return cleared
 
 

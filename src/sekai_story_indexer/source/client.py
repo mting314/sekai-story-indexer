@@ -262,6 +262,36 @@ def en_episode_titles() -> dict[int, dict[int, str]]:
     return out
 
 
+def en_area_names() -> dict[int, str]:
+    """Official English area names from the EN master DB, keyed by area id
+    (``{5: "School SEKAI"}``). Area-talk arcs are slugged ``<areaId>-<jp-slug>``,
+    so this is what turns 「教室のセカイ」 into an English heading. ``{}`` when
+    unreachable — callers fall back to the Japanese name."""
+    try:
+        rows = fetch_json(f"{REGION_DBS['en']}/areas.json")
+    except Exception:
+        return {}
+    return {a["id"]: a["name"] for a in rows if a.get("id") and a.get("name")}
+
+
+def en_card_episode_titles() -> dict[int, dict[int, str]]:
+    """Official English card side-story titles from the EN master DB, keyed by card
+    id then part (1 = first, 2 = second) — ``{1144: {1: "Side Story (Part 1)"}}``.
+    ``{}`` when unreachable; cards past the EN region's catalogue are absent."""
+    try:
+        rows = fetch_json(f"{REGION_DBS['en']}/cardEpisodes.json")
+    except Exception:
+        return {}
+    out: dict[int, dict[int, str]] = {}
+    for ep in rows:
+        cid, title = ep.get("cardId"), ep.get("title")
+        if cid is None or not title:
+            continue
+        part = 1 if ep.get("cardEpisodePartType") == "first_part" else 2
+        out.setdefault(cid, {})[part] = title
+    return out
+
+
 def en_music_titles() -> dict[int, str]:
     """Official English song titles from the EN master DB, keyed by music id."""
     try:
