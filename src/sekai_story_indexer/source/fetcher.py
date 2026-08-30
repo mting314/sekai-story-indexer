@@ -215,6 +215,7 @@ def fetch_card_stories(
     if limit:
         card_ids = card_ids[:limit]
     written = 0
+    en_written = 0
     for cid in card_ids:
         card = cards_by_id.get(cid, {})
         char_id = card.get("characterId", 0)
@@ -227,7 +228,17 @@ def fetch_card_stories(
             bundle, sid = ep["assetbundleName"], ep["scenarioId"]
             out = story_root / tree_relpath(unit, "card", card_slug, fname)
             if skip_existing and out.exists() and out.stat().st_size > 0:
-                written += 1
+                written += 1  # already fetched — resumable
+                # Backfill the EN sidecar onto an existing corpus without
+                # re-downloading JP (align against the on-disk JP line count). Card
+                # EN was unreachable until the CDN path was corrected, so every
+                # pre-existing card is missing one; without this the skip branch
+                # would keep them missing forever.
+                en_path = en_sidecar_path(out)
+                if not (en_path.exists() and en_path.stat().st_size > 0) and _write_en_sidecar(
+                    out, title, _lines_from_markdown(out), fetch_en, bundle, sid
+                ):
+                    en_written += 1
                 continue
             try:
                 scenario = fetch_scenario(bundle, sid)
@@ -237,10 +248,11 @@ def fetch_card_stories(
             lines = scenario_to_lines(scenario)
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(render_episode_markdown(title, [lines]), encoding="utf-8")
-            _write_en_sidecar(out, title, lines, fetch_en, bundle, sid)
+            if _write_en_sidecar(out, title, lines, fetch_en, bundle, sid):
+                en_written += 1
             written += 1
         log(f"wrote {unit}/card/{card_slug}")
-    log(f"card stories: {written} episodes from {len(card_ids)} cards")
+    log(f"card stories: {written} episodes from {len(card_ids)} cards, {en_written} EN sidecars")
     return written
 
 

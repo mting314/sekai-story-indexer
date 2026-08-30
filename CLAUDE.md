@@ -24,7 +24,10 @@ These hosts are **external**; run `indexer fetch` where egress to them is allowe
 story/<unit>/<content_type>/<arc_slug>/<NN_episode-slug>.md
 ```
 `unit` ∈ leo_need, more_more_jump, vivid_bad_squad, wonderlands_showtime,
-nightcord, virtual_singer, mixed. Scenes split by `---`; lines `speaker: text`.
+nightcord, virtual_singer, mixed. Lines are `speaker: text`. Scenes split by `---`
+— but the Sekai fetcher never emits that delimiter, so in the real corpus **one
+file = one scene = one whole episode** (~48 dialogue turns, 7345/7345 single-scene);
+only `sample/story` actually has `---`. That's why retrieval also indexes turns.
 
 ## Sekai-specific code (what the fork added)
 * `src/sekai_story_indexer/source/` — `constants` (taxonomy), `transform` (pure,
@@ -71,7 +74,15 @@ with any interpreter that has `pydantic`+`pyyaml`:
     content-only fingerprint so Gemini/Claude-subagent notes coexist). Provider-
     agnostic; served keyless by the resonance intent. Needs `build-lyric-map` +
     `summarize` first.
-* `/api/query` picks backend via `SEKAI_QUERY_BACKEND` (`local` default, `full`).
+* `/api/query` picks backend via `SEKAI_QUERY_BACKEND` (`local` default, `full`,
+  `derived`). The **public Cloud Run deploy runs `derived`** (`Dockerfile.derived`):
+  prose-free index + quotes fetched live from sekai.best on citation click. So a
+  retrieval change only reaches production after `sekai build-index` is re-run and
+  `derived_index.json.gz` is redeployed. `build-index` ships **only openable
+  scenes** (those with `scene_sources` coords, plus unit overviews) — a scene that
+  ranks but has no fetch coords renders an empty citation. `--all-scenes` opts out.
+  Turn-level attribution is local-only: the derived index has no prose, so it has
+  no dialogue turns to attribute.
 
 ## Constant ingestion (`sekai ingest`) — see docs/ingestion.md
 One scheduled command catches the corpus up with the game (a new event ~every 15
@@ -142,6 +153,38 @@ Note: the **pytest** job does not build the frontend, so `test_index_html_served
     (`sessions.py`/`server.py`): carry the event across follow-ups; drop it when the
     turn names a character absent from it (`engine.names_absent_character`) or shares
     no evidence — so a topic switch self-heals. Wired for local/derived/full.
+  - **Turn-level attribution** (`query/turns.py`): "what does X say about Y" is
+    answered by an *utterance*, not an episode. A scene is a whole episode, so
+    scene TF-IDF only knows "X somewhere, topic somewhere" and happily quotes a
+    line another character said. `_attributed_speaker` gates on a speech verb with
+    the name in **subject** position ("Honami mentions…" yes; "tell Kohane…" no),
+    then `find_turn_hits` ranks turn windows: DIRECT (they said it) > REPLY (they
+    answer within 2 turns using an anaphor) > PRESENT (merely in the room —
+    dropped; ~7:1 noise on the full corpus). Citations carry a `window` of the
+    surrounding turns so a pronoun reply can be resolved. If the gate fires but
+    nothing is attributable, the engine **declines** rather than falling back to
+    scene retrieval, which is the false-attribution path.
+  - **`query/scoring.py` is shared by the local AND derived backends.** They had
+    drifted — the local engine gained concept scoring while the public deploy kept
+    ranking on raw tf — so the maths now lives in one pure module both import.
+    Change scoring there, never in one backend. The derived index is **v2**: it
+    serializes `characters` so `score_query` can group a name's surfaces the same
+    way. A v1 index has no `characters` and falls back to bag-of-words.
+  - **Concept scoring** in `retrieve()` (`_scoring_groups` / `_concept_score`): a
+    character name expands to ~8 lexical surfaces (`honami`, `穂波`, `穂`, `波`, `望月`…),
+    so summing them × raw tf made ranking a name-frequency sort — "when does Haruka
+    become MMJ's producer" ranked scenes with `tf[遥]=81` and `tf[producer]=0`.
+    The name is now **one max-scored concept**, tf is sublinear, and the total is
+    scaled by **topic coverage**, so a scene matching only the name scores zero.
+    Coverage is proportional, not all-or-nothing: questions paraphrase ("promise")
+    and the tokenizer doesn't stem, so demanding every term drops real answers.
+    Falls back to `_retrieve_additive` when nothing is nameable/topical, or when
+    every scene misses every topic. Unit words (`mmj`, `vivid`) are scope, not
+    topic — counting them penalises the answer for spelling the group out in full.
+  - The index text now includes each scene's **official-EN rendering** alongside
+    JP (`_index_text`), so English content words exist in the vocabulary at all —
+    without it every non-name term in an EN question is dropped before scoring and
+    the query ranks on the character name alone. Makes `translate.py` non-load-bearing.
   - Cross-lingual glossary bridge; quote-grounded answers + excerpt sidebar;
     official-EN episode titles in citation labels (`_episode_title` +
     `episode_titles_en` serve-time overlay, JP H1 fallback).
@@ -171,11 +214,11 @@ Note: the **pytest** job does not build the frontend, so `test_index_html_served
 - Fetch is resilient (retries IncompleteRead) + resumable (`--skip-existing`).
 
 ## Tests
-CI runs the **full** suite (`uv run pytest -q`) — **542 passing**. chromadb is
+CI runs the **full** suite (`uv run pytest -q`) — **565 passing**. chromadb is
 installed in CI, so the inherited linkura tests collect + run too; **run the full
 `uv run pytest` locally before pushing, not just a Sekai subset** (a subset-only
 run once missed a `test_database.py` break that CI caught). Sekai-specific files:
 `test_sekai_source test_local_query test_scoping test_eval_local test_webapp_api
 test_content_and_summaries test_sessions test_generate_config test_summarize_limit
 test_conclusion test_conclusions_extractor test_lyrics test_resonance
-test_ingest_pipeline test_webapp_freshness`.
+test_ingest_pipeline test_webapp_freshness test_turn_retrieval`.

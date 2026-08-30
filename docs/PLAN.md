@@ -365,6 +365,38 @@ even the filesystem sorted chronologically). Hand-authored content still uses
 * The inherited test suite is still Hasunosora-shaped (needs chromadb to even
   collect); Sekai tests are the `test_sekai_source/local_query/scoping/eval_local/
   webapp_api/content_and_summaries` files.
+* **Richer sidebar: a character-centric viewer (TODO — needs scoping).**
+  Today `frontend/src/components/Sidebar.tsx` has two modes: `vn` (visual-novel
+  chat bubbles, speaker colors from the entity map) and `excerpt` (raw text with
+  the quote marked). Both are *scene*-shaped — you open a citation and read that
+  episode. There's no way to pivot from "Honami said this" to "who is Honami,
+  and where else does she appear?", even though the data for that mostly exists:
+  `events_index.json` carries `focus_character_id` / `nickname` / `focus_index`,
+  the processor records per-scene `speakers`, and `/static/chara/<id>.png` is
+  already served.
+
+  Reference the user gave: `https://pjsk.cleista.cc/#/characters/ichika`. That
+  site is a client-rendered SPA — fetching it returns only a JS shell, so the
+  layout could not be inspected from here and the target needs to be pinned down
+  from the live page before building.
+
+  Open questions to settle first:
+  * **Which surface?** Extend the existing right-hand panel with a third mode
+    (`character`), or a separate route? A character view is arguably a page, not
+    a sidebar, and the panel is currently shared by Ask *and* Summaries.
+  * **What goes in it?** Candidates, cheapest first: profile (name/unit/CV/
+    birthday), appearance index (their focus events via `focus_character_id`,
+    plus every scene where they *speak* via `speakers`), a "notable lines" list
+    (turn retrieval already finds attributed utterances — see `query/turns.py`),
+    card gallery, relationship/co-appearance graph.
+  * **Where does non-story metadata come from?** Profile fields (CV, birthday,
+    height, school) are in the master DB's `gameCharacters` /
+    `gameCharacterUnits`, which we do not currently ingest. Card art is on the
+    asset CDN. Both are fetch-time additions, not derived data.
+  * **Copyright contract.** The public deploy ships zero transcript prose and
+    fetches quotes live (`docs/derived-hosting.md`). A "notable lines" panel must
+    follow the same rule — derived refs + live fetch, never stored text — or it
+    breaks the thing that makes the deploy hostable.
 
 ## 6. Lyric ↔ story resonance (new feature, phased)
 

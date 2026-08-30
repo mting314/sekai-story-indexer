@@ -63,6 +63,40 @@
       "id": "contextual-focus-event",
       "question": "What happens in Kohane's first focus event?",
       "expect_arc": "0006-lyric"
+    },
+    {
+      "id": "turn-speaker-attribution",
+      "question": "When does Honami mention her brother?",
+      "expect_arc": "0001-firststar",
+      "expect_unit": "leo_need",
+      "answer_contains_any": ["I have a younger brother"],
+      "answer_excludes_any": ["My brother walked me here", "Tsukasa never lets me get wet"]
+    },
+    {
+      "id": "turn-anaphora-reply",
+      "question": "What does Honami say about going shopping with her brother?",
+      "expect_arc": "0001-firststar",
+      "answer_contains_any": ["he's at an age where he's a little shy"]
+    },
+    {
+      "id": "turn-wrong-speaker-rejected",
+      "question": "What does Shiho say about her brother?",
+      "answer_excludes_any": ["I have a younger brother", "My brother walked me here"]
+    },
+    {
+      "id": "continuity-state-change",
+      "question": "When does Haruka become the producer?",
+      "expect_arc": "0133-lead",
+      "expect_unit": "more_more_jump",
+      "answer_contains_any": ["Okay, I'll do it", "becoming the producer for MORE MORE JUMP"],
+      "answer_excludes_any": ["we won't have a producer", "Hope is something you can hand"]
+    },
+    {
+      "id": "continuity-name-mass-does-not-win",
+      "question": "When did Haruka take on the producer role for the group?",
+      "expect_unit": "more_more_jump",
+      "answer_contains_any": ["Okay, I'll do it", "asked to be the producer", "As the producer of MORE MORE JUMP"],
+      "answer_excludes_any": ["Minori was so nervous", "Hope is something you can hand", "I still get nervous before the lights"]
     }
   ]
 }

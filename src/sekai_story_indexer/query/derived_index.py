@@ -19,20 +19,37 @@ from pathlib import Path
 from typing import Any
 
 from ..source.relevance import weight_factor
-from .local import LocalQueryEngine, build_local_engine, tokenize
+from .local import LocalQueryEngine, build_local_engine
+from .scoring import concept_score, scoring_groups, tokenize
 
 
 def build_derived_index(
-    engine: LocalQueryEngine, scene_sources: dict[str, dict] | None = None
+    engine: LocalQueryEngine,
+    scene_sources: dict[str, dict] | None = None,
+    *,
+    quotable_only: bool = True,
 ) -> dict[str, Any]:
     """Serialize an engine's derived retrieval data — counts + idf + expansions +
-    scene metadata (+ optional sekai.best fetch coords) — with NO prose. Safe to
-    host publicly. ``scene_sources`` maps ``"arc/episode" -> {bundle,...}`` so the
-    public UI can fetch a cited scene live for display."""
+    characters + scene metadata (+ optional sekai.best fetch coords) — with NO
+    prose. Safe to host publicly. ``scene_sources`` maps ``"arc/episode" ->
+    {bundle,...}`` so the public UI can fetch a cited scene live for display.
+
+    ``quotable_only`` keeps the public index to scenes the UI can actually open: a
+    scene with no fetch coords ranks in search and then shows an empty citation,
+    which is worse than not returning it. Unit overviews are exempt — they are our
+    own derived prose, not transcript, so they need no live fetch. The filter is
+    inert when no ``scene_sources`` are supplied at all: nothing is quotable then,
+    so applying it would empty the index rather than trim it."""
     scene_sources = scene_sources or {}
+    quotable_only = quotable_only and bool(scene_sources)
     scenes: list[dict[str, Any]] = []
+    skipped = 0
     for i, node in enumerate(engine.nodes):
         m = node.metadata
+        source = scene_sources.get(f"{m.arc_id}/{m.episode_name}")
+        if quotable_only and source is None and m.content_type != "unit_overview":
+            skipped += 1
+            continue
         loc = engine.human_location(node)
         scenes.append(
             {
@@ -43,13 +60,24 @@ def build_derived_index(
                 "label": loc["label"],
                 "nickname": loc.get("nickname"),
                 "plot_weight": engine._weight_by_arc.get(m.arc_id, "unrated"),
-                "source": scene_sources.get(f"{m.arc_id}/{m.episode_name}"),  # live-fetch coords
+                "source": source,  # live-fetch coords
                 "tf": dict(engine._tf[i]),  # {token: count} — derived, non-reversible
             }
         )
+    if skipped:
+        # Never let a coverage cut look like full coverage.
+        print(f"derived index: skipped {skipped} scene(s) with no live-fetch coords")
     # expansions as [[sorted trigger tokens], [additions]] — JSON-friendly
     expansions = [[sorted(trig), list(adds)] for trig, adds in engine._expansions]
-    return {"version": 1, "scenes": scenes, "idf": dict(engine._idf), "expansions": expansions}
+    return {
+        "version": 2,  # v2 adds `characters`, needed for concept scoring
+        "scenes": scenes,
+        "idf": dict(engine._idf),
+        "expansions": expansions,
+        # (jp, en) name pairs — lets score_query group a name's ~8 lexical surfaces
+        # into one concept, exactly as the local engine does.
+        "characters": [list(pair) for pair in engine._characters],
+    }
 
 
 def write_derived_index(index: dict[str, Any], path: str | Path) -> Path:
@@ -80,6 +108,7 @@ def build_index_file(
     scene_sources_path: str | Path = "scene_sources.json",
     glossary_path: str | Path = "glossary.json",
     out_path: str | Path = "derived_index.json.gz",
+    quotable_only: bool = True,
 ) -> Path:
     """Build the prose-free derived index from the local corpus + fetch coords and
     write it. Run where the corpus exists; the output ships to the public host."""
@@ -91,7 +120,8 @@ def build_index_file(
     if Path(scene_sources_path).exists():
         scene_sources = json.loads(Path(scene_sources_path).read_text(encoding="utf-8"))
     engine = build_local_engine(Path(story_root), events_index, glossary)
-    return write_derived_index(build_derived_index(engine, scene_sources), out_path)
+    index = build_derived_index(engine, scene_sources, quotable_only=quotable_only)
+    return write_derived_index(index, out_path)
 
 
 def _expand(tokens: list[str], expansions: list[list[list[str]]]) -> list[str]:
@@ -120,31 +150,49 @@ def score_query(
     q_tokens = [t for t in _expand(toks, index.get("expansions", [])) if t in idf]
     if not q_tokens:
         return []
+    # Concept scoring, identical to the local engine (query/scoring.py) so the
+    # public deploy ranks the same way. A v1 index predates `characters`; it then
+    # has no name concept to group and falls back to the plain bag-of-words below.
+    characters = [tuple(p) for p in index.get("characters", [])]
+    name_group, topics = scoring_groups(question, characters, idf, aux_query=aux_query)
     arc_set = set(arc_ids)
-    ranked: list[tuple[float, dict[str, Any]]] = []
-    for sc in index["scenes"]:
-        if arc_set and sc["arc_id"] not in arc_set:
-            continue
-        if unit and sc["unit"] != unit:
-            continue
-        tf = sc["tf"]
-        score = sum(tf.get(t, 0) * idf[t] for t in q_tokens)
-        if score > 0:
-            # same plot-weight boost the live engine applies, for ranking parity
-            score *= weight_factor(sc.get("plot_weight"))
-            ranked.append(
-                (
-                    score,
-                    {
-                        "arc_id": sc["arc_id"],
-                        "episode": sc["episode"],
-                        "unit": sc["unit"],
-                        "label": sc["label"],
-                        "nickname": sc.get("nickname"),
-                        "source": sc.get("source"),  # live-fetch coords for the UI
-                        "score": score,
-                    },
+
+    def rank(use_concepts: bool) -> list[tuple[float, dict[str, Any]]]:
+        out: list[tuple[float, dict[str, Any]]] = []
+        for sc in index["scenes"]:
+            if arc_set and sc["arc_id"] not in arc_set:
+                continue
+            if unit and sc["unit"] != unit:
+                continue
+            tf = sc["tf"]
+            if use_concepts:
+                score = concept_score(tf, idf, name_group, topics)
+            else:
+                score = sum(tf.get(t, 0) * idf[t] for t in q_tokens)
+            if score > 0:
+                # same plot-weight boost the live engine applies, for ranking parity
+                score *= weight_factor(sc.get("plot_weight"))
+                out.append(
+                    (
+                        score,
+                        {
+                            "arc_id": sc["arc_id"],
+                            "episode": sc["episode"],
+                            "unit": sc["unit"],
+                            "label": sc["label"],
+                            "nickname": sc.get("nickname"),
+                            "source": sc.get("source"),  # live-fetch coords for the UI
+                            "score": score,
+                        },
+                    )
                 )
-            )
+        return out
+
+    ranked = rank(bool(name_group or topics))
+    if not ranked:
+        # Every scene missed every topic. Questions paraphrase and the tokenizer
+        # does not stem, so that is a phrasing gap, not evidence of absence — same
+        # fallback the local engine makes.
+        ranked = rank(False)
     ranked.sort(key=lambda r: (-r[0], r[1]["arc_id"], r[1]["episode"]))
     return [ref for _, ref in ranked[:top_k]]

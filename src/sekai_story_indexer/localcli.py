@@ -145,12 +145,17 @@ def build_lyric_map_command(
 def build_index_command(
     story_root: Path = typer.Option(Path("story")),
     out: Path = typer.Option(Path("derived_index.json.gz"), help="Output (.gz to compress)"),
+    all_scenes: bool = typer.Option(
+        False,
+        "--all-scenes",
+        help="Include scenes with no live-fetch coords (they rank but cannot be opened).",
+    ),
 ):
     """Build the prose-free derived index (token counts + coords, NO transcript
     text) for copyright-clean public hosting. See docs/derived-hosting.md."""
     from .query.derived_index import build_index_file
 
-    p = build_index_file(story_root, out_path=out)
+    p = build_index_file(story_root, out_path=out, quotable_only=not all_scenes)
     typer.echo(f"wrote {p}")
 
 

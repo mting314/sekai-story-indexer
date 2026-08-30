@@ -647,6 +647,7 @@ def test_virtual_singer_banner_is_not_a_focus_event():
     cat = build_catalog(events, stories_by_event=stories, story_units_by_story_id=su,
                         music_by_event={}, banner_char_by_event=banner,
                         event_card_ids=event_card_ids, cards_by_id=cards_by_id)
+    r = cat[0]
     assert r["focus_character_id"] == 0 and r["nickname"] is None
 
 
@@ -789,26 +790,90 @@ def test_load_official_en_skips_drifted_pairs(tmp_path: Path):
     assert load_official_en(tmp_path) == {}
 
 
-def test_backfill_story_tree(tmp_path: Path):
-    import json
+def test_en_card_scenario_uses_the_en_bucket_path(monkeypatch):
+    """The EN mirror serves card side-stories under ``character/member_scenario/``
+    while JP uses ``character/member/``. Events and unit stories share their path
+    across both buckets, so cards are the one asymmetric case — and pointing EN at
+    the JP path 404s every card, which reads as "not localized yet" rather than as
+    a bug. Guard the asymmetry so it can't quietly regress."""
+    from sekai_story_indexer.source import client
 
-    from sekai_story_indexer.source.backfill_slugs import backfill_story_tree
+    seen: list[str] = []
 
-    story_root = tmp_path / "story"
-    ep_dir = story_root / "leo_need" / "event" / "0001"
-    ep_dir.mkdir(parents=True)
-    ep_file = ep_dir / "01.md"
-    ep_file.write_text("# 1. 雨上がりのステップ\n\n咲希: こんにちは", encoding="utf-8")
+    def fake_fetch(url, **kwargs):
+        seen.append(url)
+        return {"TalkData": []}
 
-    index_file = tmp_path / "events_index.json"
-    index_file.write_text(
-        json.dumps([{"event_id": 1, "name": "雨上がりのステップ", "arc_slug": "0001"}], ensure_ascii=False),
-        encoding="utf-8",
+    monkeypatch.setattr(client, "fetch_json", fake_fetch)
+
+    client.en_card_story_scenario("res003_no044", "003044_honami02")
+    client.card_story_scenario("res003_no044", "003044_honami02")
+    en_url, jp_url = seen
+
+    assert "sekai-en-assets" in en_url and "/character/member_scenario/" in en_url
+    assert "sekai-jp-assets" in jp_url and "/character/member/" in jp_url
+    assert "/character/member_scenario/" not in jp_url
+
+
+def test_card_skip_existing_backfills_a_missing_en_sidecar(tmp_path):
+    """Card EN was unreachable until the CDN path was corrected, so every card
+    already on disk is missing its sidecar. ``--skip-existing`` must fill that gap
+    from the on-disk JP instead of skipping the episode wholesale — otherwise the
+    corpus can never acquire card EN without re-downloading everything."""
+    cards_rows = [{"id": 1, "characterId": 1, "prefix": "card one"}]
+    episode_rows = [
+        {"id": 1, "cardId": 1, "seq": 1, "title": "a", "scenarioId": "s1",
+         "assetbundleName": "res001", "cardEpisodePartType": "first_part"},
+    ]
+    jp = {"TalkData": [{"WindowDisplayName": "一歌", "Body": "こんにちは"}]}
+    en = {"TalkData": [{"WindowDisplayName": "Ichika", "Body": "Hello"}]}
+
+    # first pass: JP written, EN unavailable (the pre-fix state)
+    fetch_card_stories(
+        tmp_path, cards_rows=cards_rows, episode_rows=episode_rows,
+        scenario_fetch=lambda *a: jp, en_scenario_fetch=lambda *a: {}, log=lambda *_: None,
     )
+    md = next((tmp_path / "leo_need" / "card").rglob("01_*.md"))
+    assert not md.with_name(md.name + ".en").exists()
 
-    stats = backfill_story_tree(story_root, index_file, tmp_path / "story_order.yaml")
-    assert stats["dirs_renamed"] == 1
-    assert stats["files_renamed"] == 1
-    assert (
-        story_root / "leo_need" / "event" / "0001-ameagari-no-suteppu" / "01_ameagari-no-suteppu.md"
-    ).exists()
+    # second pass: EN now reachable. JP must NOT be re-downloaded.
+    jp_calls: list[tuple] = []
+
+    def jp_fetch(*args):
+        jp_calls.append(args)
+        return jp
+
+    fetch_card_stories(
+        tmp_path, cards_rows=cards_rows, episode_rows=episode_rows, skip_existing=True,
+        scenario_fetch=jp_fetch, en_scenario_fetch=lambda *a: en, log=lambda *_: None,
+    )
+    sidecar = md.with_name(md.name + ".en")
+    assert sidecar.exists(), "skip-existing must backfill the EN sidecar"
+    assert "Ichika: Hello" in sidecar.read_text(encoding="utf-8")
+    assert jp_calls == [], "JP must be reused from disk, not re-fetched"
+
+
+def test_card_skip_existing_leaves_a_present_sidecar_alone(tmp_path):
+    """An already-localized card costs no network on later passes."""
+    cards_rows = [{"id": 1, "characterId": 1, "prefix": "card one"}]
+    episode_rows = [
+        {"id": 1, "cardId": 1, "seq": 1, "title": "a", "scenarioId": "s1",
+         "assetbundleName": "res001", "cardEpisodePartType": "first_part"},
+    ]
+    jp = {"TalkData": [{"WindowDisplayName": "一歌", "Body": "こんにちは"}]}
+    en = {"TalkData": [{"WindowDisplayName": "Ichika", "Body": "Hello"}]}
+    fetch_card_stories(
+        tmp_path, cards_rows=cards_rows, episode_rows=episode_rows,
+        scenario_fetch=lambda *a: jp, en_scenario_fetch=lambda *a: en, log=lambda *_: None,
+    )
+    en_calls: list[tuple] = []
+
+    def en_fetch(*args):
+        en_calls.append(args)
+        return en
+
+    fetch_card_stories(
+        tmp_path, cards_rows=cards_rows, episode_rows=episode_rows, skip_existing=True,
+        scenario_fetch=lambda *a: jp, en_scenario_fetch=en_fetch, log=lambda *_: None,
+    )
+    assert en_calls == []

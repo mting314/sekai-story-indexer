@@ -25,6 +25,18 @@ from ..source.constants import CHARACTER_ID_TO_JP, CHARACTER_ID_TO_UNIT, UNIT_NA
 from ..source.relevance import weight_factor
 from .context import arc_context_line
 from .scoping import Scope, ScopeIndex
+from .scoring import (
+    UNIT_KEYWORDS as _UNIT_KEYWORDS,
+)
+from .scoring import (
+    concept_score,
+    name_surfaces,
+    named_characters,
+    scoring_groups,
+    tokenize,
+    topic_terms,
+)
+from .turns import TIER_REPLY, find_turn_hits, window_lines
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 _CJK_RE = re.compile(r"[぀-ヿ㐀-鿿]")
@@ -57,30 +69,22 @@ _EARLY_INTENT_RE = re.compile(
 )
 _POS_BOOST = 1.0  # max extra weight applied to scenes at the asked-about end
 
-# Unit references in questions (substring, lowercased) -> unit slug.
-_UNIT_KEYWORDS = {
-    "leo/need": "leo_need", "leoneed": "leo_need", "leo need": "leo_need",
-    "more more jump": "more_more_jump", "moremorejump": "more_more_jump",
-    "mmj": "more_more_jump", "momojan": "more_more_jump",
-    "vivid bad squad": "vivid_bad_squad", "vbs": "vivid_bad_squad", "vivid": "vivid_bad_squad",
-    "wonderlands": "wonderlands_showtime", "wxs": "wonderlands_showtime", "wonder show": "wonderlands_showtime",
-    "nightcord": "nightcord", "25-ji": "nightcord", "niigo": "nightcord", "n25": "nightcord",
-    "virtual singer": "virtual_singer", "vocaloid": "virtual_singer",
-}
 
 
-def tokenize(text: str) -> list[str]:
-    """ASCII words + CJK unigrams AND bigrams — a language-agnostic lexical key set
-    that needs no tokenizer dependency (works for JP and EN). Unigrams let a short,
-    standalone kanji word (弟, 兄) be found even when it fuses with a following
-    particle into a bigram (弟も); bigrams keep multi-char phrase precision."""
-    text = text.lower()
-    tokens = _WORD_RE.findall(text)
-    cjk = _CJK_RE.findall(text)
-    tokens += cjk  # unigrams (single CJK chars)
-    if len(cjk) > 1:
-        tokens += ["".join(pair) for pair in zip(cjk, cjk[1:])]  # adjacent bigrams
-    return tokens
+# Speech verbs. Turn-level attribution only takes over when the question asks what
+# a character *said*, and only when the character is the SUBJECT of that verb —
+# "when does Honami mention her brother" (Honami speaks) but not "where does she
+# tell Kohane to meet" (Kohane is the recipient). Subject position is approximated
+# by the name appearing before the verb, which is what separates the two.
+_SPEECH_VERB_RE = re.compile(
+    r"\b(mention(s|ed)?|say(s)?|said|talk(s|ed)?|speak(s)?|spoke|"
+    r"tell(s)?|told|call(s|ed)?|describe(s|d)?|refer(s|red)?|"
+    r"bring(s)? up|brought up)\b",
+    re.IGNORECASE,
+)
+
+
+
 
 
 def load_story_nodes(root: str | Path) -> list[StoryNode]:
@@ -99,8 +103,14 @@ class LocalQueryEngine:
         events_index: list[dict] | None = None,
         glossary: dict | None = None,
         event_summaries: dict[str, str] | None = None,
+        official_en: dict[str, str] | None = None,
     ):
         self.nodes = nodes
+        # JP line -> official EN line. Folded into the *index* text (so an English
+        # question matches a Japanese transcript with no translation round-trip) and
+        # used by turn retrieval to read/quote utterances in English. node.text is
+        # never modified — JP stays the quoted source of truth.
+        self._en: dict[str, str] = official_en or {}
         # pre-computed event summaries {arc_id: text} (hierarchical summaries_cache) —
         # used to answer 'summarize X' cheaply instead of re-reading raw scenes.
         self._event_summaries: dict[str, str] = event_summaries or {}
@@ -157,6 +167,7 @@ class LocalQueryEngine:
         for toks in self._tokens:
             df.update(set(toks))
         n_docs = max(1, len(nodes))
+        self._df: Counter = df
         self._idf: dict[str, float] = {
             term: math.log(1 + n_docs / (1 + count)) for term, count in df.items()
         }
@@ -170,11 +181,26 @@ class LocalQueryEngine:
         en = self._char_by_id.get(fcid, (None, None))[1] if fcid else None
         return arc_context_line(meta, focus_name_en=en)
 
+    def _english_text(self, node: StoryNode) -> str:
+        """The node's official-EN rendering, line-for-line, or "" when unlocalized."""
+        if not self._en:
+            return ""
+        out = [
+            self._en[s]
+            for s in (ln.strip() for ln in node.text.splitlines())
+            if s and s != "---" and not s.startswith("#") and s in self._en
+        ]
+        return "\n".join(out)
+
     def _index_text(self, node: StoryNode) -> str:
-        """Text used for TF-IDF indexing: situating context + the scene text. The
-        context is index-only; node.text (shown/quoted) is never modified."""
-        ctx = self._context_line(node.metadata.arc_id)
-        return f"{ctx}\n{node.text}" if ctx else node.text
+        """Text used for TF-IDF indexing: situating context + the scene text + its
+        official-EN rendering. All three are index-only; node.text (shown/quoted)
+        is never modified. Indexing EN alongside JP is what puts English content
+        words in the vocabulary at all — without it every non-name term in an
+        English question is dropped before scoring, leaving the query to rank on
+        the character name alone."""
+        parts = [self._context_line(node.metadata.arc_id), node.text, self._english_text(node)]
+        return "\n".join(p for p in parts if p)
 
     def _expand_tokens(self, tokens: list[str]) -> list[str]:
         """Augment query tokens with glossary equivalents whose trigger appears."""
@@ -253,19 +279,140 @@ class LocalQueryEngine:
         arc_ids: tuple[str, ...] = (),
         aux_query: str = "",
     ) -> list[tuple[StoryNode, float]]:
-        q_tokens = [t for t in self._expand_tokens(self._query_tokens(question, aux_query)) if t in self._idf]
         candidates = self._candidate_indices(unit, arc_id, arc_ids)
+        name_group, topics = self._scoring_groups(question, aux_query)
+        if not name_group and not topics:  # nothing nameable or topical
+            return self._retrieve_additive(question, candidates, k=k, aux_query=aux_query)
+
+        scored: list[tuple[float, int]] = []
+        for i in candidates:
+            score = self._concept_score(i, name_group, topics)
+            if score > 0:
+                # boost plot-heavy scenes, de-prioritize filler (never drop it)
+                score *= weight_factor(self._weight_by_arc.get(self.nodes[i].metadata.arc_id))
+                scored.append((score, i))
+        if not scored:
+            # Every scene missed every topic. Questions paraphrase ("promise",
+            # "gender") and the tokenizer does not stem, so this is a phrasing gap,
+            # not evidence of absence — fall back rather than answer nothing.
+            return self._retrieve_additive(question, candidates, k=k, aux_query=aux_query)
+        # deterministic tie-break: score desc, then stable source order
+        scored.sort(key=lambda s: (-s[0], self._sort_key(self.nodes[s[1]])))
+        return [(self.nodes[i], score) for score, i in scored[:k]]
+
+    def _retrieve_additive(
+        self, question: str, candidates: list[int], *, k: int, aux_query: str = ""
+    ) -> list[tuple[StoryNode, float]]:
+        """Plain TF-IDF over every query token — the fallback for questions with no
+        name and no topic to group (nicknames, bare unit words, JP-only phrasings)."""
+        q_tokens = [
+            t for t in self._expand_tokens(self._query_tokens(question, aux_query)) if t in self._idf
+        ]
         scored: list[tuple[float, int]] = []
         for i in candidates:
             tf = self._tf[i]
             score = sum(tf.get(t, 0) * self._idf[t] for t in q_tokens)
             if score > 0:
-                # boost plot-heavy scenes, de-prioritize filler (never drop it)
                 score *= weight_factor(self._weight_by_arc.get(self.nodes[i].metadata.arc_id))
                 scored.append((score, i))
-        # deterministic tie-break: score desc, then stable source order
         scored.sort(key=lambda s: (-s[0], self._sort_key(self.nodes[s[1]])))
         return [(self.nodes[i], score) for score, i in scored[:k]]
+
+    def _scoring_groups(
+        self, question: str, aux_query: str = ""
+    ) -> tuple[list[str], list[list[str]]]:
+        """``(name surfaces, topic concepts)`` — see :mod:`query.scoring`. Shared
+        with the derived backend so the public deploy ranks identically."""
+        return scoring_groups(
+            question, self._characters, self._idf, aux_query=aux_query, floor=False
+        )
+
+    def _concept_score(
+        self, index: int, name_group: list[str], topics: list[list[str]]
+    ) -> float:
+        """Concept-wise relevance for one scene — see :mod:`query.scoring`."""
+        return concept_score(self._tf[index], self._idf, name_group, topics)
+
+    # -- turn-level retrieval -------------------------------------------------
+    def _attributed_speaker(self, question: str) -> list[tuple[str, str]]:
+        """Characters the question asks about *as speakers* — named, and sitting in
+        subject position before a speech verb. [] when this isn't an attribution
+        question, which leaves scene retrieval in charge."""
+        verb = _SPEECH_VERB_RE.search(question)
+        if not verb:
+            return []
+        before = question[: verb.start()].lower()
+        out = []
+        for jp, en in self._named_chars(question):
+            surfaces = [jp, *(t for t in en.lower().split() if len(t) >= 3)]
+            if any(s.lower() in before for s in surfaces):
+                out.append((jp, en))
+        return out
+
+    def _name_tokens(self, question: str) -> set[str]:
+        """Every lexical surface of the characters the question names, as one
+        concept rather than N independent terms."""
+        return set(name_surfaces(question, self._characters, self._idf))
+
+    def _topic_terms(self, question: str) -> list[str]:
+        """Question terms that carry topic, sharpest first (no relevance floor)."""
+        return topic_terms(question, self._characters, self._idf)
+
+    def _content_concepts(self, question: str, aux_query: str = "") -> list[list[str]]:
+        """What the question is *about*, as interchangeable surface forms per topic,
+        pruned to the terms sharp enough to be its subject. Used by turn retrieval,
+        which needs a tight topic set because it matches against single utterances."""
+        return scoring_groups(
+            question, self._characters, self._idf, aux_query=aux_query, floor=True
+        )[1]
+
+    def _turn_hits(
+        self,
+        question: str,
+        *,
+        unit: str | None,
+        arc_id: str | None,
+        arc_ids: tuple[str, ...],
+        aux_query: str = "",
+    ) -> list:
+        """Turn windows where the character the question asks about is themselves
+        involved in the topic. [] when this isn't an attribution question."""
+        named = self._attributed_speaker(question)
+        concepts = self._content_concepts(question, aux_query)
+        if not named or not concepts:
+            return []
+
+        # Prefilter on the most discriminative topic so the turn scan stays cheap;
+        # requiring *every* topic is too strict for multi-word questions.
+        best = max(
+            (c for c in concepts),
+            key=lambda c: max((self._idf.get(t, 0.0) for t in c), default=0.0),
+        )
+        pool = [
+            i
+            for i in self._candidate_indices(unit, arc_id, arc_ids)
+            if any(self._tf[i].get(t) for t in best)
+        ]
+        if not pool:
+            return []
+
+        targets = [(jp, {t for t in en.lower().split() if len(t) >= 2}) for jp, en in named]
+
+        def is_speaker(speaker: str) -> bool:
+            return any(_speaker_is(speaker, jp, en_toks) for jp, en_toks in targets)
+
+        hits = find_turn_hits(
+            self.nodes,
+            pool,
+            content_concepts=concepts,
+            is_speaker=is_speaker,
+            en_map=self._en,
+        )
+        # Mere co-presence (TIER_PRESENT) is overwhelmingly noise — on the full
+        # corpus it outnumbers real attributions ~7:1, and it is exactly the
+        # "someone else said it while they were in the room" failure this path
+        # exists to remove. Keep only utterances we can actually attribute.
+        return [h for h in hits if h.tier >= TIER_REPLY]
 
     def _budget_cover(
         self, idxs: list[int], budget_chars: int, bias: str | None = None
@@ -407,12 +554,45 @@ class LocalQueryEngine:
         # survives), not a top-k cut. The query is often cross-lingual (EN over JP
         # scenes), so nothing lexically favors the finale and a top-k would return
         # the first k episodes — hiding the climax from the answer.
+        turn_hits: list = []
         if arc_id and not arc_ids:
             hits = self._scoped_event_hits(question, unit, arc_id, aux_query=aux_query)
         else:
-            hits = self.retrieve(
-                question, k=k, unit=unit, arc_id=arc_id, arc_ids=arc_ids, aux_query=aux_query
+            # A question that names a character and asks about a topic ("when does
+            # Honami mention her brother") is answered by an *utterance*, not by an
+            # episode. Attribute at turn level first; fall back to scene retrieval
+            # when the speaker is never near the topic.
+            turn_hits = self._turn_hits(
+                question, unit=unit, arc_id=arc_id, arc_ids=arc_ids, aux_query=aux_query
             )
+            if turn_hits:
+                best_by_node: dict[int, object] = {}
+                for th in turn_hits:  # already strongest-first
+                    best_by_node.setdefault(th.node_index, th)
+                turn_hits = list(best_by_node.values())[:k]
+                hits = [(self.nodes[th.node_index], float(th.tier)) for th in turn_hits]
+            elif self._attributed_speaker(question) and self._content_concepts(
+                question, aux_query
+            ):
+                # An attribution question we could not attribute. Falling through to
+                # scene retrieval here is precisely how another character's line gets
+                # quoted back as if they'd said it, so decline instead.
+                who = ", ".join(en for _, en in self._attributed_speaker(question))
+                msg = (
+                    f"No line where {who} says that — nothing in the indexed corpus "
+                    "attributes it to them."
+                )
+                return {
+                    "answer": msg,
+                    "answer_parts": [{"type": "text", "text": msg}],
+                    "citations": [],
+                    "scope": scope.as_dict(),
+                    "backend": "local",
+                }
+            else:
+                hits = self.retrieve(
+                    question, k=k, unit=unit, arc_id=arc_id, arc_ids=arc_ids, aux_query=aux_query
+                )
         if not hits:
             candidates = (
                 self._candidate_indices(unit, arc_id, arc_ids) if (arc_id or arc_ids) else []
@@ -446,11 +626,45 @@ class LocalQueryEngine:
                 }
 
         top, _ = hits[0]
+        if turn_hits:
+            # Turn-attributed: quote the named speaker's own line, and hand back the
+            # surrounding exchange so a reply that refers back ("he", 彼) still reads
+            # as evidence and the generator can resolve it.
+            quotes = [(float(th.tier), th.quote, i) for i, th in enumerate(turn_hits)]
+            citations = [
+                self._citation(
+                    node,
+                    i + 1,
+                    score=score,
+                    quote=turn_hits[i].quote,
+                    window=window_lines(node, turn_hits[i], self._en),
+                )
+                for i, (node, score) in enumerate(hits)
+            ]
+            label = citations[0]["label"]
+            answer_parts: list[dict] = [{"type": "text", "text": f"From {label}:"}]
+            for _, line, hit_idx in quotes:
+                answer_parts.append({"type": "quote", "ref": hit_idx + 1, "text": line})
+            return {
+                "answer": f"From {label}:\n" + "\n".join(q[1] for q in quotes),
+                "answer_parts": answer_parts,
+                "citations": citations,
+                "scope": scope.as_dict(),
+                "backend": "local",
+            }
+
         q_tokens = set(self._expand_tokens(tokenize(question)))
         # Extractive answer: gather query-overlapping lines from across the top
         # hits (not just #1), ranked by overlap × scene score, so supporting
         # evidence in a lower-ranked scene of the same arc still surfaces. Track
         # which hit each quote came from so the UI can link quote -> excerpt.
+        #
+        # Overlap is measured against the JP line *and* its official-EN rendering:
+        # an English question matches the EN side, so scanning JP alone scores every
+        # line at zero and leaves the answer quoteless. Weight by IDF rather than by
+        # a raw term count, so a line whose only overlap is the speaker's name — the
+        #「…………」 filler lines that a name-dense scene is full of — cannot outrank a
+        # line that actually carries the topic.
         scored_lines: list[tuple[float, str, int]] = []
         seen_lines: set[str] = set()
         for hit_idx, (node, node_score) in enumerate(hits):
@@ -458,9 +672,11 @@ class LocalQueryEngine:
                 stripped = ln.strip()
                 if not stripped or stripped.startswith("#") or stripped in seen_lines:
                     continue
-                overlap = len(q_tokens & set(tokenize(stripped)))
-                if overlap:
-                    scored_lines.append((overlap * node_score, stripped, hit_idx))
+                english = self._en.get(stripped, "")
+                matched = q_tokens & set(tokenize(f"{stripped} {english}"))
+                if matched:
+                    overlap = sum(self._idf.get(t, 0.0) for t in matched)
+                    scored_lines.append((overlap * node_score, english or stripped, hit_idx))
                     seen_lines.add(stripped)
         scored_lines.sort(key=lambda s: -s[0])
         quotes = scored_lines[:6]
@@ -496,10 +712,19 @@ class LocalQueryEngine:
             "backend": "local",
         }
 
-    def _citation(self, node: StoryNode, ref: int, *, score: float = 0.0, quote: str = "") -> dict:
+    def _citation(
+        self,
+        node: StoryNode,
+        ref: int,
+        *,
+        score: float = 0.0,
+        quote: str = "",
+        window: list[str] | None = None,
+    ) -> dict:
         loc = self.human_location(node)
         m = node.metadata
         return {
+            "window": window or [],
             "ref": ref,
             "label": loc["label"],
             "unit_name": loc["unit_name"],
@@ -600,15 +825,7 @@ class LocalQueryEngine:
 
     def _named_chars(self, question: str) -> list[tuple[str, str]]:
         """All characters explicitly named in the question (JP fragment or EN token)."""
-        q_tokens = set(tokenize(question))
-        jp_runs = _CJK_RE.findall(question)
-        jp_bigrams = {"".join(pair) for pair in zip(jp_runs, jp_runs[1:])}
-        out = []
-        for jp, en in self._characters:
-            if (jp in question or any(bg in jp for bg in jp_bigrams)
-                    or any(len(t) >= 3 and t in q_tokens for t in tokenize(en))):
-                out.append((jp, en))
-        return out
+        return named_characters(question, self._characters)
 
     def names_absent_character(
         self, question: str, arc_ids: tuple[str, ...]
@@ -773,7 +990,15 @@ def build_local_engine(
         nodes = nodes + build_unit_overviews(events_index)
     # Pre-computed event summaries (arc_id -> text), if built by `indexer ingest`.
     event_summaries = _load_event_summaries(story_root)
-    return LocalQueryEngine(nodes, events_index, glossary, event_summaries)
+    # Official-EN sidecars (*.md.en). Best-effort: a corpus without them (the
+    # sample fixture, or a fetch that predates EN support) just stays JP-only.
+    try:
+        from .official_en import load_official_en
+
+        official_en = load_official_en(story_root)
+    except Exception:
+        official_en = {}
+    return LocalQueryEngine(nodes, events_index, glossary, event_summaries, official_en)
 
 
 def _load_event_summaries(story_root: Path) -> dict[str, str]:

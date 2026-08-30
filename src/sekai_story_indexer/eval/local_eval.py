@@ -79,6 +79,14 @@ def _check_case(engine, case: dict) -> CaseResult:
     if wanted and not any(w.lower() in answer for w in wanted):
         failures.append(f"answer missing any of {wanted}")
 
+    # Precision guard: text that must NOT be quoted. Scene-level retrieval happily
+    # returns a line another character said, because the whole episode matched —
+    # asserting on absence is the only way to pin that regression down.
+    banned = case.get("answer_excludes_any")
+    for phrase in banned or []:
+        if phrase.lower() in answer:
+            failures.append(f"answer wrongly quoted {phrase!r}")
+
     return CaseResult(id=case["id"], passed=not failures, failures=failures)
 
 

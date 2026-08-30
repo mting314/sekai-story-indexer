@@ -21,6 +21,7 @@ from pathlib import Path
 
 from .constants import CHARACTER_ID_TO_UNIT, DB_UNIT_TO_SLUG
 
+
 def en_sidecar_path(jp_path: Path) -> Path:
     """Co-located official-EN sidecar for a JP episode: ``foo.md`` → ``foo.md.en``.
     The trailing ``.en`` (not ``.en.md``) keeps it off every ``*.md`` glob, so the
