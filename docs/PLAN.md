@@ -398,6 +398,34 @@ even the filesystem sorted chronologically). Hand-authored content still uses
     follow the same rule — derived refs + live fetch, never stored text — or it
     breaks the thing that makes the deploy hostable.
 
+* **Citation click should scroll to the quoted line (TODO).**
+  Clicking a citation opens the episode in the sidebar and tints the matching row
+  (`isHit` → `yellow.400/25`, `VNTranscript` in `frontend/src/components/Sidebar.tsx`),
+  but nothing scrolls. A scene here is a whole episode — ~48 dialogue turns, up to
+  324 — so the highlighted line is usually well below the fold and the reader has
+  to hunt for the thing they just clicked. The panel has no scroll logic at all
+  today; the only `useRef` is request sequencing.
+
+  Not just "call `scrollIntoView`" — the anchor is unreliable:
+  * **Matching is exact string equality** (`line.trim() === highlight`). Cross-
+    lingual citations routinely miss: the quote can be official-EN while the
+    fetched transcript is JP (or the reverse, when the EN CDN has the scene and
+    the cached quote came from JP). On a miss nothing is tinted, so there is
+    nothing to scroll to and the failure is silent.
+  * **Text arrives after the panel opens** (live fetch from sekai.best, or
+    `/api/episode-raw`), so the scroll has to run post-render, not on open.
+  * **Two modes.** `vn` renders rows; `excerpt` renders a marked blob. They need
+    different anchoring.
+  * **A better anchor already exists for turn-attributed hits:** citations now
+    carry `window` (the surrounding turns) and turn retrieval knows the anchor
+    turn index — positional, not string-matched. That is local-backend only; the
+    derived backend has no turns, so string matching stays the fallback there.
+
+  Suggested shape: have the matched row register a ref, scroll it to centre on
+  first paint after load, and fall back to the first `window` line when exact
+  matching fails. Worth a visible "couldn't locate the quote" state rather than
+  silently showing an untinted transcript.
+
 ## 6. Lyric ↔ story resonance (new feature, phased)
 
 **Goal.** Each Sekai event has a commissioned/theme song deliberately tied to its
