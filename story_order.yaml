@@ -214,5 +214,6 @@ chronological_order: &id001
   - 0213-leap-beyond-the-limits
   - 0214-again-and-again-ambition
   - 0215-mix-make-party-time
+  - 0216-after-the-fire
 summary_order: *id001
 part_order_overrides: []

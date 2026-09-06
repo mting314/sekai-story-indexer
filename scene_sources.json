@@ -8708,5 +8708,45 @@
     "bundle": "event_partytime_2026",
     "scenario_id": "event_215_08",
     "region": "jp"
+  },
+  "0216-after-the-fire/01_kiai-ha-juubun": {
+    "bundle": "event_afterfire_2026",
+    "scenario_id": "event_216_01",
+    "region": "jp"
+  },
+  "0216-after-the-fire/02_yosougai-no-raihousha-tooru": {
+    "bundle": "event_afterfire_2026",
+    "scenario_id": "event_216_02",
+    "region": "jp"
+  },
+  "0216-after-the-fire/03_sorezoreno-aibou": {
+    "bundle": "event_afterfire_2026",
+    "scenario_id": "event_216_03",
+    "region": "jp"
+  },
+  "0216-after-the-fire/04_ano-gorono-kyori": {
+    "bundle": "event_afterfire_2026",
+    "scenario_id": "event_216_04",
+    "region": "jp"
+  },
+  "0216-after-the-fire/05_tashikana-netsu-wo": {
+    "bundle": "event_afterfire_2026",
+    "scenario_id": "event_216_05",
+    "region": "jp"
+  },
+  "0216-after-the-fire/06_kyoumei-suru-omoi": {
+    "bundle": "event_afterfire_2026",
+    "scenario_id": "event_216_06",
+    "region": "jp"
+  },
+  "0216-after-the-fire/07_konran": {
+    "bundle": "event_afterfire_2026",
+    "scenario_id": "event_216_07",
+    "region": "jp"
+  },
+  "0216-after-the-fire/08_ginen": {
+    "bundle": "event_afterfire_2026",
+    "scenario_id": "event_216_08",
+    "region": "jp"
   }
 }
