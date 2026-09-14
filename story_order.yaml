@@ -215,5 +215,6 @@ chronological_order: &id001
   - 0214-again-and-again-ambition
   - 0215-mix-make-party-time
   - 0216-after-the-fire
+  - 0217-drive-to-dream
 summary_order: *id001
 part_order_overrides: []

@@ -8748,5 +8748,45 @@
     "bundle": "event_afterfire_2026",
     "scenario_id": "event_216_08",
     "region": "jp"
+  },
+  "0217-drive-to-dream/01_odoroki-no-tayori": {
+    "bundle": "event_drive_2026",
+    "scenario_id": "event_217_01",
+    "region": "jp"
+  },
+  "0217-drive-to-dream/02_akogare-no-chi-he": {
+    "bundle": "event_drive_2026",
+    "scenario_id": "event_217_02",
+    "region": "jp"
+  },
+  "0217-drive-to-dream/03_toraburu-hassei": {
+    "bundle": "event_drive_2026",
+    "scenario_id": "event_217_03",
+    "region": "jp"
+  },
+  "0217-drive-to-dream/04_nayamu-yori-mae-he": {
+    "bundle": "event_drive_2026",
+    "scenario_id": "event_217_04",
+    "region": "jp"
+  },
+  "0217-drive-to-dream/05_mahou-no-shootaimu": {
+    "bundle": "event_drive_2026",
+    "scenario_id": "event_217_05",
+    "region": "jp"
+  },
+  "0217-drive-to-dream/06_shiage-no-mahou": {
+    "bundle": "event_drive_2026",
+    "scenario_id": "event_217_06",
+    "region": "jp"
+  },
+  "0217-drive-to-dream/07_susumu-kakugo": {
+    "bundle": "event_drive_2026",
+    "scenario_id": "event_217_07",
+    "region": "jp"
+  },
+  "0217-drive-to-dream/08_mune-ni-daku-hikari": {
+    "bundle": "event_drive_2026",
+    "scenario_id": "event_217_08",
+    "region": "jp"
   }
 }
