@@ -8788,5 +8788,15 @@
     "bundle": "event_drive_2026",
     "scenario_id": "event_217_08",
     "region": "jp"
+  },
+  "0218-connect-to-sekai/01_tomoni-sekai-he": {
+    "bundle": "event_wl_3rd_finale_2026",
+    "scenario_id": "wl_3rd_finale_01",
+    "region": "jp"
+  },
+  "0218-connect-to-sekai/02_korekaraha": {
+    "bundle": "event_wl_3rd_finale_2026",
+    "scenario_id": "wl_3rd_finale_02",
+    "region": "jp"
   }
 }
