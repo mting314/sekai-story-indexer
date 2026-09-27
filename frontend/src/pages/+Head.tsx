@@ -4,7 +4,7 @@ export default function HeadDefault() {
   return (
     <>
       <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <meta name="description" content="Build and share Project Sekai setlists, organized by unit." />
+      <meta name="description" content="Search, browse and ask questions about Project Sekai stories." />
       <link rel="icon" type="image/png" href={faviconUrl} />
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />

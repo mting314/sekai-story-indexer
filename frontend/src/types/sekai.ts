@@ -1,5 +1,5 @@
-// Project Sekai content types for the setlist builder. Song data is baked into
-// data/songs.json by scripts/fetch-songs.ts (joined from the Sekai master DB).
+// Project Sekai song/unit catalog types (event songs on Summaries, unit colors on Timeline).
+// Song data is baked into data/songs.json by scripts/fetch-songs.ts (from the Sekai master DB).
 
 // The six in-game units. A song belongs to zero-or-more of these (via musicTags);
 // a song with no unit is the "Other" (commissioned / Vocaloid-only) category.
@@ -12,7 +12,7 @@ export type UnitId =
   | 'nightcord';
 
 export interface Song {
-  id: string; // musics.json id, stringified (the builder keys songs by string id)
+  id: string; // musics.json id, stringified
   title: string; // JP title
   pronunciation?: string; // kana reading, used for search
   englishName?: string; // optional official/romanized name, when known
@@ -23,7 +23,7 @@ export interface Song {
   publishedAt?: number; // epoch ms (for year sort/filter)
 }
 
-// A unit chip, plus the synthetic 'other' bucket. Sourced from data/units.json.
+// A unit (name + color), plus the synthetic 'other' bucket. Sourced from data/units.json.
 export interface UnitMeta {
   id: UnitId | 'other';
   name: string;

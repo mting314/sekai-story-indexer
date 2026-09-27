@@ -150,12 +150,6 @@ export const theme: PartialTheme = {
       '0%': { backgroundPosition: '200% 50%' },
       '100%': { backgroundPosition: '0% 50%' }
     },
-    // Brief highlight pulse for a just-added setlist row (added from the search modal):
-    // an accent ring that fades out, so the new row is obvious without washing the text.
-    flashAdded: {
-      '0%': { boxShadow: '0 0 0 2px rgba(233,61,130,0.95), 0 0 16px 3px rgba(233,61,130,0.6)' },
-      '100%': { boxShadow: '0 0 0 2px rgba(233,61,130,0)' }
-    },
     // Modal entrance: the panel rises up from below + fades in (instead of just appearing);
     // the backdrop fades. Used by every dialog/modal overlay.
     modalSlideUp: {
