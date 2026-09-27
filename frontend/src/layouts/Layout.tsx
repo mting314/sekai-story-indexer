@@ -1,16 +1,15 @@
 import React from 'react';
 import '~/index.css';
 import { usePageContext } from 'vike-react/usePageContext';
-import { FaSun, FaMoon, FaBookOpen, FaMusic } from 'react-icons/fa6';
+import { FaSun, FaMoon, FaBookOpen } from 'react-icons/fa6';
 import { css } from 'styled-system/css';
 import { Box, Container, Flex, HStack, Stack } from 'styled-system/jsx';
 import { useColorMode } from '~/hooks/useColorMode';
 
-// Top-level nav across the two tools (story indexer + setlist builder), Vike file-based routing.
+// Top-level nav (Vike file-based routing). The setlist builder moved to the-sorter (/sekai-setlist).
 interface NavItem { href: string; label: string; icon: React.ComponentType<{ size?: number }>; exact?: boolean }
 const NAV: NavItem[] = [
-  { href: '/', label: 'Story Indexer', icon: FaBookOpen, exact: true },
-  { href: '/setlist', label: 'Setlist', icon: FaMusic }
+  { href: '/', label: 'Story Indexer', icon: FaBookOpen, exact: true }
 ];
 const isActive = (href: string, path: string, exact?: boolean) =>
   exact ? path === href : path === href || path.startsWith(`${href}/`);

@@ -27,14 +27,14 @@ export default function Page() {
   );
 }
 
-// Responsive 2-pane shell. Desktop (lg+): Ask chat pinned on the left, Timeline/Summaries/Setlist
-// as tabs on the right. Mobile: a single column with the full 4-tab bar (Ask included). All panes
+// Responsive 2-pane shell. Desktop (lg+): Ask chat pinned on the left, Timeline/Summaries
+// as tabs on the right. Mobile: a single column with the full tab bar (Ask included). All panes
 // are keep-alive (mounted once, hidden with display:none) so state — the Ask conversation,
 // Timeline/Summaries scroll+expand — survives switching.
 function Shell() {
   const { tab, setTab } = useStore();
   // `tab` is the global/mobile active surface. On desktop, Ask is always visible and the right
-  // pane shows the active content tab (the last of timeline/summaries/setlist that was selected).
+  // pane shows the active content tab (the last of timeline/summaries that was selected).
   const [lastContent, setLastContent] = useState<TabId>('timeline');
   useEffect(() => { if (CONTENT_IDS.includes(tab)) setLastContent(tab); }, [tab]);
   const rightTab = CONTENT_IDS.includes(tab) ? tab : lastContent;

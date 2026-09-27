@@ -2215,7 +2215,7 @@ def admin_reload(request: Request, response: Response, x_admin_token: str = Head
 if STATIC.exists():
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
-# The React/Vike/Panda frontend (``frontend/``) — the app UI (Ask, Timeline, Summaries, Setlist),
+# The React/Vike/Panda frontend (``frontend/``) — the app UI (Ask, Timeline, Summaries),
 # a static bundle that calls the same ``/api/*`` endpoints. Served at ``/`` and registered LAST so
 # the explicit ``/api/*`` routes and the ``/static`` mount take precedence over this catch-all.
 # Override the build location with ``SEKAI_FRONTEND_DIST``.

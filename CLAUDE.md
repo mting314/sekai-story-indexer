@@ -112,13 +112,14 @@ network side-quests and all of Tier 2 log and continue — a missing key is norm
   from the repo root, or from a scratch dir for a throwaway run.
 
 ## Web frontend (`frontend/`)
-The web UI is a **React + Vike + Panda CSS** app in `frontend/` (Ask · Timeline · Summaries ·
-Setlist). It replaced the old vanilla `webapp/static/{index.html,app.js}` page. It's a static
+The web UI is a **React + Vike + Panda CSS** app in `frontend/` (Ask · Timeline ·
+Summaries). It replaced the old vanilla `webapp/static/{index.html,app.js}` page. It's a static
 bundle served by FastAPI at `/`; it calls the same `/api/*` endpoints + reuses
 `/static/{meta.json,units,chara}`. Backend (`webapp/server.py` + `/api/*`) is unchanged.
 Build it before serving: `cd frontend && bun install && bun run build` (→ `dist/client`, picked
-up automatically; override with `SEKAI_FRONTEND_DIST`). `bun run fetch-songs` populates the
-Setlist catalog from the Sekai master DB. See `frontend/README.md`.
+up automatically; override with `SEKAI_FRONTEND_DIST`). `bun run fetch-songs` refreshes
+`data/songs.json` (event-song jackets) from the Sekai master DB. The setlist builder moved to
+the-sorter (`/sekai-setlist`). See `frontend/README.md`.
 
 ## Run / test locally (no keys)
 ```bash
