@@ -217,5 +217,6 @@ chronological_order: &id001
   - 0216-after-the-fire
   - 0217-drive-to-dream
   - 0218-connect-to-sekai
+  - 0219-side-by-side-our-ways
 summary_order: *id001
 part_order_overrides: []

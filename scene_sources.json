@@ -8798,5 +8798,45 @@
     "bundle": "event_wl_3rd_finale_2026",
     "scenario_id": "wl_3rd_finale_02",
     "region": "jp"
+  },
+  "0219-side-by-side-our-ways/01_machikado-no-shirase": {
+    "bundle": "event_ourways_2026",
+    "scenario_id": "event_219_01",
+    "region": "jp"
+  },
+  "0219-side-by-side-our-ways/02_mezase-guranpuri": {
+    "bundle": "event_ourways_2026",
+    "scenario_id": "event_219_02",
+    "region": "jp"
+  },
+  "0219-side-by-side-our-ways/03_pinchi-dakarakoso": {
+    "bundle": "event_ourways_2026",
+    "scenario_id": "event_219_03",
+    "region": "jp"
+  },
+  "0219-side-by-side-our-ways/04_iza-o-hirome": {
+    "bundle": "event_ourways_2026",
+    "scenario_id": "event_219_04",
+    "region": "jp"
+  },
+  "0219-side-by-side-our-ways/05_tokubetsu-na-omoide": {
+    "bundle": "event_ourways_2026",
+    "scenario_id": "event_219_05",
+    "region": "jp"
+  },
+  "0219-side-by-side-our-ways/06_zutto-ichibanchikaku-de": {
+    "bundle": "event_ourways_2026",
+    "scenario_id": "event_219_06",
+    "region": "jp"
+  },
+  "0219-side-by-side-our-ways/07_mirai-no-jibun-he": {
+    "bundle": "event_ourways_2026",
+    "scenario_id": "event_219_07",
+    "region": "jp"
+  },
+  "0219-side-by-side-our-ways/08_tsunagarino-shou": {
+    "bundle": "event_ourways_2026",
+    "scenario_id": "event_219_08",
+    "region": "jp"
   }
 }
