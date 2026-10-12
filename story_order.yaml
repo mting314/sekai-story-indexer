@@ -218,5 +218,6 @@ chronological_order: &id001
   - 0217-drive-to-dream
   - 0218-connect-to-sekai
   - 0219-side-by-side-our-ways
+  - 0220-stars-off-orbit
 summary_order: *id001
 part_order_overrides: []

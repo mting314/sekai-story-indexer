@@ -8838,5 +8838,45 @@
     "bundle": "event_ourways_2026",
     "scenario_id": "event_219_08",
     "region": "jp"
+  },
+  "0220-stars-off-orbit/01_arata-na-chansu": {
+    "bundle": "event_orbit_2026",
+    "scenario_id": "event_220_01",
+    "region": "jp"
+  },
+  "0220-stars-off-orbit/02_iwakan": {
+    "bundle": "event_orbit_2026",
+    "scenario_id": "event_220_02",
+    "region": "jp"
+  },
+  "0220-stars-off-orbit/03_osananajimi-mitoshite": {
+    "bundle": "event_orbit_2026",
+    "scenario_id": "event_220_03",
+    "region": "jp"
+  },
+  "0220-stars-off-orbit/04_shuumatsu-deeto-ha-odaya-kani": {
+    "bundle": "event_orbit_2026",
+    "scenario_id": "event_220_04",
+    "region": "jp"
+  },
+  "0220-stars-off-orbit/05_hoshifuru-yozora-no-shita-de": {
+    "bundle": "event_orbit_2026",
+    "scenario_id": "event_220_05",
+    "region": "jp"
+  },
+  "0220-stars-off-orbit/06_tsudou-omoi": {
+    "bundle": "event_orbit_2026",
+    "scenario_id": "event_220_06",
+    "region": "jp"
+  },
+  "0220-stars-off-orbit/07_honne": {
+    "bundle": "event_orbit_2026",
+    "scenario_id": "event_220_07",
+    "region": "jp"
+  },
+  "0220-stars-off-orbit/08_hoshiboshi-ha-sora-no-hate-he": {
+    "bundle": "event_orbit_2026",
+    "scenario_id": "event_220_08",
+    "region": "jp"
   }
 }
