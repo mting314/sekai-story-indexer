@@ -6402,5 +6402,30 @@
     "nickname": "hona7",
     "focus_index": 7,
     "indexed": true
+  },
+  {
+    "event_id": 221,
+    "name": "Vivid BAD SQUAD Memories",
+    "unit": "vivid_bad_squad",
+    "event_type": "marathon",
+    "content_type": "event",
+    "arc_slug": "0221-vivid-bad-squad-memories",
+    "started_at": 1792562400000,
+    "ended_at": 1792929599000,
+    "outline": "ストリート音楽で溢れる街・ビビッドストリート。そこで語り継がれる「伝説の夜」を越え、そして世界を獲るために挑戦し続ける少年少女——Vivid BAD SQUADの総集編ストーリー！",
+    "is_key_story": false,
+    "plot_weight": "filler",
+    "focus_character_id": 9,
+    "focus_character": "小豆沢こはね",
+    "has_story": true,
+    "episodes": 20,
+    "logo_url": "https://storage.sekai.best/sekai-jp-assets/event/event_memories_vbs_2026/logo/logo.webp",
+    "banner_url": "https://storage.sekai.best/sekai-jp-assets/home/banner/event_memories_vbs_2026/event_memories_vbs_2026.webp",
+    "story_banner_url": "https://storage.sekai.best/sekai-jp-assets/event_story/event_memories_vbs_2026/screen_image/banner_event_story.webp",
+    "jacket_url": "",
+    "is_focus_event": true,
+    "nickname": "koha8",
+    "focus_index": 8,
+    "indexed": true
   }
 ]

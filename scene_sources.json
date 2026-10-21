@@ -8878,5 +8878,105 @@
     "bundle": "event_orbit_2026",
     "scenario_id": "event_220_08",
     "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/01_vivid-bad-squad-memories-1": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_01",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/02_vivid-bad-squad-memories-2": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_02",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/03_vivid-bad-squad-memories-3": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_03",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/04_vivid-bad-squad-memories-4": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_04",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/05_vivid-bad-squad-memories-5": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_05",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/06_vivid-bad-squad-memories-6": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_06",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/07_vivid-bad-squad-memories-7": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_07",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/08_vivid-bad-squad-memories-8": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_08",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/09_vivid-bad-squad-memories-9": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_09",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/10_vivid-bad-squad-memories-10": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_10",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/11_vivid-bad-squad-memories-11": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_11",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/12_vivid-bad-squad-memories-12": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_12",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/13_vivid-bad-squad-memories-13": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_13",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/14_vivid-bad-squad-memories-14": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_14",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/15_vivid-bad-squad-memories-15": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_15",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/16_vivid-bad-squad-memories-16": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_16",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/17_vivid-bad-squad-memories-17": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_17",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/18_vivid-bad-squad-memories-18": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_18",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/19_vivid-bad-squad-memories-19": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_19",
+    "region": "jp"
+  },
+  "0221-vivid-bad-squad-memories/20_vivid-bad-squad-memories-20": {
+    "bundle": "event_memories_vbs_2026",
+    "scenario_id": "event_221_20",
+    "region": "jp"
   }
 }
