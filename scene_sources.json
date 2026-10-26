@@ -8978,5 +8978,105 @@
     "bundle": "event_memories_vbs_2026",
     "scenario_id": "event_221_20",
     "region": "jp"
+  },
+  "0222-more-more-jump-memories/01_more-more-jump-memories-1": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_01",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/02_more-more-jump-memories-2": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_02",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/03_more-more-jump-memories-3": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_03",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/04_more-more-jump-memories-4": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_04",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/05_more-more-jump-memories-5": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_05",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/06_more-more-jump-memories-6": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_06",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/07_more-more-jump-memories-7": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_07",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/08_more-more-jump-memories-8": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_08",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/09_more-more-jump-memories-9": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_09",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/10_more-more-jump-memories-10": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_10",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/11_more-more-jump-memories-11": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_11",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/12_more-more-jump-memories-12": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_12",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/13_more-more-jump-memories-13": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_13",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/14_more-more-jump-memories-14": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_14",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/15_more-more-jump-memories-15": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_15",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/16_more-more-jump-memories-16": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_16",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/17_more-more-jump-memories-17": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_17",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/18_more-more-jump-memories-18": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_18",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/19_more-more-jump-memories-19": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_19",
+    "region": "jp"
+  },
+  "0222-more-more-jump-memories/20_more-more-jump-memories-20": {
+    "bundle": "event_memories_mmj_2026",
+    "scenario_id": "event_222_20",
+    "region": "jp"
   }
 }
