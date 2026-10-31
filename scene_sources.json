@@ -9078,5 +9078,45 @@
     "bundle": "event_memories_mmj_2026",
     "scenario_id": "event_222_20",
     "region": "jp"
+  },
+  "0223-itsukano-kun-he-senritsu-wo/01_kotae-no-dena-i-hibi": {
+    "bundle": "event_someday_2026",
+    "scenario_id": "event_223_01",
+    "region": "jp"
+  },
+  "0223-itsukano-kun-he-senritsu-wo/02_kini-naru-deai": {
+    "bundle": "event_someday_2026",
+    "scenario_id": "event_223_02",
+    "region": "jp"
+  },
+  "0223-itsukano-kun-he-senritsu-wo/03_kikkakeha-ongaku-de": {
+    "bundle": "event_someday_2026",
+    "scenario_id": "event_223_03",
+    "region": "jp"
+  },
+  "0223-itsukano-kun-he-senritsu-wo/04_aratani-mie-ru-mirai": {
+    "bundle": "event_someday_2026",
+    "scenario_id": "event_223_04",
+    "region": "jp"
+  },
+  "0223-itsukano-kun-he-senritsu-wo/05_kotae": {
+    "bundle": "event_someday_2026",
+    "scenario_id": "event_223_05",
+    "region": "jp"
+  },
+  "0223-itsukano-kun-he-senritsu-wo/06_kyoufu-no-riyuu": {
+    "bundle": "event_someday_2026",
+    "scenario_id": "event_223_06",
+    "region": "jp"
+  },
+  "0223-itsukano-kun-he-senritsu-wo/07_hontou-no-omoi": {
+    "bundle": "event_someday_2026",
+    "scenario_id": "event_223_07",
+    "region": "jp"
+  },
+  "0223-itsukano-kun-he-senritsu-wo/08_kurayami-no-mukou-niaru-oto": {
+    "bundle": "event_someday_2026",
+    "scenario_id": "event_223_08",
+    "region": "jp"
   }
 }

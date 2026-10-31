@@ -6452,5 +6452,30 @@
     "nickname": "mino8",
     "focus_index": 8,
     "indexed": true
+  },
+  {
+    "event_id": 223,
+    "name": "いつかの君へ、旋律を",
+    "unit": "nightcord",
+    "event_type": "marathon",
+    "content_type": "event",
+    "arc_slug": "0223-itsukano-kun-he-senritsu-wo",
+    "started_at": 1793426400000,
+    "ended_at": 1794139199000,
+    "outline": "まふゆを救うためには、どうすればいいのか。家庭の問題に自分が踏み込んでもいいのだろうか、と悩み続ける奏。そんなある日、父の見舞いで訪れた病院で、ひとりの少女と出会い——。",
+    "is_key_story": true,
+    "plot_weight": "medium",
+    "focus_character_id": 17,
+    "focus_character": "宵崎奏",
+    "has_story": true,
+    "episodes": 8,
+    "logo_url": "https://storage.sekai.best/sekai-jp-assets/event/event_someday_2026/logo/logo.webp",
+    "banner_url": "https://storage.sekai.best/sekai-jp-assets/home/banner/event_someday_2026/event_someday_2026.webp",
+    "story_banner_url": "https://storage.sekai.best/sekai-jp-assets/event_story/event_someday_2026/screen_image/banner_event_story.webp",
+    "jacket_url": "",
+    "is_focus_event": true,
+    "nickname": "kana7",
+    "focus_index": 7,
+    "indexed": false
   }
 ]
