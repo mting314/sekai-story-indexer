@@ -6476,6 +6476,6 @@
     "is_focus_event": true,
     "nickname": "kana7",
     "focus_index": 7,
-    "indexed": false
+    "indexed": true
   }
 ]
