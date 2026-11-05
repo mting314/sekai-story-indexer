@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "master_songs": 716,
-    "mapped": 707,
+    "master_songs": 739,
+    "mapped": 730,
     "missing": [
       241,
       290,
@@ -1688,7 +1688,7 @@
     },
     "367": {
       "pageid": 27469,
-      "title": "Suki na Koto Dake de Ii desu",
+      "title": "Suki na Koto Dake de Ii Desu",
       "english": "All I Need Are Things I Like"
     },
     "368": {
@@ -2784,7 +2784,7 @@
     "600": {
       "pageid": 86159,
       "title": "Yuke",
-      "english": "GO FORTH"
+      "english": "Go forth"
     },
     "601": {
       "pageid": 85034,
@@ -3094,7 +3094,7 @@
     "666": {
       "pageid": 78484,
       "title": "Shoujo A",
-      "english": ""
+      "english": "Young Girl A"
     },
     "667": {
       "pageid": 79109,
@@ -3356,6 +3356,21 @@
       "title": "Stardust Rain",
       "english": "Stardust Rain"
     },
+    "729": {
+      "pageid": 114944,
+      "title": "LEMON MELON COOKIE",
+      "english": ""
+    },
+    "730": {
+      "pageid": 114089,
+      "title": "Emerald",
+      "english": "Emerald"
+    },
+    "731": {
+      "pageid": 115392,
+      "title": "Ultimate Senpai",
+      "english": "Ultimate Senpai"
+    },
     "732": {
       "pageid": 99664,
       "title": "Tenran no Ice Heaven",
@@ -3496,6 +3511,11 @@
       "title": "All in One",
       "english": "All in One"
     },
+    "763": {
+      "pageid": 95287,
+      "title": "Hydrangea",
+      "english": "Hydrangea"
+    },
     "764": {
       "pageid": 111153,
       "title": "Otsukimi Recital",
@@ -3505,6 +3525,46 @@
       "pageid": 110337,
       "title": "REM",
       "english": "REM"
+    },
+    "766": {
+      "pageid": 114607,
+      "title": "Abnormality Dancin' Girl",
+      "english": "Abnormality Dancin' Girl"
+    },
+    "767": {
+      "pageid": 115121,
+      "title": "Demon Lord",
+      "english": "Demon Lord"
+    },
+    "773": {
+      "pageid": 115482,
+      "title": "Darling",
+      "english": "Darling"
+    },
+    "774": {
+      "pageid": 114840,
+      "title": "Rabbit Hole",
+      "english": "Rabbit Hole"
+    },
+    "775": {
+      "pageid": 115065,
+      "title": "Doomer",
+      "english": "Doomer"
+    },
+    "776": {
+      "pageid": 115193,
+      "title": "Suitei Love Song",
+      "english": "You Love Me"
+    },
+    "783": {
+      "pageid": 116319,
+      "title": "ULTIM@TE☆BE∀M!!",
+      "english": ""
+    },
+    "784": {
+      "pageid": 114495,
+      "title": "Obsolete Meat",
+      "english": "Obsolete Meat"
     },
     "788": {
       "pageid": 112351,
@@ -3531,6 +3591,11 @@
       "title": "Astronauts",
       "english": "Astronauts"
     },
+    "793": {
+      "pageid": 115859,
+      "title": "Baka Tsuushin",
+      "english": "Idiotic Transaction"
+    },
     "794": {
       "pageid": 110616,
       "title": "De Los Santos",
@@ -3550,6 +3615,56 @@
       "pageid": 112406,
       "title": "Sora ni Menjite",
       "english": "For the Skies' Sake"
+    },
+    "804": {
+      "pageid": 113094,
+      "title": "Seikai",
+      "english": "Solution"
+    },
+    "805": {
+      "pageid": 113694,
+      "title": "Ki no Sei",
+      "english": "Just Your Imagination"
+    },
+    "809": {
+      "pageid": 113574,
+      "title": "Haisou",
+      "english": "Retreat"
+    },
+    "811": {
+      "pageid": 113468,
+      "title": "Heredity",
+      "english": "Heredity"
+    },
+    "812": {
+      "pageid": 115644,
+      "title": "Hoshi, Tokidoki Hikari",
+      "english": "Star, with a Chance of Light"
+    },
+    "813": {
+      "pageid": 115535,
+      "title": "At",
+      "english": ""
+    },
+    "814": {
+      "pageid": 113671,
+      "title": "Kowarechatta!!",
+      "english": "It's Broken!!"
+    },
+    "824": {
+      "pageid": 115806,
+      "title": "Palette",
+      "english": ""
+    },
+    "825": {
+      "pageid": 116198,
+      "title": "Discotheque Blue",
+      "english": "Discotheque Blue"
+    },
+    "828": {
+      "pageid": 116401,
+      "title": "Predator",
+      "english": "Predator"
     }
   }
 }
