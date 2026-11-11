@@ -9118,5 +9118,45 @@
     "bundle": "event_someday_2026",
     "scenario_id": "event_223_08",
     "region": "jp"
+  },
+  "0225-my-searing-light/01_honban-ni-muke-te": {
+    "bundle": "event_searing_2026",
+    "scenario_id": "event_225_01",
+    "region": "jp"
+  },
+  "0225-my-searing-light/02_iwakan-no-riyuu": {
+    "bundle": "event_searing_2026",
+    "scenario_id": "event_225_02",
+    "region": "jp"
+  },
+  "0225-my-searing-light/03_fumidai": {
+    "bundle": "event_searing_2026",
+    "scenario_id": "event_225_03",
+    "region": "jp"
+  },
+  "0225-my-searing-light/04_kie-naimono": {
+    "bundle": "event_searing_2026",
+    "scenario_id": "event_225_04",
+    "region": "jp"
+  },
+  "0225-my-searing-light/05_watashi-no-genten": {
+    "bundle": "event_searing_2026",
+    "scenario_id": "event_225_05",
+    "region": "jp"
+  },
+  "0225-my-searing-light/06_yume-wo-tsukamu-kakugo": {
+    "bundle": "event_searing_2026",
+    "scenario_id": "event_225_06",
+    "region": "jp"
+  },
+  "0225-my-searing-light/07_dare-yori-tsuyoku-kagayai-te": {
+    "bundle": "event_searing_2026",
+    "scenario_id": "event_225_07",
+    "region": "jp"
+  },
+  "0225-my-searing-light/08_kono-saki-he": {
+    "bundle": "event_searing_2026",
+    "scenario_id": "event_225_08",
+    "region": "jp"
   }
 }
