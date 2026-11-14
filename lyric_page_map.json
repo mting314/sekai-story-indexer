@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "master_songs": 739,
-    "mapped": 730,
+    "master_songs": 743,
+    "mapped": 733,
     "missing": [
       241,
       290,
@@ -11,7 +11,8 @@
       676,
       707,
       708,
-      709
+      709,
+      826
     ],
     "wiki_only": 0
   },
@@ -3511,6 +3512,11 @@
       "title": "All in One",
       "english": "All in One"
     },
+    "761": {
+      "pageid": 116514,
+      "title": "Hoshi o Sagashite♭♭",
+      "english": "Searching for the Stars♭♭"
+    },
     "763": {
       "pageid": 95287,
       "title": "Hydrangea",
@@ -3555,6 +3561,11 @@
       "pageid": 115193,
       "title": "Suitei Love Song",
       "english": "You Love Me"
+    },
+    "782": {
+      "pageid": 116861,
+      "title": "Psi",
+      "english": "Psi"
     },
     "783": {
       "pageid": 116319,
@@ -3630,6 +3641,11 @@
       "pageid": 113574,
       "title": "Haisou",
       "english": "Retreat"
+    },
+    "810": {
+      "pageid": 117015,
+      "title": "No More Fiction",
+      "english": "No More Fiction"
     },
     "811": {
       "pageid": 113468,
