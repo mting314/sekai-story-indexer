@@ -6539,5 +6539,30 @@
     "nickname": "shizu7",
     "focus_index": 7,
     "indexed": true
+  },
+  {
+    "event_id": 226,
+    "name": "ワンダーランズ×ショウタイム Memories",
+    "unit": "wonderlands_showtime",
+    "event_type": "marathon",
+    "content_type": "event",
+    "arc_slug": "0226-wandaaranzu-x-shoutaimu-memories",
+    "started_at": 1795154400000,
+    "ended_at": 1795521599000,
+    "outline": "大人気テーマパークのさびれたショーステージを復活させる！？小さなステージから始まった、最高のショーで世界中に笑顔を届ける夢を追う劇団——ワンダーランズ×ショウタイムの総集編ストーリー！",
+    "is_key_story": false,
+    "plot_weight": "filler",
+    "focus_character_id": 13,
+    "focus_character": "天馬司",
+    "has_story": true,
+    "episodes": 20,
+    "logo_url": "https://storage.sekai.best/sekai-jp-assets/event/event_memories_wds_2026/logo/logo.webp",
+    "banner_url": "https://storage.sekai.best/sekai-jp-assets/home/banner/event_memories_wds_2026/event_memories_wds_2026.webp",
+    "story_banner_url": "https://storage.sekai.best/sekai-jp-assets/event_story/event_memories_wds_2026/screen_image/banner_event_story.webp",
+    "jacket_url": "",
+    "is_focus_event": true,
+    "nickname": "kasa8",
+    "focus_index": 8,
+    "indexed": true
   }
 ]

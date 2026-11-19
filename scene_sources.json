@@ -9158,5 +9158,105 @@
     "bundle": "event_searing_2026",
     "scenario_id": "event_225_08",
     "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/01_wandaaranzu-x-shoutaimu-memories-1": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_01",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/02_wandaaranzu-x-shoutaimu-memories-2": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_02",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/03_wandaaranzu-x-shoutaimu-memories-3": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_03",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/04_wandaaranzu-x-shoutaimu-memories-4": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_04",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/05_wandaaranzu-x-shoutaimu-memories-5": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_05",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/06_wandaaranzu-x-shoutaimu-memories-6": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_06",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/07_wandaaranzu-x-shoutaimu-memories-7": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_07",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/08_wandaaranzu-x-shoutaimu-memories-8": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_08",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/09_wandaaranzu-x-shoutaimu-memories-9": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_09",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/10_wandaaranzu-x-shoutaimu-memories-10": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_10",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/11_wandaaranzu-x-shoutaimu-memories-11": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_11",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/12_wandaaranzu-x-shoutaimu-memories-12": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_12",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/13_wandaaranzu-x-shoutaimu-memories-13": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_13",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/14_wandaaranzu-x-shoutaimu-memories-14": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_14",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/15_wandaaranzu-x-shoutaimu-memories-15": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_15",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/16_wandaaranzu-x-shoutaimu-memories-16": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_16",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/17_wandaaranzu-x-shoutaimu-memories-17": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_17",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/18_wandaaranzu-x-shoutaimu-memories-18": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_18",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/19_wandaaranzu-x-shoutaimu-memories-19": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_19",
+    "region": "jp"
+  },
+  "0226-wandaaranzu-x-shoutaimu-memories/20_wandaaranzu-x-shoutaimu-memories-20": {
+    "bundle": "event_memories_wds_2026",
+    "scenario_id": "event_226_20",
+    "region": "jp"
   }
 }
