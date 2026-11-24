@@ -9258,5 +9258,105 @@
     "bundle": "event_memories_wds_2026",
     "scenario_id": "event_226_20",
     "region": "jp"
+  },
+  "0227-leo-need-memories/01_leo-need-memories-1": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_01",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/02_leo-need-memories-2": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_02",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/03_leo-need-memories-3": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_03",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/04_leo-need-memories-4": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_04",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/05_leo-need-memories-5": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_05",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/06_leo-need-memories-6": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_06",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/07_leo-need-memories-7": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_07",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/08_leo-need-memories-8": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_08",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/09_leo-need-memories-9": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_09",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/10_leo-need-memories-10": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_10",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/11_leo-need-memories-11": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_11",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/12_leo-need-memories-12": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_12",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/13_leo-need-memories-13": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_13",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/14_leo-need-memories-14": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_14",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/15_leo-need-memories-15": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_15",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/16_leo-need-memories-16": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_16",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/17_leo-need-memories-17": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_17",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/18_leo-need-memories-18": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_18",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/19_leo-need-memories-19": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_19",
+    "region": "jp"
+  },
+  "0227-leo-need-memories/20_leo-need-memories-20": {
+    "bundle": "event_memories_lon_2026",
+    "scenario_id": "event_227_20",
+    "region": "jp"
   }
 }

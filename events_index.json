@@ -6564,5 +6564,30 @@
     "nickname": "kasa8",
     "focus_index": 8,
     "indexed": true
+  },
+  {
+    "event_id": 227,
+    "name": "Leo/need Memories",
+    "unit": "leo_need",
+    "event_type": "marathon",
+    "content_type": "event",
+    "arc_slug": "0227-leo-need-memories",
+    "started_at": 1795586400000,
+    "ended_at": 1795953599000,
+    "outline": "すれ違いから離れ離れになっていた幼馴染の少女達。『また一緒にいたい』という想いをきっかけに、かつてみんなで奏でた楽器を手に取ることに。４人の音楽を響かせる幼馴染バンド——Leo/needの総集編ストーリー！",
+    "is_key_story": false,
+    "plot_weight": "filler",
+    "focus_character_id": 1,
+    "focus_character": "星乃一歌",
+    "has_story": true,
+    "episodes": 20,
+    "logo_url": "https://storage.sekai.best/sekai-jp-assets/event/event_memories_lon_2026/logo/logo.webp",
+    "banner_url": "https://storage.sekai.best/sekai-jp-assets/home/banner/event_memories_lon_2026/event_memories_lon_2026.webp",
+    "story_banner_url": "https://storage.sekai.best/sekai-jp-assets/event_story/event_memories_lon_2026/screen_image/banner_event_story.webp",
+    "jacket_url": "",
+    "is_focus_event": true,
+    "nickname": "ichi8",
+    "focus_index": 8,
+    "indexed": false
   }
 ]
